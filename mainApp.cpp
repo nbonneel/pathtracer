@@ -16,7 +16,7 @@ bool RaytracerApp::OnInit()
 	RaytracerFrame* frame = new RaytracerFrame();
 	frame->SetSize(1200, 1000);
 
-	renderPanel = new RenderPanel<double>(frame, this);
+	renderPanel = new RenderPanel(frame, this);
 	renderPanel->displayW = 600;
 	renderPanel->displayH = 800;
 
@@ -35,22 +35,22 @@ bool RaytracerApp::OnInit()
 	wxBoxSizer * panelObject_sizer = new wxBoxSizer(wxVERTICAL);
 	objectName = new wxTextCtrl(panelObject, 1000, "", wxDefaultPosition, wxDefaultSize);
 	show_edges = new wxCheckBox(panelObject, EDGES_CHECKBOX, "Show Edges", wxDefaultPosition, wxDefaultSize);
-	Connect(EDGES_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(EDGES_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	interp_normals = new wxCheckBox(panelObject, INTERP_CHECKBOX, "Interp. Normals per Vtx", wxDefaultPosition, wxDefaultSize);
-	Connect(INTERP_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(INTERP_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 
 	wxBoxSizer * transp_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* transp_text = new wxStaticText(panelObject, 9999, "Refraction index: ");
 	transparent = new wxCheckBox(panelObject, TRANSPARENT_CHECKBOX, "Transparent", wxDefaultPosition, wxDefaultSize);
-	Connect(TRANSPARENT_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(TRANSPARENT_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	refractionIndex = new wxSpinCtrlDouble(panelObject, REFRACTION_INDEX, "1.5", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.1, 10, 1.5, 0.05);
-	Connect(REFRACTION_INDEX, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(REFRACTION_INDEX, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	transp_sizer->Add(transparent);
 	transp_sizer->Add(transp_text);
 	transp_sizer->Add(refractionIndex);
 
 	flipnormals = new wxCheckBox(panelObject, FLIPNORMALS_CHECKBOX, "Flip normals for transparency", wxDefaultPosition, wxDefaultSize);
-	Connect(FLIPNORMALS_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(FLIPNORMALS_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 
 
 	m_AlbedoFile = new wxListCtrl(panelObject, ALBEDO_FILES, wxDefaultPosition, wxSize(-1, 100), wxLC_REPORT);
@@ -126,7 +126,7 @@ bool RaytracerApp::OnInit()
 	ks_sizer->Add(ks_slider, 1, wxEXPAND);*/
 
 	deleteObject = new wxButton(panelObject, DELETE_OBJECT, "Delete", wxDefaultPosition, wxDefaultSize);
-	Connect(DELETE_OBJECT, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel<double>::delete_object), NULL, renderPanel);
+	Connect(DELETE_OBJECT, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::delete_object), NULL, renderPanel);
 
 	panelObject_sizer->Add(objectName, 0, wxEXPAND);
 	panelObject_sizer->Add(show_edges, 0, wxEXPAND);
@@ -154,10 +154,10 @@ bool RaytracerApp::OnInit()
 	wxBoxSizer * rendersize_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* renderwidth_text = new wxStaticText(panelRenderer, 9999 - 1, "W: ");
 	renderwidth = new wxSpinCtrl(panelRenderer, RENDER_WIDTH, wxString("1000"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 2, 10000, 1000);	
-	Connect(RENDER_WIDTH, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(RENDER_WIDTH, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	wxStaticText* renderheight_text = new wxStaticText(panelRenderer, 9999 - 1, "H: ");
 	renderheight = new wxSpinCtrl(panelRenderer, RENDER_HEIGHT, wxString("800"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 2, 10000, 800);
-	Connect(RENDER_HEIGHT, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(RENDER_HEIGHT, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	rendersize_sizer->Add(renderwidth_text, 0, wxEXPAND);
 	rendersize_sizer->Add(renderwidth, 1, wxEXPAND);
 	rendersize_sizer->Add(renderheight_text, 0, wxEXPAND);
@@ -166,35 +166,35 @@ bool RaytracerApp::OnInit()
 	wxBoxSizer * nbrays_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* nbrays_text = new wxStaticText(panelRenderer, 9999 - 1, "nb paths per pixel: ");
 	nbrays = new wxSpinCtrl(panelRenderer, NBRAYS, wxString("1000"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 10000, 1000);
-	Connect(NBRAYS, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(NBRAYS, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	nbrays_sizer->Add(nbrays_text, 0, wxEXPAND);
 	nbrays_sizer->Add(nbrays, 1, wxEXPAND);
 
 	wxBoxSizer * fov_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* fov_text = new wxStaticText(panelRenderer, 9999, "fov (deg): ");
 	fov_slider = new wxSlider(panelRenderer, FOV_SLIDER, 35, 2, 179, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL|wxSL_LABELS);
-	Connect(FOV_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(FOV_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	fov_sizer->Add(fov_text, 0, wxEXPAND);
 	fov_sizer->Add(fov_slider, 1, wxEXPAND);
 
 	wxBoxSizer * aperture_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* aperture_text = new wxStaticText(panelRenderer, 9999-1, "aperture (mm): ");
 	aperture_slider = new wxSlider(panelRenderer, APERTURE_SLIDER, 10, 0, 3000, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL | wxSL_LABELS);
-	Connect(APERTURE_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(APERTURE_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	aperture_sizer->Add(aperture_text, 0, wxEXPAND);
 	aperture_sizer->Add(aperture_slider, 1, wxEXPAND);
 
 	wxBoxSizer * focus_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* focus_text = new wxStaticText(panelRenderer, 9999 - 1, "focus distance (cm): ");
 	focus_slider = new wxSlider(panelRenderer, FOCUS_SLIDER, 5000, 0, 10000, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL | wxSL_LABELS);
-	Connect(FOCUS_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(FOCUS_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	focus_sizer->Add(focus_text, 0, wxEXPAND);
 	focus_sizer->Add(focus_slider, 1, wxEXPAND);
 
 	wxBoxSizer * filter_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* filter_text = new wxStaticText(panelRenderer, 9999 - 1, "filter width: ");
 	filter_slider = new wxSlider(panelRenderer, FILTER_SLIDER, 5, 1, 100, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL | wxSL_LABELS);
-	Connect(FILTER_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(FILTER_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	filter_sizer->Add(filter_text, 0, wxEXPAND);
 	filter_sizer->Add(filter_slider, 1, wxEXPAND);
 
@@ -209,26 +209,26 @@ bool RaytracerApp::OnInit()
 	wxBoxSizer * envmapintensity_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* envmapintensity_text = new wxStaticText(panelRenderer, 9999 - 1, "envmap intensity: ");
 	envmapintensity_slider = new wxSlider(panelRenderer, ENVMAPINTENSITY_SLIDER, 100, 0, 1000, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL | wxSL_LABELS);
-	Connect(ENVMAPINTENSITY_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(ENVMAPINTENSITY_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	envmapintensity_sizer->Add(envmapintensity_text, 0, wxEXPAND);
 	envmapintensity_sizer->Add(envmapintensity_slider, 1, wxEXPAND);
 
 	wxBoxSizer * lightintensity_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* lightintensity_text = new wxStaticText(panelRenderer, 9999 - 1, "light intensity: ");
 	lightintensity_slider = new wxSlider(panelRenderer, LIGHTINTENSITY_SLIDER, 100, 0, 1000, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL | wxSL_LABELS);
-	Connect(LIGHTINTENSITY_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(LIGHTINTENSITY_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	lightintensity_sizer->Add(lightintensity_text, 0, wxEXPAND);
 	lightintensity_sizer->Add(lightintensity_slider, 1, wxEXPAND);
 
 	wxBoxSizer * bounces_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* bounces_text = new wxStaticText(panelRenderer, 9999 - 1, "light bounces: ");
 	bounces = new wxSpinCtrl(panelRenderer, BOUNCES_SPIN, wxString("3"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 10, 3);
-	Connect(BOUNCES_SPIN, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(BOUNCES_SPIN, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	bounces_sizer->Add(bounces_text, 0, wxEXPAND);
 	bounces_sizer->Add(bounces, 1, wxEXPAND);
 
 	launchRender = new wxButton(panelRenderer, LAUNCH_RENDER, "Offline render (freezes app)", wxDefaultPosition, wxDefaultSize);
-	Connect(LAUNCH_RENDER, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel<double>::launch_render), NULL, renderPanel);
+	Connect(LAUNCH_RENDER, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::launch_render), NULL, renderPanel);
 	
 	panelRenderer_sizer->Add(rendersize_sizer, 0, wxEXPAND);
 	panelRenderer_sizer->Add(nbrays_sizer, 0, wxEXPAND);	
@@ -253,14 +253,14 @@ bool RaytracerApp::OnInit()
 	wxBoxSizer * fogdensity_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* fogdensity_text = new wxStaticText(panelFog, 9999 - 1, "fog density : ");
 	fogdensity_slider = new wxSlider(panelFog, FOGDENSITY_SLIDER, 0, 0, 100, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL | wxSL_LABELS);
-	Connect(FOGDENSITY_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(FOGDENSITY_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	fogdensity_sizer->Add(fogdensity_text, 0, wxEXPAND);
 	fogdensity_sizer->Add(fogdensity_slider, 1, wxEXPAND);
 
 	uniformFogRadio = new wxRadioButton(panelFog, UNIFORMFOG_RADIO, "Uniform fog", wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
 	expFogRadio = new wxRadioButton(panelFog, EXPFOG_RADIO, "Exponential fog", wxDefaultPosition, wxDefaultSize, 0);
-	Connect(UNIFORMFOG_RADIO, wxEVT_RADIOBUTTON, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
-	Connect(UNIFORMFOG_RADIO, wxEVT_RADIOBUTTON, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
+	Connect(UNIFORMFOG_RADIO, wxEVT_RADIOBUTTON, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	Connect(UNIFORMFOG_RADIO, wxEVT_RADIOBUTTON, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 
 	panelFog_sizer->Add(fogdensity_sizer, 0, wxEXPAND);
 	panelFog_sizer->Add(uniformFogRadio, 0, wxEXPAND);
@@ -291,6 +291,19 @@ bool RaytracerApp::OnInit()
 }
 
 
+void RaytracerApp::activateRenderLoop(bool on)
+{
+	renderPanel->SetDoubleBuffered(true);
+	if (on && !render_loop_on)
+	{
+		Connect(wxID_ANY, wxEVT_IDLE, wxIdleEventHandler(RaytracerApp::OnIdle));
+		Connect(wxID_ANY, wxEVT_ERASE_BACKGROUND, wxEraseEventHandler(RaytracerApp::OnEraseBackGround));
+		render_loop_on = true;
+	} else if (!on && render_loop_on) {
+		Disconnect(wxEVT_IDLE, wxIdleEventHandler(RaytracerApp::OnIdle));
+		render_loop_on = false;
+	}
+}
 
 RaytracerFrame::RaytracerFrame()
         : wxFrame(NULL, wxID_ANY, wxT("Pathtracer by N.Bonneel"),
@@ -328,6 +341,283 @@ RaytracerFrame::RaytracerFrame()
 }
 
 
+
+
+void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
+
+	if (selected_object < 0) return;
+	if (selected_object >= raytracer.s.objects.size()) return;
+
+	stop_render();
+
+	raytracer.W = raytracer_app->renderwidth->GetValue();
+	raytracer.H = raytracer_app->renderheight->GetValue();
+	raytracer.nrays = raytracer_app->nbrays->GetValue();
+	raytracer.s.objects[selected_object]->display_edges = raytracer_app->show_edges->IsChecked();
+	raytracer.s.objects[selected_object]->interp_normals = raytracer_app->interp_normals->IsChecked();
+	raytracer.s.objects[selected_object]->transparent = raytracer_app->transparent->IsChecked();
+	raytracer.cam.fov = raytracer_app->fov_slider->GetValue() * M_PI / 180.;
+	raytracer.cam.aperture = raytracer_app->aperture_slider->GetValue() / 1000.;
+	raytracer.cam.focus_distance = raytracer_app->focus_slider->GetValue() / 100.;
+	raytracer.sigma_filter = raytracer_app->filter_slider->GetValue() / 10.;
+	//wxColour alb = raytracer_app->albedoColorPicker->GetColour();
+	//raytracer.s.objects[selected_object]->albedo = Vector(alb.Red()/255., alb.Green()/255., alb.Blue()/255.);
+
+	//raytracer.s.objects[selected_object]->ks = raytracer_app->ks_slider->GetValue() / 100.;
+	raytracer.s.fog_density = raytracer_app->fogdensity_slider->GetValue() / 100.;
+
+	raytracer.s.intensite_lumiere = raytracer_app->lightintensity_slider->GetValue() / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
+	raytracer.s.envmap_intensity = raytracer_app->envmapintensity_slider->GetValue() / 100.;
+
+	raytracer.s.fog_type = raytracer_app->uniformFogRadio->GetValue() ? 0 : 1;
+	raytracer.nb_bounces = raytracer_app->bounces->GetValue();
+
+	raytracer.s.objects[selected_object]->flip_normals = raytracer_app->flipnormals->IsChecked();
+	raytracer.s.objects[selected_object]->refr_index = raytracer_app->refractionIndex->GetValue();
+
+
+
+	start_render();
+}
+void RenderPanel::update_textures_and_render(wxCommandEvent& event) {
+
+	if (selected_object < 0) return;
+	if (selected_object >= raytracer.s.objects.size()) return;
+
+	stop_render();
+
+	raytracer.s.objects[selected_object]->display_edges = raytracer_app->show_edges->IsChecked();
+
+	start_render();
+}
+
+void RenderPanel::update_gui() {
+
+	if ((selected_object < 0) || (selected_object >= raytracer.s.objects.size())) {
+		raytracer_app->objectName->SetLabelText(" ");
+		return;
+	}
+
+	Geometry* g = dynamic_cast<Geometry*>(raytracer.s.objects[selected_object]);
+	if (g) {
+		std::ostringstream os;
+		os << "triangles: " << g->indices.size() << ", vertices: " << g->vertices.size() << ", bvh leaves size: " << g->max_bvh_triangles << ", bvh max depth: " << g->bvh_depth << ", bvh avg depth:" << g->bvh_avg_depth << ", bvh nb nodes: " << g->bvh_nb_nodes << ", mouse distance: " << selected_object_t;
+		raytracer_app->infoModel->SetLabelText(os.str().c_str());
+	} else {
+		std::ostringstream os;
+		os << "mouse distance: " << selected_object_t;
+		raytracer_app->infoModel->SetLabelText(os.str().c_str());
+	}
+
+	raytracer_app->renderwidth->SetValue(raytracer.W);
+	raytracer_app->renderheight->SetValue(raytracer.H);
+	raytracer_app->nbrays->SetValue(raytracer.nrays);
+	raytracer_app->objectName->SetLabelText(raytracer.s.objects[selected_object]->name);
+	raytracer_app->show_edges->SetValue(raytracer.s.objects[selected_object]->display_edges);
+	raytracer_app->interp_normals->SetValue(raytracer.s.objects[selected_object]->interp_normals);
+	raytracer_app->fov_slider->SetValue(raytracer.cam.fov * 180. / M_PI);
+	raytracer_app->aperture_slider->SetValue(raytracer.cam.aperture * 1000);
+	raytracer_app->focus_slider->SetValue(raytracer.cam.focus_distance*100.);
+	//raytracer_app->ks_slider->SetValue(raytracer.s.objects[selected_object]->ks*100.);
+	raytracer_app->filter_slider->SetValue(raytracer.sigma_filter*10.);
+	raytracer_app->bounces->SetValue(raytracer.nb_bounces);
+	raytracer_app->transparent->SetValue(raytracer.s.objects[selected_object]->transparent);
+	raytracer_app->flipnormals->SetValue(raytracer.s.objects[selected_object]->flip_normals);
+	raytracer_app->refractionIndex->SetValue(raytracer.s.objects[selected_object]->refr_index);
+
+	//Vector alb = raytracer.s.objects[selected_object]->albedo;
+	//raytracer_app->albedoColorPicker->SetColour(wxColour(alb[0] * 255., alb[1] * 255., alb[2] * 255.));
+
+	raytracer_app->m_AlbedoFile->DeleteAllItems();
+	for (int i = 0; i < raytracer.s.objects[selected_object]->textures.size(); i++) {
+		std::string txt = extractFileName(raytracer.s.objects[selected_object]->textures[i].filename);
+		wxListItem item;
+		item.SetId(i);
+		std::string filename = raytracer.s.objects[selected_object]->textures[i].filename;
+		long index = raytracer_app->m_AlbedoFile->InsertItem(i, item);
+		raytracer_app->m_AlbedoFile->SetItem(index, 0, txt, -1);
+		raytracer_app->m_AlbedoFile->SetItem(index, 1, raytracer.s.objects[selected_object]->textures[i].multiplier.toColorStr(), -1);
+		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
+			raytracer_app->m_AlbedoFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
+	}
+
+	raytracer_app->m_NormalFile->DeleteAllItems();
+	for (int i = 0; i < raytracer.s.objects[selected_object]->normal_map.size(); i++) {
+		std::string txt = extractFileName(raytracer.s.objects[selected_object]->normal_map[i].filename);
+		wxListItem item;
+		item.SetId(i);
+		std::string filename = raytracer.s.objects[selected_object]->normal_map[i].filename;
+		long index = raytracer_app->m_NormalFile->InsertItem(i, item);
+		raytracer_app->m_NormalFile->SetItem(index, 0, txt, -1);
+		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
+			raytracer_app->m_NormalFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
+	}
+	raytracer_app->envmapName->SetLabelText(((Sphere*)raytracer.s.objects[1])->envmapfilename);
+
+	raytracer_app->m_AlphaFile->DeleteAllItems();
+	for (int i = 0; i < raytracer.s.objects[selected_object]->alphamap.size(); i++) {
+		std::string txt = extractFileName(raytracer.s.objects[selected_object]->alphamap[i].filename);
+		wxListItem item;
+		item.SetId(i);
+		std::string filename = raytracer.s.objects[selected_object]->alphamap[i].filename;
+		long index = raytracer_app->m_AlphaFile->InsertItem(i, item);
+		raytracer_app->m_AlphaFile->SetItem(index, 0, txt, -1);
+		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
+			raytracer_app->m_AlphaFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
+	}
+
+	raytracer_app->m_SpecularFile->DeleteAllItems();
+	for (int i = 0; i < raytracer.s.objects[selected_object]->specularmap.size(); i++) {
+		std::string txt = extractFileName(raytracer.s.objects[selected_object]->specularmap[i].filename);
+		wxListItem item;
+		item.SetId(i);
+		std::string filename = raytracer.s.objects[selected_object]->specularmap[i].filename;
+		long index = raytracer_app->m_SpecularFile->InsertItem(i, item);
+		raytracer_app->m_SpecularFile->SetItem(index, 0, txt, -1);
+		raytracer_app->m_SpecularFile->SetItem(index, 1, raytracer.s.objects[selected_object]->specularmap[i].multiplier.toColorStr(), -1);
+		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
+			raytracer_app->m_SpecularFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
+	}
+
+	raytracer_app->m_RoughnessFile->DeleteAllItems();
+	for (int i = 0; i < raytracer.s.objects[selected_object]->roughnessmap.size(); i++) {
+		std::string txt = extractFileName(raytracer.s.objects[selected_object]->roughnessmap[i].filename);
+		wxListItem item;
+		item.SetText(txt);
+		item.SetId(i);
+		std::string filename = raytracer.s.objects[selected_object]->roughnessmap[i].filename;
+		long index = raytracer_app->m_RoughnessFile->InsertItem(i, item);
+		raytracer_app->m_RoughnessFile->SetItem(index, 0, txt, -1);
+		raytracer_app->m_RoughnessFile->SetItem(index, 1, raytracer.s.objects[selected_object]->roughnessmap[i].multiplier.toColorStr(), -1);
+		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
+			raytracer_app->m_RoughnessFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
+	}
+
+	if (g) {
+		int id = g->indices[selected_tri].group;
+		raytracer_app->m_AlbedoFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+		raytracer_app->m_NormalFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+		raytracer_app->m_AlphaFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+		raytracer_app->m_SpecularFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+		raytracer_app->m_RoughnessFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+
+		raytracer_app->m_AlbedoFile->EnsureVisible(id);
+		raytracer_app->m_NormalFile->EnsureVisible(id);
+		raytracer_app->m_AlphaFile->EnsureVisible(id);
+		raytracer_app->m_SpecularFile->EnsureVisible(id);
+		raytracer_app->m_RoughnessFile->EnsureVisible(id);
+	}
+
+	raytracer_app->fogdensity_slider->SetValue(raytracer.s.fog_density*100.);
+	raytracer_app->uniformFogRadio->SetValue(raytracer.s.fog_type == 0);
+
+	double factor = 1. / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
+	raytracer_app->lightintensity_slider->SetValue(raytracer.s.intensite_lumiere / factor);
+	raytracer_app->envmapintensity_slider->SetValue(raytracer.s.envmap_intensity * 100);
+}
+
+void RenderPanel::render(wxDC& dc)
+{
+	if (cur_img.size() == 0) return;
+	if (raytracer.stopped) return;
+	raytracer_app->progressBar->SetValue(raytracer.current_nb_rays / (double)raytracer.nrays*1000.);
+	std::ostringstream os;
+	os << "Time per ray: " << raytracer.curTimePerFrame / 1000. << " s";
+	raytracer_app->infoPerf->SetLabelText(os.str().c_str());
+
+	gamma_corrected_image.resize(raytracer.W*raytracer.H * 3);
+	extrapolated_image = raytracer.imagedouble;
+	/*computed = raytracer.computed;
+	computed2 = raytracer.computed;
+	double lastR = 0, lastG = 0, lastB = 0;
+	int offsetsi[4] = { -1, 0, 0, 1 };
+	int offsetsj[4] = { 0, -1, 1, 0 };
+	int nbchanged;
+	for (int iter = 0; iter < 10; iter++) {   // Voronoi : lent et moche
+	nbchanged = 0;
+	#pragma omp parallel for
+	for (int i = 0; i < raytracer.H; i++) {
+	for (int j = 0; j < raytracer.W; j++) {
+	if (!computed2[i*raytracer.W + j]) {
+	//for (int k = std::max(0, i - 1); k <= std::min(H - 1, i + 1); k++) {
+	//	for (int l = std::max(0, j - 1); l <= std::min(W - 1, j + 1); l++) {
+	int rand_shuff = rand();
+	for (int id=0; id<4; id++) {
+	int k = i + offsetsi[(id+ rand_shuff)%4]; if (k < 0 || k>= raytracer.H) continue;
+	int l = j + offsetsj[(id + rand_shuff) % 4]; if (l < 0 || l >= raytracer.W) continue;
+	if (computed2[k*raytracer.W + l]) {
+	extrapolated_image[(i*raytracer.W + j) * 3 + 0] = extrapolated_image[(k*raytracer.W + l) * 3 + 0];
+	extrapolated_image[(i*raytracer.W + j) * 3 + 1] = extrapolated_image[(k*raytracer.W + l) * 3 + 1];
+	extrapolated_image[(i*raytracer.W + j) * 3 + 2] = extrapolated_image[(k*raytracer.W + l) * 3 + 2];
+	computed[i*raytracer.W + j] = true;
+	nbchanged++;
+	break;
+	}
+	}
+	}
+	}
+	}
+	if (nbchanged == 0) break;
+	computed2 = computed;
+	}*/
+
+	for (int i = 0; i < raytracer.H; i++) {
+		for (int j = 0; j < raytracer.W; j++) {
+			//if (!raytracer.computed[i*raytracer.W + j]) {
+			//if (j< raytracer.W/2) {
+			if (raytracer.sample_count[i*raytracer.W + j] <= 5) {
+				double alpha = raytracer.sample_count[i*raytracer.W + j] / 6.;
+
+				int ix = j / 16;
+				double fx = (j / 16.) - ix;
+
+				int iy = i / 16;
+				double fy = (i / 16.) - iy;
+
+				for (int k = 0; k < 3; k++) {
+					//double lowval = raytracer.imagedouble_lowres[(iy * raytracer.Wlr + ix) * 3 + k];  // nearest neighbor interp.
+					double lowval;
+					if (ix < raytracer.Wlr - 1 && iy < raytracer.Hlr - 1)
+						lowval = (raytracer.imagedouble_lowres[(iy*raytracer.Wlr + ix) * 3 + k] * (1 - fx) + raytracer.imagedouble_lowres[(iy*raytracer.Wlr + ix + 1) * 3 + k] * fx) * (1 - fy)
+						+ (raytracer.imagedouble_lowres[((iy + 1)*raytracer.Wlr + ix) * 3 + k] * (1 - fx) + raytracer.imagedouble_lowres[((iy + 1)*raytracer.Wlr + ix + 1) * 3 + k] * fx) * fy;
+					else
+						lowval = raytracer.imagedouble_lowres[(iy*raytracer.Wlr + ix) * 3 + k];
+					extrapolated_image[(i*raytracer.W + j) * 3 + k] = extrapolated_image[(i*raytracer.W + j) * 3 + k] * alpha + (1. - alpha)*lowval;
+				}
+			}
+		}
+	}
+	//os << "Nbchanged: " << nbchanged;
+	//raytracer_app->infoPerf->SetLabelText(os.str().c_str());
+
+#pragma omp parallel for 
+	for (int i = 0; i < raytracer.H; i++) {
+		for (int j = 0; j < raytracer.W; j++) {
+			double normalization = 1. / (raytracer.sample_count[i*raytracer.W + j] + 1.);
+			/*gamma_corrected_image[(i*raytracer.W + j) * 3 + 0] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 0] / (raytracer.current_nb_rays + 1)), 1 / 2.2));   // rouge
+			gamma_corrected_image[(i*raytracer.W + j) * 3 + 1] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 1] / (raytracer.current_nb_rays + 1)), 1 / 2.2)); // vert
+			gamma_corrected_image[(i*raytracer.W + j) * 3 + 2] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 2] / (raytracer.current_nb_rays + 1)), 1 / 2.2)); // bleu*/
+			gamma_corrected_image[(i*raytracer.W + j) * 3 + 0] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 0] * normalization), 1 / 2.2));   // rouge
+			gamma_corrected_image[(i*raytracer.W + j) * 3 + 1] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 1] * normalization), 1 / 2.2)); // vert
+			gamma_corrected_image[(i*raytracer.W + j) * 3 + 2] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 2] * normalization), 1 / 2.2)); // bleu
+
+		}
+	}
+
+	static int nbcalls = -1; nbcalls++;
+	if (nbcalls == 0 || screenImage.GetWidth() != raytracer.W || screenImage.GetHeight() != raytracer.H) {
+		screenImage = wxImage(raytracer.W, raytracer.H, &(gamma_corrected_image[0]), true);
+	}
+
+	bmpBuf = wxBitmap(screenImage, dc);
+
+
+	double scale_x = (double)displayW / raytracer.W;
+	double scale_y = (double)displayH / raytracer.H;
+	dc.SetUserScale(scale_x, scale_y);
+	dc.DrawBitmap(bmpBuf, 0, 0);
+	dc.SetUserScale(1.0, 1.0);
+}
 
 
 void RaytracerFrame::SaveAs(wxCommandEvent &evt) {

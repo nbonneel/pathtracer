@@ -85,7 +85,7 @@
 
 
 class RaytracerApp;
-template<typename T> class RenderPanel;
+class RenderPanel;
 
 class RaytracerFrame : public wxFrame
 {
@@ -122,7 +122,7 @@ public:
 	void ExportMtl(wxCommandEvent &evt);
 	void Open(wxCommandEvent &evt);
 
-	RenderPanel<double> *render_panel;
+	RenderPanel *render_panel;
 private:
 
 	wxDECLARE_EVENT_TABLE();
@@ -244,7 +244,6 @@ static void doRender(void* Param);
 
 
 
-template<typename T>
 class RenderPanel : public wxPanel
 {
 
@@ -360,285 +359,14 @@ public:
 		start_render();
 	}
 
-	void update_parameters_and_render(wxCommandEvent& event) {
-		
-		if (selected_object < 0) return;
-		if (selected_object >= raytracer.s.objects.size()) return;
-
-		stop_render();
-
-		raytracer.W = raytracer_app->renderwidth->GetValue();
-		raytracer.H = raytracer_app->renderheight->GetValue();
-		raytracer.nrays = raytracer_app->nbrays->GetValue();
-		raytracer.s.objects[selected_object]->display_edges = raytracer_app->show_edges->IsChecked();
-		raytracer.s.objects[selected_object]->interp_normals = raytracer_app->interp_normals->IsChecked();
-		raytracer.s.objects[selected_object]->transparent = raytracer_app->transparent->IsChecked();
-		raytracer.cam.fov = raytracer_app->fov_slider->GetValue() * M_PI / 180.;
-		raytracer.cam.aperture = raytracer_app->aperture_slider->GetValue()/1000.;
-		raytracer.cam.focus_distance = raytracer_app->focus_slider->GetValue() / 100.;
-		raytracer.sigma_filter = raytracer_app->filter_slider->GetValue() / 10.;
-		//wxColour alb = raytracer_app->albedoColorPicker->GetColour();
-		//raytracer.s.objects[selected_object]->albedo = Vector(alb.Red()/255., alb.Green()/255., alb.Blue()/255.);
-
-		//raytracer.s.objects[selected_object]->ks = raytracer_app->ks_slider->GetValue() / 100.;
-		raytracer.s.fog_density = raytracer_app->fogdensity_slider->GetValue() / 100.;
-
-		raytracer.s.intensite_lumiere = raytracer_app->lightintensity_slider->GetValue() / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
-		raytracer.s.envmap_intensity = raytracer_app->envmapintensity_slider->GetValue()/100.;
-
-		raytracer.s.fog_type = raytracer_app->uniformFogRadio->GetValue()?0:1;
-		raytracer.nb_bounces = raytracer_app->bounces->GetValue();
-		
-		raytracer.s.objects[selected_object]->flip_normals = raytracer_app->flipnormals->IsChecked();
-		raytracer.s.objects[selected_object]->refr_index = raytracer_app->refractionIndex->GetValue();
-
-		
-
-		start_render();
-	}
-	void update_textures_and_render(wxCommandEvent& event) {
-
-		if (selected_object < 0) return;
-		if (selected_object >= raytracer.s.objects.size()) return;
-
-		stop_render();
-
-		raytracer.s.objects[selected_object]->display_edges = raytracer_app->show_edges->IsChecked();
-		
-		start_render();
-	}
-
-	void update_gui() {
-
-		if ((selected_object < 0) || (selected_object >= raytracer.s.objects.size())) {
-			raytracer_app->objectName->SetLabelText(" ");
-			return;
-		}
-
-		Geometry* g = dynamic_cast<Geometry*>(raytracer.s.objects[selected_object]);
-		if (g) {
-			std::ostringstream os;
-			os << "triangles: " << g->indices.size() << ", vertices: " << g->vertices.size() <<", bvh leaves size: "<<g->max_bvh_triangles<<", bvh max depth: "<<g->bvh_depth<<", bvh avg depth:"<<g->bvh_avg_depth<<", bvh nb nodes: "<<g->bvh_nb_nodes<<", mouse distance: "<< selected_object_t;
-			raytracer_app->infoModel->SetLabelText(os.str().c_str());
-		} else {
-			std::ostringstream os;
-			os << "mouse distance: " << selected_object_t;
-			raytracer_app->infoModel->SetLabelText(os.str().c_str());
-		}
-		
-		raytracer_app->renderwidth->SetValue(raytracer.W);
-		raytracer_app->renderheight->SetValue(raytracer.H);
-		raytracer_app->nbrays->SetValue(raytracer.nrays);
-		raytracer_app->objectName->SetLabelText(raytracer.s.objects[selected_object]->name);
-		raytracer_app->show_edges->SetValue( raytracer.s.objects[selected_object]->display_edges );
-		raytracer_app->interp_normals->SetValue(raytracer.s.objects[selected_object]->interp_normals);
-		raytracer_app->fov_slider->SetValue(raytracer.cam.fov * 180. / M_PI);
-		raytracer_app->aperture_slider->SetValue(raytracer.cam.aperture*1000);
-		raytracer_app->focus_slider->SetValue(raytracer.cam.focus_distance*100.);
-		//raytracer_app->ks_slider->SetValue(raytracer.s.objects[selected_object]->ks*100.);
-		raytracer_app->filter_slider->SetValue(raytracer.sigma_filter*10.);
-		raytracer_app->bounces->SetValue(raytracer.nb_bounces);
-		raytracer_app->transparent->SetValue(raytracer.s.objects[selected_object]->transparent);
-		raytracer_app->flipnormals->SetValue(raytracer.s.objects[selected_object]->flip_normals);
-		raytracer_app->refractionIndex->SetValue(raytracer.s.objects[selected_object]->refr_index);
-
-		//Vector alb = raytracer.s.objects[selected_object]->albedo;
-		//raytracer_app->albedoColorPicker->SetColour(wxColour(alb[0] * 255., alb[1] * 255., alb[2] * 255.));
-
-		raytracer_app->m_AlbedoFile->DeleteAllItems();
-		for (int i = 0; i < raytracer.s.objects[selected_object]->textures.size(); i++) {
-			std::string txt = extractFileName(raytracer.s.objects[selected_object]->textures[i].filename);
-			wxListItem item;
-			item.SetId(i);
-			std::string filename = raytracer.s.objects[selected_object]->textures[i].filename;
-			long index = raytracer_app->m_AlbedoFile->InsertItem(i, item);			
-			raytracer_app->m_AlbedoFile->SetItem(index, 0, txt, -1);
-			raytracer_app->m_AlbedoFile->SetItem(index, 1, raytracer.s.objects[selected_object]->textures[i].multiplier.toColorStr(), -1);
-			if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
-				raytracer_app->m_AlbedoFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
-		}
-
-		raytracer_app->m_NormalFile->DeleteAllItems();
-		for (int i = 0; i < raytracer.s.objects[selected_object]->normal_map.size(); i++) {
-			std::string txt = extractFileName(raytracer.s.objects[selected_object]->normal_map[i].filename);
-			wxListItem item;
-			item.SetId(i);
-			std::string filename = raytracer.s.objects[selected_object]->normal_map[i].filename;
-			long index = raytracer_app->m_NormalFile->InsertItem(i, item);
-			raytracer_app->m_NormalFile->SetItem(index, 0, txt, -1);			
-			if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
-				raytracer_app->m_NormalFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
-		}
-		raytracer_app->envmapName->SetLabelText( ((Sphere*)raytracer.s.objects[1])->envmapfilename);
-
-		raytracer_app->m_AlphaFile->DeleteAllItems();
-		for (int i = 0; i < raytracer.s.objects[selected_object]->alphamap.size(); i++) {
-			std::string txt = extractFileName(raytracer.s.objects[selected_object]->alphamap[i].filename);
-			wxListItem item;			
-			item.SetId(i);
-			std::string filename = raytracer.s.objects[selected_object]->alphamap[i].filename;
-			long index = raytracer_app->m_AlphaFile->InsertItem(i, item);
-			raytracer_app->m_AlphaFile->SetItem(index, 0, txt, -1);
-			if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
-				raytracer_app->m_AlphaFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
-		}
-
-		raytracer_app->m_SpecularFile->DeleteAllItems();
-		for (int i = 0; i < raytracer.s.objects[selected_object]->specularmap.size(); i++) {
-			std::string txt = extractFileName(raytracer.s.objects[selected_object]->specularmap[i].filename);
-			wxListItem item;			
-			item.SetId(i);
-			std::string filename = raytracer.s.objects[selected_object]->specularmap[i].filename;
-			long index = raytracer_app->m_SpecularFile->InsertItem(i, item);
-			raytracer_app->m_SpecularFile->SetItem(index, 0, txt, -1);
-			raytracer_app->m_SpecularFile->SetItem(index, 1, raytracer.s.objects[selected_object]->specularmap[i].multiplier.toColorStr(), -1);
-			if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
-				raytracer_app->m_SpecularFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
-		}
-
-		raytracer_app->m_RoughnessFile->DeleteAllItems();
-		for (int i = 0; i < raytracer.s.objects[selected_object]->roughnessmap.size(); i++) {
-			std::string txt = extractFileName(raytracer.s.objects[selected_object]->roughnessmap[i].filename);
-			wxListItem item;
-			item.SetText(txt);
-			item.SetId(i);
-			std::string filename = raytracer.s.objects[selected_object]->roughnessmap[i].filename;
-			long index = raytracer_app->m_RoughnessFile->InsertItem(i, item);
-			raytracer_app->m_RoughnessFile->SetItem(index, 0, txt, -1);
-			raytracer_app->m_RoughnessFile->SetItem(index, 1, raytracer.s.objects[selected_object]->roughnessmap[i].multiplier.toColorStr(), -1);
-			if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
-				raytracer_app->m_RoughnessFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
-		}
-
-		if (g) {
-			int id = g->indices[selected_tri].group;			
-			raytracer_app->m_AlbedoFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
-			raytracer_app->m_NormalFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
-			raytracer_app->m_AlphaFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
-			raytracer_app->m_SpecularFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
-			raytracer_app->m_RoughnessFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
-
-			raytracer_app->m_AlbedoFile->EnsureVisible(id);
-			raytracer_app->m_NormalFile->EnsureVisible(id);
-			raytracer_app->m_AlphaFile->EnsureVisible(id);
-			raytracer_app->m_SpecularFile->EnsureVisible(id);
-			raytracer_app->m_RoughnessFile->EnsureVisible(id);
-		}
-
-		raytracer_app->fogdensity_slider->SetValue(raytracer.s.fog_density*100.);
-		raytracer_app->uniformFogRadio->SetValue(raytracer.s.fog_type==0);
-
-		double factor = 1. / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
-		raytracer_app->lightintensity_slider->SetValue(raytracer.s.intensite_lumiere / factor);
-		raytracer_app->envmapintensity_slider->SetValue(raytracer.s.envmap_intensity * 100);
-	}
-
-
+	void update_textures_and_render(wxCommandEvent& event);
+	void update_parameters_and_render(wxCommandEvent& event);
+	void update_gui();
 
 	std::vector<double> extrapolated_image;
 	std::vector<bool> computed, computed2;
-	void render(wxDC& dc)
-	{
-		if (cur_img.size() == 0) return;
-		if (raytracer.stopped) return;
-		raytracer_app->progressBar->SetValue(raytracer.current_nb_rays/ (double)raytracer.nrays*1000.);
-		std::ostringstream os;
-		os << "Time per ray: " << raytracer.curTimePerFrame/1000. <<" s";
-		raytracer_app->infoPerf->SetLabelText(os.str().c_str());
-		
-		gamma_corrected_image.resize(raytracer.W*raytracer.H * 3);
-		extrapolated_image = raytracer.imagedouble;
-		/*computed = raytracer.computed;
-		computed2 = raytracer.computed;
-		double lastR = 0, lastG = 0, lastB = 0;
-		int offsetsi[4] = { -1, 0, 0, 1 };
-		int offsetsj[4] = { 0, -1, 1, 0 };
-		int nbchanged;
-		for (int iter = 0; iter < 10; iter++) {   // Voronoi : lent et moche
-			nbchanged = 0;
-#pragma omp parallel for 
-			for (int i = 0; i < raytracer.H; i++) {
-				for (int j = 0; j < raytracer.W; j++) {
-					if (!computed2[i*raytracer.W + j]) {
-						//for (int k = std::max(0, i - 1); k <= std::min(H - 1, i + 1); k++) {
-						//	for (int l = std::max(0, j - 1); l <= std::min(W - 1, j + 1); l++) {
-						int rand_shuff = rand();
-						for (int id=0; id<4; id++) {
-							int k = i + offsetsi[(id+ rand_shuff)%4]; if (k < 0 || k>= raytracer.H) continue;
-							int l = j + offsetsj[(id + rand_shuff) % 4]; if (l < 0 || l >= raytracer.W) continue;
-								if (computed2[k*raytracer.W + l]) {
-									extrapolated_image[(i*raytracer.W + j) * 3 + 0] = extrapolated_image[(k*raytracer.W + l) * 3 + 0];
-									extrapolated_image[(i*raytracer.W + j) * 3 + 1] = extrapolated_image[(k*raytracer.W + l) * 3 + 1];
-									extrapolated_image[(i*raytracer.W + j) * 3 + 2] = extrapolated_image[(k*raytracer.W + l) * 3 + 2];
-									computed[i*raytracer.W + j] = true;
-									nbchanged++;
-									break;								
-							}
-						}
-					}
-				}				
-			}
-			if (nbchanged == 0) break;
-			computed2 = computed;
-		}*/
 
-		for (int i = 0; i < raytracer.H; i++) {
-			for (int j = 0; j < raytracer.W; j++) {
-				//if (!raytracer.computed[i*raytracer.W + j]) {
-				//if (j< raytracer.W/2) {
-				if (raytracer.sample_count[i*raytracer.W + j]<=5) {
-					double alpha = raytracer.sample_count[i*raytracer.W + j] / 6.;
-
-					int ix = j / 16;
-					double fx = (j / 16.) - ix;
-
-					int iy = i / 16;
-					double fy = (i / 16.) - iy;
-
-					for (int k = 0; k < 3; k++) {
-						//double lowval = raytracer.imagedouble_lowres[(iy * raytracer.Wlr + ix) * 3 + k];  // nearest neighbor interp.
-						double lowval;
-						if (ix < raytracer.Wlr-1 && iy < raytracer.Hlr-1)
-							lowval = (raytracer.imagedouble_lowres[(iy*raytracer.Wlr + ix) * 3 + k] * (1 - fx) + raytracer.imagedouble_lowres[(iy*raytracer.Wlr + ix + 1) * 3 + k] * fx) * (1 - fy)
-							+ (raytracer.imagedouble_lowres[((iy + 1)*raytracer.Wlr + ix) * 3 + k] * (1 - fx) + raytracer.imagedouble_lowres[((iy + 1)*raytracer.Wlr + ix + 1) * 3 + k] * fx) * fy;
-						else
-							lowval = raytracer.imagedouble_lowres[(iy*raytracer.Wlr + ix) * 3 + k];
-						extrapolated_image[(i*raytracer.W + j) * 3 + k] = extrapolated_image[(i*raytracer.W + j) * 3 + k] * alpha + (1. - alpha)*lowval;
-					}
-				}
-			}
-		}
-		//os << "Nbchanged: " << nbchanged;
-		//raytracer_app->infoPerf->SetLabelText(os.str().c_str());
-
-#pragma omp parallel for 
-		for (int i = 0; i < raytracer.H; i++) {
-			for (int j = 0; j < raytracer.W; j++) {
-				double normalization = 1./(raytracer.sample_count[i*raytracer.W + j]+1.);
-				/*gamma_corrected_image[(i*raytracer.W + j) * 3 + 0] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 0] / (raytracer.current_nb_rays + 1)), 1 / 2.2));   // rouge
-				gamma_corrected_image[(i*raytracer.W + j) * 3 + 1] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 1] / (raytracer.current_nb_rays + 1)), 1 / 2.2)); // vert
-				gamma_corrected_image[(i*raytracer.W + j) * 3 + 2] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 2] / (raytracer.current_nb_rays + 1)), 1 / 2.2)); // bleu*/
-				gamma_corrected_image[(i*raytracer.W + j) * 3 + 0] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 0] * normalization), 1 / 2.2));   // rouge
-				gamma_corrected_image[(i*raytracer.W + j) * 3 + 1] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 1] * normalization), 1 / 2.2)); // vert
-				gamma_corrected_image[(i*raytracer.W + j) * 3 + 2] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 2] * normalization), 1 / 2.2)); // bleu
-
-			}
-		}
-
-		static int nbcalls = -1; nbcalls++;
-		if (nbcalls == 0 || screenImage.GetWidth()!= raytracer.W || screenImage.GetHeight()!= raytracer.H) {
-			screenImage = wxImage(raytracer.W, raytracer.H, &(gamma_corrected_image[0]), true);
-		}
-
-		bmpBuf = wxBitmap(screenImage, dc);
-		
-
-		double scale_x = (double)displayW / raytracer.W;
-		double scale_y = (double)displayH / raytracer.H;
-		dc.SetUserScale(scale_x, scale_y);
-		dc.DrawBitmap(bmpBuf, 0,0);
-		dc.SetUserScale(1.0, 1.0);
-	}
+	void render(wxDC& dc);
 
 
 
@@ -805,18 +533,18 @@ public:
 };
 
 static void doRender(void* Param) {
-	Raytracer* raytracer = &(((RenderPanel<double>*)Param)->raytracer);
+	Raytracer* raytracer = &(((RenderPanel*)Param)->raytracer);
 	raytracer->render_image();
 }
 
-BEGIN_EVENT_TABLE_TEMPLATE1(RenderPanel, wxPanel, T)
-EVT_PAINT(RenderPanel<T>::paintEvent)
-EVT_MOTION(RenderPanel<T>::mouseMoved)
-EVT_LEFT_DOWN(RenderPanel<T>::mouseDown)
-EVT_RIGHT_DOWN(RenderPanel<T>::mouseDown)
-EVT_LEFT_UP(RenderPanel<T>::mouseUp)
-EVT_RIGHT_UP(RenderPanel<T>::mouseUp)
-EVT_MOUSEWHEEL(RenderPanel<T>::mouseWheel)
+BEGIN_EVENT_TABLE(RenderPanel, wxPanel)
+EVT_PAINT(RenderPanel::paintEvent)
+EVT_MOTION(RenderPanel::mouseMoved)
+EVT_LEFT_DOWN(RenderPanel::mouseDown)
+EVT_RIGHT_DOWN(RenderPanel::mouseDown)
+EVT_LEFT_UP(RenderPanel::mouseUp)
+EVT_RIGHT_UP(RenderPanel::mouseUp)
+EVT_MOUSEWHEEL(RenderPanel::mouseWheel)
 END_EVENT_TABLE()
 
 
@@ -824,7 +552,7 @@ class RaytracerApp : public wxApp
 {
 public:
 	virtual bool OnInit() wxOVERRIDE;
-	RenderPanel<double>* renderPanel;
+	RenderPanel* renderPanel;
 	wxGauge *progressBar;
 	wxBookCtrlBase *m_bookCtrl;
 	wxCheckBox *show_edges, *interp_normals, *transparent, *flipnormals;
@@ -842,20 +570,7 @@ public:
 	wxStaticText* infoPerf;
 	bool render_loop_on;
 
-	void activateRenderLoop(bool on)
-	{
-		renderPanel->SetDoubleBuffered(true);
-		if (on && !render_loop_on)
-		{
-			Connect(wxID_ANY, wxEVT_IDLE, wxIdleEventHandler(RaytracerApp::OnIdle));
-			Connect(wxID_ANY, wxEVT_ERASE_BACKGROUND, wxEraseEventHandler(RaytracerApp::OnEraseBackGround));
-			render_loop_on = true;
-		} else if (!on && render_loop_on)
-		{
-			Disconnect(wxEVT_IDLE, wxIdleEventHandler(RaytracerApp::OnIdle));
-			render_loop_on = false;
-		}
-	}
+	void activateRenderLoop(bool on);
 
 	void OnEraseBackGround(wxEraseEvent& event) {
 		//wxDC * TheDC = event.GetDC();		
