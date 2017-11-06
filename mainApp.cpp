@@ -1,5 +1,5 @@
 #include "mainApp.h"
-
+#include <wx/msgdlg.h> 
 
 wxIMPLEMENT_APP(RaytracerApp);
 
@@ -326,8 +326,13 @@ RaytracerFrame::RaytracerFrame()
 	file_menu->Append(ID_EXPORT_MTL, wxT("&Export .mtl (selected object)..."));
 	Connect(ID_EXPORT_MTL, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(RaytracerFrame::ExportMtl), NULL, this);
 
+	wxMenu *info_menu = new wxMenu();
+	info_menu->Append(ID_MESHINFO, wxT("&Mesh information..."));
+	Connect(ID_MESHINFO, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(RaytracerFrame::ShowMeshInfo), NULL, this);
+
 	wxMenuBar* menu_bar = new wxMenuBar();
 	menu_bar->Append(file_menu, wxT("&File"));	
+	menu_bar->Append(info_menu, wxT("&Info"));
 
     SetMenuBar(menu_bar);
 
@@ -638,15 +643,16 @@ void RaytracerFrame::SaveImage(wxCommandEvent &evt) {
 	if (saveFileDialog.ShowModal() == wxID_CANCEL)
 		return;
 
+	int nbr = render_panel->raytracer.current_nb_rays;
 	int W = render_panel->raytracer.W;
 	int H = render_panel->raytracer.H;
 	std::vector<unsigned char> image(W*H * 3);
 #pragma omp parallel for 
 	for (int i = 0; i < H; i++) {
 		for (int j = 0; j < W; j++) {
-			image[((H - i - 1)*W + j) * 3 + 0] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 0] / (render_panel->raytracer.nrays + 1), 1 / 2.2)));   // rouge
-			image[((H - i - 1)*W + j) * 3 + 1] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 1] / (render_panel->raytracer.nrays + 1), 1 / 2.2))); // vert
-			image[((H - i - 1)*W + j) * 3 + 2] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 2] / (render_panel->raytracer.nrays + 1), 1 / 2.2))); // bleu
+			image[((H - i - 1)*W + j) * 3 + 0] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 0] / (nbr + 1.), 1 / 2.2)));   // rouge
+			image[((H - i - 1)*W + j) * 3 + 1] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 1] / (nbr + 1.), 1 / 2.2))); // vert
+			image[((H - i - 1)*W + j) * 3 + 2] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 2] / (nbr + 1.), 1 / 2.2))); // bleu
 		}
 	}
 	save_img(saveFileDialog.GetPath().c_str(), &image[0], W, H);
@@ -680,6 +686,43 @@ void RaytracerFrame::Open(wxCommandEvent &evt) {
 	render_panel->raytracer.load_scene(openFileDialog.GetPath());
 	render_panel->update_gui();
 	render_panel->start_render();
+}
+
+
+void RaytracerFrame::ShowMeshInfo(wxCommandEvent &evt) {
+	int obj_id = render_panel->selected_object;
+	if (obj_id < 0) return;
+	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
+	Geometry* g = dynamic_cast<Geometry*>(render_panel->raytracer.s.objects[obj_id]);
+	if (!g) return;
+
+	int nbE, nbNonM, nbBoundaries;
+	int nbC = g->getNbConnected(nbE, nbNonM, nbBoundaries);
+	int Euler = (int)g->vertices.size() - nbE + (int)g->indices.size();
+	int nbRealEdges, nbOthers, nbTri;
+	g->findQuads(nbTri, nbOthers, nbRealEdges);
+
+	std::ostringstream os;
+	os << "Object ID: " << obj_id << std::endl;
+	os << "Nb Tessellated Triangles: " << g->indices.size() << std::endl;
+	os << "Nb Triangles in Original mesh: " << nbTri << std::endl;
+	os << "Nb Quads (or other poly) in Original mesh: " << nbOthers << std::endl;
+	os << "Nb Vertices: " << g->vertices.size() << std::endl;
+	os << "Nb Tessellated Triangle Edges: " << nbE << std::endl;
+	os << "Nb Edges in Original mesh: " << nbRealEdges << std::endl;
+	os << "Nb Connected Components: " << nbC << std::endl;
+	os << "Non Manifold Edges: " << nbNonM << std::endl;
+	os << "Boundary edges: " << nbBoundaries << std::endl;
+	os << "Euler Number: " << Euler << std::endl;
+	os << "Genus: " << (2 - Euler)/2 << std::endl;
+	os << " BVH max depth: " << g->bvh_depth << std::endl;
+	os << " BVH avg depth: " << g->bvh_avg_depth << std::endl;
+	os << " BVH nb nodes: " << g->bvh_nb_nodes << std::endl;
+	os << " BVH max triangles per leaf: " << g->max_bvh_triangles << std::endl;
+
+	wxMessageBox(os.str().c_str(), "Mesh information");
+
+
 }
 
 void RaytracerFrame::OnPopupClick(wxCommandEvent &evt) {

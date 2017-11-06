@@ -3,8 +3,9 @@
 #include <vector>
 #include "Vector.h"
 #include "Geometry.h"
-#include "PointSet.h"
 #include "TriangleMesh.h"
+#include "PointSet.h"
+
 
 
 class Raytracer {

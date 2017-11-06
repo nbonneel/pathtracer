@@ -82,6 +82,7 @@
 #define ID_REMOVE_TEXTURE_SPECULAR 44
 #define ID_SAVEIMAGE 45
 #define ID_EXPORT_MTL 46
+#define ID_MESHINFO 47
 
 
 class RaytracerApp;
@@ -121,6 +122,7 @@ public:
 	void SaveImage(wxCommandEvent &evt);
 	void ExportMtl(wxCommandEvent &evt);
 	void Open(wxCommandEvent &evt);
+	void ShowMeshInfo(wxCommandEvent &evt);
 
 	RenderPanel *render_panel;
 private:

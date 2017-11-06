@@ -2,8 +2,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "Geometry.h"
 #include "nanoflann.hpp"
-
-
+#include "TriangleMesh.h"
 
 // only for NanoFlann
 template <typename T>

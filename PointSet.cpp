@@ -1,5 +1,6 @@
 #include "PointSet.h"
 
+
 BBox PointSet::build_bbox(int i0, int i1) {
 
 	BBox result;
