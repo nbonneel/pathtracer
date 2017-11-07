@@ -265,7 +265,7 @@ public:
 		direction_vec = camera_right * direction_vec[0] + up*direction_vec[1] + direction*direction_vec[2];
 
 		Vector destination = position + focus_distance * direction_vec;
-		Vector new_origin = position + Vector(dx_aperture, dy_aperture, 0);
+		Vector new_origin = position + dx_aperture*camera_right +  dy_aperture*up;
 		return Ray(new_origin, (destination - new_origin).getNormalized(), time);
 
 	}
