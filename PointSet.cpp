@@ -4,11 +4,11 @@
 BBox PointSet::build_bbox(int i0, int i1) {
 
 	BBox result;
-	result.bounds[1] = vertices[i0] + Vector(radius, radius, radius);
-	result.bounds[0] = vertices[i0] - Vector(radius, radius, radius);
+	result.bounds[1] = vertices[i0] + Vector(radius[i0], radius[i0], radius[i0]);
+	result.bounds[0] = vertices[i0] - Vector(radius[i0], radius[i0], radius[i0]);
 	for (int i = i0; i < i1; i++) { // indice de triangle
-		result.bounds[0] = min(result.bounds[0], vertices[i] - Vector(radius, radius, radius));
-		result.bounds[1] = max(result.bounds[1], vertices[i] + Vector(radius, radius, radius));
+		result.bounds[0] = min(result.bounds[0], vertices[i] - Vector(radius[i], radius[i], radius[i]));
+		result.bounds[1] = max(result.bounds[1], vertices[i] + Vector(radius[i], radius[i], radius[i]));
 	}
 	return result;
 }
@@ -76,12 +76,12 @@ void PointSet::build_bvh_recur(BVH* b, int node, int i0, int i1) {
 			double center_split_dim = vertices[i][split_dim];
 
 			if (center_split_dim <= split_val) {
-				bb_left.bounds[0] = min(bb_left.bounds[0], vertices[i] - Vector(radius, radius, radius));
-				bb_left.bounds[1] = max(bb_left.bounds[1], vertices[i] + Vector(radius, radius, radius));
+				bb_left.bounds[0] = min(bb_left.bounds[0], vertices[i] - Vector(radius[i], radius[i], radius[i]));
+				bb_left.bounds[1] = max(bb_left.bounds[1], vertices[i] + Vector(radius[i], radius[i], radius[i]));
 				nl++;
 			} else {
-				bb_right.bounds[0] = min(bb_right.bounds[0], vertices[i] - Vector(radius, radius, radius));
-				bb_right.bounds[1] = max(bb_right.bounds[1], vertices[i] + Vector(radius, radius, radius));
+				bb_right.bounds[0] = min(bb_right.bounds[0], vertices[i] - Vector(radius[i], radius[i], radius[i]));
+				bb_right.bounds[1] = max(bb_right.bounds[1], vertices[i] + Vector(radius[i], radius[i], radius[i]));
 				nr++;
 			}
 		}
@@ -102,6 +102,7 @@ void PointSet::build_bvh_recur(BVH* b, int node, int i0, int i1) {
 			std::swap(vertices[i], vertices[pivot]);
 			std::swap(colors[i], colors[pivot]);
 			std::swap(normals[i], normals[pivot]);
+			std::swap(radius[i], radius[pivot]);
 		}
 	}
 
@@ -177,7 +178,7 @@ bool PointSet::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 		} else {  // feuille
 
 			for (int i = fg; i < fd; i++) {
-				if (Disk(vertices[i], normals[i], radius).intersection(d, localP, localN, localt)) {
+				if (Disk(vertices[i], normals[i], radius[i]).intersection(d, localP, localN, localt)) {
 					if (localt < t) {
 						has_inter = true;
 						best_index = i;
@@ -192,7 +193,7 @@ bool PointSet::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 	if (has_inter) {
 		int i = best_index;
 		triangle_id = best_index;
-		Disk(vertices[i], normals[i], radius).intersection(d, localP, localN, localt);
+		Disk(vertices[i], normals[i], radius[i]).intersection(d, localP, localN, localt);
 		localN.normalize();
 		P = localP;
 		mat.shadingN = localN;
@@ -206,7 +207,7 @@ bool PointSet::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 			mat.Kd = Vector(0.5, 0.5, 0.5);
 		if (display_edges) {
 			double r2 = (localP - vertices[i]).getNorm2();
-			if (r2 > (radius*radius*0.95*0.95))
+			if (r2 > (radius[i]*radius[i] *0.95*0.95))
 				mat.Kd = Vector(0., 0., 0.);
 		}
 
@@ -297,7 +298,7 @@ bool PointSet::intersection_shadow(const Ray& d, double &t, double cur_best_t, d
 		} else {  // feuille
 
 			for (int i = fg; i < fd; i++) {
-				if (Disk(vertices[i], normals[i], radius).intersection(d, localP, localN, localt)) {
+				if (Disk(vertices[i], normals[i], radius[i]).intersection(d, localP, localN, localt)) {
 					if (localt < t) {
 						has_inter = true;
 						best_index = i;

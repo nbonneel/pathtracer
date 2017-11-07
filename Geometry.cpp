@@ -6,7 +6,7 @@
 #include <algorithm>
 #include "utils.h"
 #include "TriangleMesh.h"
-
+#include "PointSet.h"
 
 Object* Object::create_from_file(FILE* f) {
 
@@ -18,8 +18,11 @@ Object* Object::create_from_file(FILE* f) {
 	if (line[4] == 'S') { // sphere
 		return Sphere::create_from_file(f);
 	}
-	if (line[4] == 'P') { // Plane
+	if (line[4] == 'P' && line[5] == 'L') { // Plane
 		return Plane::create_from_file(f);
+	}
+	if (line[4] == 'P' && line[5] == 'O') { // PointSet
+		return PointSet::create_from_file(f);
 	}
 }
 

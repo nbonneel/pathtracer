@@ -1,5 +1,6 @@
 #include "mainApp.h"
 #include <wx/msgdlg.h> 
+#include <wx/textdlg.h> 
 
 wxIMPLEMENT_APP(RaytracerApp);
 
@@ -1135,7 +1136,19 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 		for (size_t n = 0; n < nFiles; n++) {		
 
 			if (filenames[n].find(".xyz") != std::string::npos) {
-				PointSet* g = new PointSet(filenames[n], 0.005);
+
+				std::string values = wxGetTextFromUser("Space separated, -1: ignore, 0:x 1:y, 2:z, 3:nx,4:ny,5:nz, 6:colr, 7:colg, 8:colb",
+					"Enter XYZ file format", "-1 -1 0 1 2 6 7 8");
+				const char* line = &values.c_str()[0];
+				int cols[100];
+				int nbcols = 0;
+				int offset;
+				while (sscanf(line, "%d%n", &cols[nbcols], &offset) == 1) {
+					nbcols++;
+					line += offset;
+				}
+
+				PointSet* g = new PointSet(filenames[n], nbcols, cols, 0.005);
 				g->scale = 30;
 				Vector c = (g->bvh.bbox.bounds[0] + g->bvh.bbox.bounds[1])*0.5; // c is at 0
 				double s = std::max(g->bvh.bbox.bounds[1][0] - g->bvh.bbox.bounds[0][0], std::max(g->bvh.bbox.bounds[1][1] - g->bvh.bbox.bounds[0][1], g->bvh.bbox.bounds[1][2] - g->bvh.bbox.bounds[0][2]));

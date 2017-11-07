@@ -428,12 +428,17 @@ public:
 				}
 				if (middle_mouse_down) {
 					if (selected_object >= 0 && selected_object < raytracer.s.objects.size()) {
-						raytracer.s.objects[selected_object]->max_rotation += Vector(0., 0., dy*M_PI / 180.*3.);
+						//raytracer.s.objects[selected_object]->max_rotation += Vector(0., 0., dy*M_PI / 180.*3.);
+						Matrix<3, 3> R = createRotationMatrixZ(dy*M_PI / 180.*3.);
+
+						raytracer.s.objects[selected_object]->mat_rotation = R * raytracer.s.objects[selected_object]->mat_rotation;
 					}
 				}
 				if (right_mouse_down) {
 					if (selected_object >= 0 && selected_object < raytracer.s.objects.size()) {
-						raytracer.s.objects[selected_object]->max_rotation += Vector(dy*M_PI / 180.*3., dx*M_PI / 180.*3., 0.);
+						//raytracer.s.objects[selected_object]->max_rotation += Vector(dy*M_PI / 180.*3., dx*M_PI / 180.*3., 0.);
+						Matrix<3, 3> R = createRotationMatrixX(dy*M_PI / 180.*3.)*createRotationMatrixY(dx*M_PI / 180.*3.);
+						raytracer.s.objects[selected_object]->mat_rotation = R * raytracer.s.objects[selected_object]->mat_rotation;
 					}
 				}
 			} else { // camera motion
