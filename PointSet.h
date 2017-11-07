@@ -38,13 +38,12 @@ struct PointCloud
 class PointSet : public Object {
 public:
 	PointSet() {};
-	PointSet(const char* filename, int nbcols, int *cols, bool mirror = false, bool transp = false, bool normal_swapped = false) {
-		init(filename, nbcols, cols, mirror, transp, normal_swapped);
+	PointSet(const char* filename, int nbcols, int *cols, bool mirror = false, bool normal_swapped = false) {
+		init(filename, nbcols, cols, mirror, normal_swapped);
 	};
 
-	void init(const char* filename, int nbcols, int *cols, bool mirror = false, bool transp = false, bool normal_swapped = false) {
+	void init(const char* filename, int nbcols, int *cols, bool mirror = false, bool normal_swapped = false) {
 		miroir = mirror;
-		transparent = transp;
 		flip_normals = normal_swapped;
 		this->nbcols = nbcols;
 		memcpy(this->cols, cols, nbcols * sizeof(int));
@@ -195,7 +194,7 @@ public:
 		for (int i = 0; i <result->nbcols; i++) {
 			fscanf(f, "%d", &result->cols[i]);
 		}
-		result->init(result->name.c_str(), result->nbcols, result->cols, result->miroir, result->transparent, result->flip_normals);
+		result->init(result->name.c_str(), result->nbcols, result->cols, result->miroir, result->flip_normals);
 		return result;
 	}
 

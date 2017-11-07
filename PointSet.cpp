@@ -198,7 +198,7 @@ bool PointSet::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 		P = localP;
 		mat.shadingN = localN;
 
-		if (dot(mat.shadingN, d.direction) > 0 && !transparent) mat.shadingN = -mat.shadingN;
+		if (dot(mat.shadingN, d.direction) > 0 && !mat.transp) mat.shadingN = -mat.shadingN;
 		if (flip_normals) mat.shadingN = -mat.shadingN;
 
 		if (colors.size() > i)

@@ -84,7 +84,46 @@ void Object::set_specularmap(const char* filename, int idx) {
 	specularmap[idx].loadColors(filename);
 }
 
-
+void Object::add_transp_map(const char* filename) {
+	transparent_map.push_back(Texture(filename, 5, Vector(1., 1., 1.)));
+}
+void Object::set_transp_map(const char* filename, int idx) {
+	if (idx >= transparent_map.size()) return;
+	transparent_map[idx].loadColors(filename);
+}
+void Object::set_col_transp(double col, int idx) {
+	if (idx >= transparent_map.size()) return;
+	transparent_map[idx] = Texture("Null", 5, Vector(col, col, col));
+}
+void Object::remove_transp(int id) {
+	transparent_map.erase(transparent_map.begin() + id);
+}
+void Object::swap_transp(int id1, int id2) {
+	std::swap(transparent_map[id1], transparent_map[id2]);
+}
+void Object::add_col_transp(double col) {
+	transparent_map.push_back(Texture("Null", 5, Vector(col, col, col)));
+}
+void Object::add_refr_map(const char* filename) {
+	refr_index_map.push_back(Texture(filename, 6, Vector(1., 1., 1.)));
+}
+void Object::set_refr_map(const char* filename, int idx) {
+	if (idx >= refr_index_map.size()) return;
+	refr_index_map[idx].loadColors(filename);
+}
+void Object::set_col_refr(double col, int idx) {
+	if (idx >= refr_index_map.size()) return;
+	refr_index_map[idx] = Texture("Null", 6, Vector(col, col, col));
+}
+void Object::remove_refr(int id) {
+	refr_index_map.erase(refr_index_map.begin() + id);
+}
+void Object::swap_refr(int id1, int id2) {
+	std::swap(refr_index_map[id1], refr_index_map[id2]);
+}
+void Object::add_col_refr(double col) {
+	refr_index_map.push_back(Texture("Null", 6, Vector(col, col, col)));
+}
 void Object::add_roughnessmap(const char* filename) {
 	roughnessmap.push_back(Texture(filename, 4, Vector(1., 1., 1.)));
 }
@@ -101,6 +140,7 @@ void Object::set_col_alpha(double col, int idx) {
 	if (idx >= alphamap.size()) return;
 	alphamap[idx] = Texture("Null", 3, Vector(col, col, col));
 }
+
 void Object::add_col_specular(const Vector& col) {
 //	std::string name = std::string("Color: (") + std::to_string((int)(col[0] * 255)) + std::string(", ") + std::to_string((int)(col[1] * 255)) + std::string(", ") + std::to_string((int)(col[2] * 255)) + std::string(")");
 	specularmap.push_back(Texture("Null", 1, col));

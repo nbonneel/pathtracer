@@ -27,6 +27,8 @@
 #define NORMAL_FILES 10062
 #define ALPHA_FILES 10063
 #define ROUGHNESS_FILES 10064
+#define TRANSP_FILES 10065
+#define REFR_FILES 10066
 #define FILTER_SLIDER 1007
 #define ALBEDO_COLORPICKER 1008
 #define FOGDENSITY_SLIDER 1009
@@ -65,6 +67,21 @@
 #define ID_MOVEUP_ROUGHNESS 27
 #define ID_MOVEDOWN_ROUGHNESS 28
 #define ID_ADDWHITE_ROUGHNESS 29
+#define ID_DELETE_TRANSP 261
+#define ID_MOVEUP_TRANSP 271
+#define ID_MOVEDOWN_TRANSP 281
+#define ID_ADDWHITE_TRANSP 291
+#define ID_REMOVE_TEXTURE_TRANSP 431
+#define ID_CHANGE_COLOR_TRANSP 401
+#define ID_CHANGE_TEXTURE_TRANSP 411
+#define ID_DELETE_REFR 262
+#define ID_MOVEUP_REFR 272
+#define ID_MOVEDOWN_REFR 282
+#define ID_ADDWHITE_REFR 292
+#define ID_REMOVE_TEXTURE_REFR 432
+#define ID_CHANGE_COLOR_REFR 402
+#define ID_CHANGE_TEXTURE_REFR 412
+
 #define ID_SAVE 30
 #define ID_OPEN 31
 #define ID_CHANGE_COLOR 32
@@ -128,11 +145,15 @@ public:
 	void OnPopupClickNormal(wxCommandEvent &evt);
 	void OnPopupClickAlpha(wxCommandEvent &evt);
 	void OnPopupClickRoughness(wxCommandEvent &evt);
+	void OnPopupClickTransparent(wxCommandEvent &evt);
+	void OnPopupClickRefrIndex(wxCommandEvent &evt);
 	void OnListRightClick(wxListEvent &evt);
 	void OnListRightClickSpecular(wxListEvent &evt);
 	void OnListRightClickNormal(wxListEvent &evt);
 	void OnListRightClickAlpha(wxListEvent &evt);
 	void OnListRightClickRoughness(wxListEvent &evt);
+	void OnListRightClickTransparent(wxListEvent &evt);
+	void OnListRightClickRefrIndex(wxListEvent &evt);
 	void OnListSelected(wxListEvent &evt);
 
 
@@ -146,6 +167,9 @@ public:
 	RenderPanel *render_panel;
 	bool programHandling;
 private:
+	void createAlbedoMenu();
+	wxMenu albedomnu, albedosubmnu;
+	wxMenu subsubmnu, subsubmnu2, subsubmnu3, subsubmnu4, subsubmnu5, subsubmnu6, subsubmnu7;
 
 	wxDECLARE_EVENT_TABLE();
 };
@@ -161,6 +185,8 @@ public:
 private:
 	RaytracerFrame *m_pOwner;
 };
+
+
 
 class DnDAlbedoFile : public wxFileDropTarget
 {
@@ -206,7 +232,20 @@ private:
 	wxListCtrl *m_pOwner;
 	RaytracerFrame *m_rtFrame;
 };
+class DnDRefrFile : public wxFileDropTarget
+{
+public:
+	DnDRefrFile(wxListCtrl* pOwner = NULL, RaytracerFrame *rtFrame = NULL) {
+		m_pOwner = pOwner; m_rtFrame = rtFrame;
+	}
 
+	virtual bool OnDropFiles(wxCoord x, wxCoord y,
+		const wxArrayString& filenames) wxOVERRIDE;
+
+private:
+	wxListCtrl *m_pOwner;
+	RaytracerFrame *m_rtFrame;
+};
 class DnDEnvmapFile : public wxFileDropTarget
 {
 public:
@@ -241,6 +280,21 @@ class DnDAlphaFile : public wxFileDropTarget
 {
 public:
 	DnDAlphaFile(wxListCtrl* pOwner = NULL, RaytracerFrame *rtFrame = NULL) {
+		m_pOwner = pOwner; m_rtFrame = rtFrame;
+	}
+
+	virtual bool OnDropFiles(wxCoord x, wxCoord y,
+		const wxArrayString& filenames) wxOVERRIDE;
+
+private:
+	wxListCtrl *m_pOwner;
+	RaytracerFrame *m_rtFrame;
+};
+
+class DnDTranspFile : public wxFileDropTarget
+{
+public:
+	DnDTranspFile(wxListCtrl* pOwner = NULL, RaytracerFrame *rtFrame = NULL) {
 		m_pOwner = pOwner; m_rtFrame = rtFrame;
 	}
 
@@ -585,7 +639,7 @@ public:
 	wxCheckBox *show_edges, *interp_normals, *transparent, *flipnormals;
 	wxTextCtrl *objectName, *envmapName;
 	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider;
-	wxListCtrl *m_AlbedoFile, *m_SpecularFile, *m_NormalFile, *m_AlphaFile, *m_RoughnessFile;
+	wxListCtrl *m_AlbedoFile, *m_SpecularFile, *m_NormalFile, *m_AlphaFile, *m_RoughnessFile, *m_TranspFile, *m_RefrFile;
 	//wxColourPickerCtrl *albedoColorPicker;
 	wxRadioButton *uniformFogRadio, *expFogRadio;
 	wxColourDialog* colPicker;

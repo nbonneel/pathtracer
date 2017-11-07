@@ -1,6 +1,7 @@
 #include "mainApp.h"
 #include <wx/msgdlg.h> 
 #include <wx/textdlg.h> 
+#include <string>
 
 wxIMPLEMENT_APP(RaytracerApp);
 
@@ -40,7 +41,7 @@ bool RaytracerApp::OnInit()
 	interp_normals = new wxCheckBox(panelObject, INTERP_CHECKBOX, "Interp. Normals per Vtx", wxDefaultPosition, wxDefaultSize);
 	Connect(INTERP_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 
-	wxBoxSizer * transp_sizer = new wxBoxSizer(wxHORIZONTAL);
+	/*wxBoxSizer * transp_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* transp_text = new wxStaticText(panelObject, 9999, "Refraction index: ");
 	transparent = new wxCheckBox(panelObject, TRANSPARENT_CHECKBOX, "Transparent", wxDefaultPosition, wxDefaultSize);
 	Connect(TRANSPARENT_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
@@ -48,7 +49,7 @@ bool RaytracerApp::OnInit()
 	Connect(REFRACTION_INDEX, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	transp_sizer->Add(transparent);
 	transp_sizer->Add(transp_text);
-	transp_sizer->Add(refractionIndex);
+	transp_sizer->Add(refractionIndex);*/
 
 	flipnormals = new wxCheckBox(panelObject, FLIPNORMALS_CHECKBOX, "Flip normals for transparency", wxDefaultPosition, wxDefaultSize);
 	Connect(FLIPNORMALS_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
@@ -118,11 +119,47 @@ bool RaytracerApp::OnInit()
 	itCol3.SetId(0);
 	itCol3.SetText("Alpha Map");
 	itCol3.SetWidth(300);
+	itCol2.SetId(1);
+	itCol2.SetText("Transparent ?");
+	itCol2.SetWidth(200);
 	m_AlphaFile->InsertColumn(0, itCol3);
+	m_AlphaFile->InsertColumn(1, itCol2);
 	m_AlphaFile->SetDropTarget(new DnDAlphaFile(m_AlphaFile, frame));
 	Connect(ALPHA_FILES, wxEVT_LIST_ITEM_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickAlpha), NULL, frame);
 	Connect(ALPHA_FILES, wxEVT_LIST_COL_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickAlpha), NULL, frame);
 	Connect(ALPHA_FILES, wxEVT_LIST_ITEM_SELECTED, wxListEventHandler(RaytracerFrame::OnListSelected), NULL, frame);
+
+
+	m_TranspFile = new wxListCtrl(panelObject, TRANSP_FILES, wxDefaultPosition, wxSize(-1, 100), wxLC_REPORT);
+	wxListItem itCol7;
+	itCol7.SetId(0);
+	itCol7.SetText("Refractive Map");
+	itCol7.SetWidth(200);
+	itCol2.SetId(1);
+	itCol2.SetText("Refractive ?");
+	itCol2.SetWidth(200);
+	m_TranspFile->InsertColumn(0, itCol7);
+	m_TranspFile->InsertColumn(1, itCol2);
+	m_TranspFile->SetDropTarget(new DnDTranspFile(m_TranspFile, frame));
+	Connect(TRANSP_FILES, wxEVT_LIST_ITEM_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickTransparent), NULL, frame);
+	Connect(TRANSP_FILES, wxEVT_LIST_COL_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickTransparent), NULL, frame);
+	Connect(TRANSP_FILES, wxEVT_LIST_ITEM_SELECTED, wxListEventHandler(RaytracerFrame::OnListSelected), NULL, frame);
+
+
+	m_RefrFile = new wxListCtrl(panelObject, REFR_FILES, wxDefaultPosition, wxSize(-1, 100), wxLC_REPORT);
+	wxListItem itCol8;
+	itCol8.SetId(0);
+	itCol8.SetText("Refraction Index Map");
+	itCol8.SetWidth(200);
+	itCol2.SetId(1);
+	itCol2.SetText("Refraction Index");
+	itCol2.SetWidth(200);
+	m_RefrFile->InsertColumn(0, itCol8);
+	m_RefrFile->InsertColumn(1, itCol2);
+	m_RefrFile->SetDropTarget(new DnDRefrFile(m_RefrFile, frame));
+	Connect(REFR_FILES, wxEVT_LIST_ITEM_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickRefrIndex), NULL, frame);
+	Connect(REFR_FILES, wxEVT_LIST_COL_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickRefrIndex), NULL, frame);
+	Connect(REFR_FILES, wxEVT_LIST_ITEM_SELECTED, wxListEventHandler(RaytracerFrame::OnListSelected), NULL, frame);
 
 	/*wxBoxSizer * ks_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* ks_text = new wxStaticText(panelObject, 9999, "Ks : ");
@@ -137,7 +174,7 @@ bool RaytracerApp::OnInit()
 	panelObject_sizer->Add(objectName, 0, wxEXPAND);
 	panelObject_sizer->Add(show_edges, 0, wxEXPAND);
 	panelObject_sizer->Add(interp_normals, 0, wxEXPAND);
-	panelObject_sizer->Add(transp_sizer, 0, wxEXPAND);
+	//panelObject_sizer->Add(transp_sizer, 0, wxEXPAND);
 	panelObject_sizer->Add(flipnormals, 0, wxEXPAND);
 	panelObject_sizer->Add(m_AlbedoFile, 0, wxEXPAND);
 	//panelObject_sizer->Add(albedoColorPicker, 0, wxEXPAND);
@@ -145,6 +182,8 @@ bool RaytracerApp::OnInit()
 	panelObject_sizer->Add(m_RoughnessFile, 0, wxEXPAND);
 	panelObject_sizer->Add(m_NormalFile, 0, wxEXPAND);
 	panelObject_sizer->Add(m_AlphaFile, 0, wxEXPAND);
+	panelObject_sizer->Add(m_TranspFile, 0, wxEXPAND);
+	panelObject_sizer->Add(m_RefrFile, 0, wxEXPAND);
 	//panelObject_sizer->Add(ks_sizer, 0, wxEXPAND);
 	panelObject_sizer->Add(deleteObject, 0, wxEXPAND);
 	
@@ -321,6 +360,9 @@ RaytracerFrame::RaytracerFrame()
 
     CreateStatusBar();
 	programHandling = false;
+
+	createAlbedoMenu();
+
     // construct menu
     wxMenu *file_menu = new wxMenu();
     file_menu->Append(ID_SAVE, wxT("&Save scene as..."));
@@ -365,8 +407,7 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 	raytracer.H = raytracer_app->renderheight->GetValue();
 	raytracer.nrays = raytracer_app->nbrays->GetValue();
 	raytracer.s.objects[selected_object]->display_edges = raytracer_app->show_edges->IsChecked();
-	raytracer.s.objects[selected_object]->interp_normals = raytracer_app->interp_normals->IsChecked();
-	raytracer.s.objects[selected_object]->transparent = raytracer_app->transparent->IsChecked();
+	raytracer.s.objects[selected_object]->interp_normals = raytracer_app->interp_normals->IsChecked();	
 	raytracer.cam.fov = raytracer_app->fov_slider->GetValue() * M_PI / 180.;
 	raytracer.cam.aperture = raytracer_app->aperture_slider->GetValue() / 1000.;
 	raytracer.cam.focus_distance = raytracer_app->focus_slider->GetValue() / 100.;
@@ -383,8 +424,7 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 	raytracer.s.fog_type = raytracer_app->uniformFogRadio->GetValue() ? 0 : 1;
 	raytracer.nb_bounces = raytracer_app->bounces->GetValue();
 
-	raytracer.s.objects[selected_object]->flip_normals = raytracer_app->flipnormals->IsChecked();
-	raytracer.s.objects[selected_object]->refr_index = raytracer_app->refractionIndex->GetValue();
+	raytracer.s.objects[selected_object]->flip_normals = raytracer_app->flipnormals->IsChecked();	
 
 
 
@@ -431,10 +471,8 @@ void RenderPanel::update_gui() {
 	raytracer_app->focus_slider->SetValue(raytracer.cam.focus_distance*100.);
 	//raytracer_app->ks_slider->SetValue(raytracer.s.objects[selected_object]->ks*100.);
 	raytracer_app->filter_slider->SetValue(raytracer.sigma_filter*10.);
-	raytracer_app->bounces->SetValue(raytracer.nb_bounces);
-	raytracer_app->transparent->SetValue(raytracer.s.objects[selected_object]->transparent);
-	raytracer_app->flipnormals->SetValue(raytracer.s.objects[selected_object]->flip_normals);
-	raytracer_app->refractionIndex->SetValue(raytracer.s.objects[selected_object]->refr_index);
+	raytracer_app->bounces->SetValue(raytracer.nb_bounces);	
+	raytracer_app->flipnormals->SetValue(raytracer.s.objects[selected_object]->flip_normals);	
 
 	//Vector alb = raytracer.s.objects[selected_object]->albedo;
 	//raytracer_app->albedoColorPicker->SetColour(wxColour(alb[0] * 255., alb[1] * 255., alb[2] * 255.));
@@ -473,6 +511,7 @@ void RenderPanel::update_gui() {
 		std::string filename = raytracer.s.objects[selected_object]->alphamap[i].filename;
 		long index = raytracer_app->m_AlphaFile->InsertItem(i, item);
 		raytracer_app->m_AlphaFile->SetItem(index, 0, txt, -1);
+		raytracer_app->m_AlphaFile->SetItem(index, 1, (raytracer.s.objects[selected_object]->alphamap[i].multiplier[0]<0.5) ? "Opaque" : "Transparent", -1);
 		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
 			raytracer_app->m_AlphaFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
 	}
@@ -499,9 +538,36 @@ void RenderPanel::update_gui() {
 		std::string filename = raytracer.s.objects[selected_object]->roughnessmap[i].filename;
 		long index = raytracer_app->m_RoughnessFile->InsertItem(i, item);
 		raytracer_app->m_RoughnessFile->SetItem(index, 0, txt, -1);
-		raytracer_app->m_RoughnessFile->SetItem(index, 1, raytracer.s.objects[selected_object]->roughnessmap[i].multiplier.toColorStr(), -1);
+		raytracer_app->m_RoughnessFile->SetItem(index, 1, raytracer.s.objects[selected_object]->roughnessmap[i].multiplier.toRedValueStr(), -1);
 		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
 			raytracer_app->m_RoughnessFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
+	}
+
+	raytracer_app->m_TranspFile->DeleteAllItems();
+	for (int i = 0; i < raytracer.s.objects[selected_object]->transparent_map.size(); i++) {
+		std::string txt = extractFileName(raytracer.s.objects[selected_object]->transparent_map[i].filename);
+		wxListItem item;
+		item.SetText(txt);
+		item.SetId(i);
+		std::string filename = raytracer.s.objects[selected_object]->transparent_map[i].filename;
+		long index = raytracer_app->m_TranspFile->InsertItem(i, item);
+		raytracer_app->m_TranspFile->SetItem(index, 0, txt, -1);
+		raytracer_app->m_TranspFile->SetItem(index, 1, (raytracer.s.objects[selected_object]->transparent_map[i].multiplier[0]>0.5) ? "Refractive" : "Not Refractive", -1);
+		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
+			raytracer_app->m_TranspFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
+	}
+	raytracer_app->m_RefrFile->DeleteAllItems();
+	for (int i = 0; i < raytracer.s.objects[selected_object]->refr_index_map.size(); i++) {
+		std::string txt = extractFileName(raytracer.s.objects[selected_object]->refr_index_map[i].filename);
+		wxListItem item;
+		item.SetText(txt);
+		item.SetId(i);
+		std::string filename = raytracer.s.objects[selected_object]->refr_index_map[i].filename;
+		long index = raytracer_app->m_RefrFile->InsertItem(i, item);
+		raytracer_app->m_RefrFile->SetItem(index, 0, txt, -1);
+		raytracer_app->m_RefrFile->SetItem(index, 1, raytracer.s.objects[selected_object]->refr_index_map[i].multiplier.toRedValueStr(), -1);
+		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
+			raytracer_app->m_RefrFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
 	}
 
 	if (g) {
@@ -511,12 +577,17 @@ void RenderPanel::update_gui() {
 		raytracer_app->m_AlphaFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
 		raytracer_app->m_SpecularFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
 		raytracer_app->m_RoughnessFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+		raytracer_app->m_RefrFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+		raytracer_app->m_TranspFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+
 
 		raytracer_app->m_AlbedoFile->EnsureVisible(id);
 		raytracer_app->m_NormalFile->EnsureVisible(id);
 		raytracer_app->m_AlphaFile->EnsureVisible(id);
 		raytracer_app->m_SpecularFile->EnsureVisible(id);
 		raytracer_app->m_RoughnessFile->EnsureVisible(id);
+		raytracer_app->m_RefrFile->EnsureVisible(id);
+		raytracer_app->m_TranspFile->EnsureVisible(id);
 	}
 
 	raytracer_app->fogdensity_slider->SetValue(raytracer.s.fog_density*100.);
@@ -986,7 +1057,7 @@ void RaytracerFrame::OnPopupClickRoughness(wxCommandEvent &evt) {
 		render_panel->start_render();
 		break;
 	case ID_REMOVE_TEXTURE_ROUGHNESS:
-		if (item_id >= render_panel->raytracer_app->m_AlbedoFile->GetItemCount() - 1) return;
+		if (item_id >= render_panel->raytracer_app->m_RoughnessFile->GetItemCount() - 1) return;
 		render_panel->stop_render();
 		render_panel->raytracer.s.objects[obj_id]->roughnessmap[item_id].clear_texture();
 		render_panel->start_render();
@@ -1036,6 +1107,159 @@ void RaytracerFrame::OnPopupClickRoughness(wxCommandEvent &evt) {
 	}
 	render_panel->update_gui();
 }
+
+
+
+void RaytracerFrame::OnPopupClickRefrIndex(wxCommandEvent &evt) {
+	int obj_id = render_panel->selected_object;
+	if (obj_id < 0) return;
+	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
+	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
+	int itemIndex = -1;
+	int firstSel = render_panel->raytracer_app->m_RefrFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+	std::string ret;
+
+	switch (evt.GetId()) {
+	case ID_DELETE_REFR:
+		render_panel->stop_render();
+		while ((itemIndex = render_panel->raytracer_app->m_RefrFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED)) != wxNOT_FOUND) {
+			render_panel->raytracer.s.objects[obj_id]->remove_refr(firstSel);
+		}
+		render_panel->start_render();
+		break;
+	case ID_REMOVE_TEXTURE_REFR:
+		if (item_id >= render_panel->raytracer_app->m_RefrFile->GetItemCount() - 1) return;
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->refr_index_map[item_id].clear_texture();
+		render_panel->start_render();
+		break;
+	case ID_MOVEUP_REFR:
+		if (item_id <= 0) return;
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->swap_refr(item_id, item_id - 1);
+		render_panel->start_render();
+		break;
+	case ID_MOVEDOWN_REFR:
+		if (item_id >= render_panel->raytracer_app->m_RefrFile->GetItemCount() - 1) return;
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->swap_refr(item_id, item_id + 1);
+		render_panel->start_render();
+		break;
+	case ID_ADDWHITE_REFR:
+		ret = wxGetTextFromUser("Enter refraction index", "Refraction index", "1.3");
+		if (ret.size() != 0) {
+			double val;
+			try {
+				val = std::stod(ret.c_str());
+			} catch (...) {
+				return;
+			}
+			render_panel->stop_render();
+			render_panel->raytracer.s.objects[obj_id]->add_col_refr(val);
+			render_panel->start_render();
+		}
+		break;
+	case ID_CHANGE_COLOR_REFR:
+	{
+		//render_panel->raytracer_app->colPicker->ShowModal() == wxID_OK
+		ret = wxGetTextFromUser("Enter refraction index", "Refraction index", "1.3");
+		if (ret.size()!=0 ) {			
+			double val;
+			try {
+				val = std::stod(ret.c_str());
+			} catch (...) {
+				return;
+			}
+			render_panel->stop_render();
+			render_panel->raytracer.s.objects[obj_id]->set_col_refr(val, item_id);
+			render_panel->start_render();
+		}
+		break;
+	}
+	case ID_CHANGE_TEXTURE_REFR:
+	{
+		if (render_panel->raytracer_app->texOpenDlg->ShowModal() == wxID_OK) {
+			std::string retData = render_panel->raytracer_app->texOpenDlg->GetPath().ToStdString();
+			render_panel->stop_render();
+			render_panel->raytracer.s.objects[obj_id]->set_refr_map(retData.c_str(), item_id);
+			render_panel->start_render();
+		}
+		break;
+	}
+	}
+	render_panel->update_gui();
+}
+
+
+void RaytracerFrame::OnPopupClickTransparent(wxCommandEvent &evt) {
+	int obj_id = render_panel->selected_object;
+	if (obj_id < 0) return;
+	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
+	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
+	int itemIndex = -1;
+	int firstSel = render_panel->raytracer_app->m_TranspFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+	wxArrayString choices; choices.push_back("Yes"); choices.push_back("No");
+
+	switch (evt.GetId()) {
+	case ID_DELETE_TRANSP:
+		render_panel->stop_render();
+		while ((itemIndex = render_panel->raytracer_app->m_TranspFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED)) != wxNOT_FOUND) {
+			render_panel->raytracer.s.objects[obj_id]->remove_transp(firstSel);
+		}
+		render_panel->start_render();
+		break;
+	case ID_REMOVE_TEXTURE_TRANSP:
+		if (item_id >= render_panel->raytracer_app->m_TranspFile->GetItemCount() - 1) return;
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->transparent_map[item_id].clear_texture();
+		render_panel->start_render();
+		break;
+	case ID_MOVEUP_TRANSP:
+		if (item_id <= 0) return;
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->swap_transp(item_id, item_id - 1);
+		render_panel->start_render();
+		break;
+	case ID_MOVEDOWN_TRANSP:
+		if (item_id >= render_panel->raytracer_app->m_TranspFile->GetItemCount() - 1) return;
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->swap_transp(item_id, item_id + 1);
+		render_panel->start_render();
+		break;
+	case ID_ADDWHITE_TRANSP:
+	{		
+		int ret = wxGetSingleChoiceIndex("Is this material at least partly transparent ?", "Transparent ?", choices, 1);
+		if (ret!=-1) {
+			render_panel->stop_render();
+			render_panel->raytracer.s.objects[obj_id]->add_col_transp(ret==0?0:1);
+			render_panel->start_render();
+		}
+		break;
+	}
+	case ID_CHANGE_COLOR_TRANSP:
+	{
+		int ret = wxGetSingleChoiceIndex("Is this material at least partly transparent ?", "Transparent ?", choices, 1);
+		if (ret != -1) {
+			render_panel->stop_render();
+			render_panel->raytracer.s.objects[obj_id]->set_col_transp(ret == 0 ? 0 : 1, item_id);
+			render_panel->start_render();
+		}
+		break;
+	}
+	case ID_CHANGE_TEXTURE_TRANSP:
+	{
+		if (render_panel->raytracer_app->texOpenDlg->ShowModal() == wxID_OK) {
+			std::string retData = render_panel->raytracer_app->texOpenDlg->GetPath().ToStdString();
+			render_panel->stop_render();
+			render_panel->raytracer.s.objects[obj_id]->set_transp_map(retData.c_str(), item_id);
+			render_panel->start_render();
+		}
+		break;
+	}
+	}
+	render_panel->update_gui();
+}
+
 void RaytracerFrame::OnPopupClickNormal(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
@@ -1187,6 +1411,8 @@ void RaytracerFrame::OnListSelected(wxListEvent &evt) {
 	DeselectAll(render_panel->raytracer_app->m_AlphaFile);
 	DeselectAll(render_panel->raytracer_app->m_SpecularFile);
 	DeselectAll(render_panel->raytracer_app->m_RoughnessFile);
+	DeselectAll(render_panel->raytracer_app->m_RefrFile);
+	DeselectAll(render_panel->raytracer_app->m_TranspFile);
 
 	for (int i = 0; i < selected_items.size(); i++) {
 		render_panel->raytracer_app->m_AlbedoFile->SetItemState(selected_items[i], wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
@@ -1194,6 +1420,8 @@ void RaytracerFrame::OnListSelected(wxListEvent &evt) {
 		render_panel->raytracer_app->m_AlphaFile->SetItemState(selected_items[i], wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
 		render_panel->raytracer_app->m_SpecularFile->SetItemState(selected_items[i], wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
 		render_panel->raytracer_app->m_RoughnessFile->SetItemState(selected_items[i], wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+		render_panel->raytracer_app->m_RefrFile->SetItemState(selected_items[i], wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+		render_panel->raytracer_app->m_TranspFile->SetItemState(selected_items[i], wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
 	}
 
 	int id = evt.GetItem();
@@ -1202,64 +1430,59 @@ void RaytracerFrame::OnListSelected(wxListEvent &evt) {
 	render_panel->raytracer_app->m_AlphaFile->EnsureVisible(id);
 	render_panel->raytracer_app->m_SpecularFile->EnsureVisible(id);
 	render_panel->raytracer_app->m_RoughnessFile->EnsureVisible(id);
+	render_panel->raytracer_app->m_RefrFile->EnsureVisible(id);
+	render_panel->raytracer_app->m_TranspFile->EnsureVisible(id);
 	evt.Skip();
 	programHandling = false;
+}
+
+void RaytracerFrame::createAlbedoMenu() {
+	
+	albedomnu.Append(ID_MOVEUP, "Move Up");
+	albedomnu.Append(ID_MOVEDOWN, "Move Down");
+	albedomnu.Append(ID_ALBEDO_DELETE, "Delete Row");
+	albedomnu.Append(ID_REMOVE_TEXTURE, "Remove Texture");
+	albedomnu.Append(ID_ADDWHITE, "Add Color");
+	albedomnu.Append(ID_CHANGE_COLOR, "Change Color");
+	albedomnu.Append(ID_CHANGE_TEXTURE, "Change Texture");
+
+	subsubmnu.Append(ID_GOLD_NGAN, "Ngan");
+	subsubmnu.Append(ID_GOLD, "OpenGL");
+	albedosubmnu.AppendSubMenu(&subsubmnu, "Gold");
+
+	subsubmnu2.Append(ID_SILVER_NGAN, "Ngan");
+	subsubmnu2.Append(ID_SILVER, "OpenGL");
+	albedosubmnu.AppendSubMenu(&subsubmnu2, "Silver");
+
+	subsubmnu3.Append(ID_CHROME_NGAN, "Ngan");
+	subsubmnu3.Append(ID_CHROME, "OpenGL");
+	albedosubmnu.AppendSubMenu(&subsubmnu3, "Chrome");
+
+	subsubmnu4.Append(ID_BRONZE_NGAN, "Ngan");
+	subsubmnu4.Append(ID_BRONZE, "OpenGL");
+	albedosubmnu.AppendSubMenu(&subsubmnu4, "Bronze");
+
+	subsubmnu5.Append(ID_COPPER_NGAN, "Ngan");
+	subsubmnu5.Append(ID_COPPER, "OpenGL");
+	albedosubmnu.AppendSubMenu(&subsubmnu5, "Copper");
+
+	subsubmnu6.Append(ID_WHITE_PLASTIC_NGAN, "Ngan");
+	subsubmnu6.Append(ID_WHITE_PLASTIC, "OpenGL");
+	albedosubmnu.AppendSubMenu(&subsubmnu6, "White Plastic");
+
+	subsubmnu7.Append(ID_PEARL_NGAN, "Ngan");
+	subsubmnu7.Append(ID_PEARL, "OpenGL");
+	albedosubmnu.AppendSubMenu(&subsubmnu7, "Pearl");
+
+	albedomnu.AppendSubMenu(&albedosubmnu, "Change Whole Material Color to...");
+	albedomnu.Connect(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(RaytracerFrame::OnPopupClick), NULL, this);
 }
 
 void RaytracerFrame::OnListRightClick(wxListEvent &evt) {
 	int sel = evt.GetItem();
 	void *data = reinterpret_cast<void *>(sel);
-	wxMenu mnu;
-	mnu.SetClientData(data);
-	mnu.Append(ID_MOVEUP, "Move Up");
-	mnu.Append(ID_MOVEDOWN, "Move Down");
-	mnu.Append(ID_ALBEDO_DELETE, "Delete Row");
-	mnu.Append(ID_REMOVE_TEXTURE, "Remove Texture");
-	mnu.Append(ID_ADDWHITE, "Add Color");
-	mnu.Append(ID_CHANGE_COLOR, "Change Color");
-	mnu.Append(ID_CHANGE_TEXTURE, "Change Texture");
-	
-
-	wxMenu submnu;
-	wxMenu subsubmnu;
-	subsubmnu.Append(ID_GOLD_NGAN, "Ngan");
-	subsubmnu.Append(ID_GOLD, "OpenGL");
-	submnu.AppendSubMenu(&subsubmnu, "Gold");
-
-	wxMenu subsubmnu2;
-	subsubmnu2.Append(ID_SILVER_NGAN, "Ngan");
-	subsubmnu2.Append(ID_SILVER, "OpenGL");
-	submnu.AppendSubMenu(&subsubmnu2, "Silver");
-
-	wxMenu subsubmnu3;
-	subsubmnu3.Append(ID_CHROME_NGAN, "Ngan");
-	subsubmnu3.Append(ID_CHROME, "OpenGL");
-	submnu.AppendSubMenu(&subsubmnu3, "Chrome");
-
-	wxMenu subsubmnu4;
-	subsubmnu4.Append(ID_BRONZE_NGAN, "Ngan");
-	subsubmnu4.Append(ID_BRONZE, "OpenGL");
-	submnu.AppendSubMenu(&subsubmnu4, "Bronze");
-
-	wxMenu subsubmnu5;
-	subsubmnu5.Append(ID_COPPER_NGAN, "Ngan");
-	subsubmnu5.Append(ID_COPPER, "OpenGL");
-	submnu.AppendSubMenu(&subsubmnu5, "Copper");
-
-	wxMenu subsubmnu6;
-	subsubmnu6.Append(ID_WHITE_PLASTIC_NGAN, "Ngan");
-	subsubmnu6.Append(ID_WHITE_PLASTIC, "OpenGL");
-	submnu.AppendSubMenu(&subsubmnu6, "White Plastic");
-
-	wxMenu subsubmnu7;
-	subsubmnu7.Append(ID_PEARL_NGAN, "Ngan");
-	subsubmnu7.Append(ID_PEARL, "OpenGL");
-	submnu.AppendSubMenu(&subsubmnu7, "Pearl");
-	
-	mnu.AppendSubMenu(&submnu, "Change Whole Material Color to...");
-
-	mnu.Connect(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(RaytracerFrame::OnPopupClick), NULL, this);	
-	PopupMenu(&mnu);
+	albedomnu.SetClientData(data);
+	PopupMenu(&albedomnu);
 }
 
 void RaytracerFrame::OnListRightClickSpecular(wxListEvent &evt) {
@@ -1324,6 +1547,36 @@ void RaytracerFrame::OnListRightClickRoughness(wxListEvent &evt) {
 	PopupMenu(&mnu);
 }
 
+void RaytracerFrame::OnListRightClickRefrIndex(wxListEvent &evt) {
+	int sel = evt.GetItem();
+	void *data = reinterpret_cast<void *>(sel);
+	wxMenu mnu;
+	mnu.SetClientData(data);
+	mnu.Append(ID_MOVEUP_REFR, "Move Up");
+	mnu.Append(ID_MOVEDOWN_REFR, "Move Down");
+	mnu.Append(ID_DELETE_REFR, "Delete Row");
+	mnu.Append(ID_REMOVE_TEXTURE_REFR, "Remove Texture");
+	mnu.Append(ID_ADDWHITE_REFR, "Add Index");
+	mnu.Append(ID_CHANGE_COLOR_REFR, "Change Index");
+	mnu.Append(ID_CHANGE_TEXTURE_REFR, "Change Texture");
+	mnu.Connect(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(RaytracerFrame::OnPopupClickRefrIndex), NULL, this);
+	PopupMenu(&mnu);
+}
+void RaytracerFrame::OnListRightClickTransparent(wxListEvent &evt) {
+	int sel = evt.GetItem();
+	void *data = reinterpret_cast<void *>(sel);
+	wxMenu mnu;
+	mnu.SetClientData(data);
+	mnu.Append(ID_MOVEUP_TRANSP, "Move Up");
+	mnu.Append(ID_MOVEDOWN_TRANSP, "Move Down");
+	mnu.Append(ID_DELETE_TRANSP, "Delete Row");
+	mnu.Append(ID_REMOVE_TEXTURE_TRANSP, "Remove Texture");
+	mnu.Append(ID_ADDWHITE_TRANSP, "Add Color");
+	mnu.Append(ID_CHANGE_COLOR_TRANSP, "Change Color");
+	mnu.Append(ID_CHANGE_TEXTURE_TRANSP, "Change Texture");
+	mnu.Connect(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(RaytracerFrame::OnPopupClickTransparent), NULL, this);
+	PopupMenu(&mnu);
+}
 bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 {
 	size_t nFiles = filenames.GetCount();
@@ -1435,6 +1688,23 @@ bool DnDRoughnessFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filena
 
 	return true;
 }
+bool DnDRefrFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
+{
+	size_t nFiles = filenames.GetCount();
+	if (m_rtFrame->render_panel->selected_object < 0) return true;
+	if (m_rtFrame->render_panel->selected_object >= m_rtFrame->render_panel->raytracer.s.objects.size()) return true;
+
+	if (m_pOwner != NULL) {
+		m_rtFrame->render_panel->stop_render();
+		for (size_t n = 0; n < nFiles; n++) {
+			m_rtFrame->render_panel->raytracer.s.objects[m_rtFrame->render_panel->selected_object]->add_refr_map(filenames[n]);
+		}
+		m_rtFrame->render_panel->update_gui();
+		m_rtFrame->render_panel->start_render();
+	}
+
+	return true;
+}
 bool DnDAlphaFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 {
 	size_t nFiles = filenames.GetCount();
@@ -1453,6 +1723,23 @@ bool DnDAlphaFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 	return true;
 }
 
+bool DnDTranspFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
+{
+	size_t nFiles = filenames.GetCount();
+	if (m_rtFrame->render_panel->selected_object < 0) return true;
+	if (m_rtFrame->render_panel->selected_object >= m_rtFrame->render_panel->raytracer.s.objects.size()) return true;
+
+	if (m_pOwner != NULL) {
+		m_rtFrame->render_panel->stop_render();
+		for (size_t n = 0; n < nFiles; n++) {
+			m_rtFrame->render_panel->raytracer.s.objects[m_rtFrame->render_panel->selected_object]->add_transp_map(filenames[n]);
+		}
+		m_rtFrame->render_panel->update_gui();
+		m_rtFrame->render_panel->start_render();
+	}
+
+	return true;
+}
 bool DnDEnvmapFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 {
 	size_t nFiles = filenames.GetCount();

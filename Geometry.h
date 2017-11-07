@@ -33,6 +33,8 @@ public:
 		Ke = Vector(0., 0., 0.);
 	}
 	Vector shadingN, Kd, Ks, Ne, Ke;
+	bool transp;
+	double refr_index;
 };
 
 class Texture {
@@ -47,6 +49,8 @@ public:
 		case 2: loadNormals(filename); break;   // normals defaults to 0,0,1
 		case 3: loadColors(filename); break;   // alpha defaults to white
 		case 4: loadColors(filename); break;   // roughness defaults to 1
+		case 5: loadColors(filename); break;   // transparency defaults to 0
+		case 6: loadColors(filename); break;   // refr index defaults to 1.3
 		}
 		this->multiplier = multiplier;
 	}
@@ -85,6 +89,18 @@ public:
 			return Vector(cr, cg, cb);
 		} else {
 			return multiplier;
+		}
+	}
+	bool getBool(double u, double v) const {
+		if (W > 0) {
+			// no assert on u and v ; assume they are btw 0  and 1
+			int x = u * (W - 1);
+			int y = v * (H - 1);
+			int idx = (y*W + x) * 3;
+			double cr = values[idx] * multiplier[0];
+			return cr<0.5;
+		} else {
+			return (multiplier[0]<0.5);
 		}
 	}
 	Vector getNormal(double u, double v) const {
@@ -342,7 +358,7 @@ public:
 
 class Object {
 public:
-	Object() { scale = 1; flip_normals = false; refr_index = 1.3; };
+	Object() { scale = 1; flip_normals = false; };
 	virtual bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const = 0;
 	virtual bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const = 0;
 
@@ -450,15 +466,23 @@ public:
 		} else {
 			mat.Ne = roughnessmap[idx].getVec(u, v);
 		}
+		if (idx >= transparent_map.size()) {
+			mat.transp = false;
+		} else {
+			mat.transp = transparent_map[idx].getBool(u, v);
+		}
+		if (idx >= refr_index_map.size()) {
+			mat.refr_index = 1.3;
+		} else {
+			mat.refr_index = refr_index_map[idx].getValRed(u, v);
+		}
 		mat.Ke = Vector(0., 0., 0.);
 		return mat;
 	}
 
 	virtual void save_to_file(FILE* f) {
-		fprintf(f, "name: %s\n", name.c_str());
-		fprintf(f, "refr_index: %lf\n", refr_index);
+		fprintf(f, "name: %s\n", name.c_str());		
 		fprintf(f, "miroir: %u\n", miroir?1:0);
-		fprintf(f, "transparent: %u\n", transparent ? 1 : 0);
 		fprintf(f, "translation: (%lf, %lf, %lf)\n", max_translation[0], max_translation[1], max_translation[2]);
 		fprintf(f, "rotation: (%lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf)\n", mat_rotation[0], mat_rotation[1], mat_rotation[2], mat_rotation[3], mat_rotation[4], mat_rotation[5], mat_rotation[6], mat_rotation[7], mat_rotation[8]);
 		fprintf(f, "center: (%lf, %lf, %lf)\n", rotation_center[0], rotation_center[1], rotation_center[2]);
@@ -491,6 +515,16 @@ public:
 			fprintf(f, "texture: %s\n", roughnessmap[i].filename.c_str());
 			fprintf(f, "multiplier: (%lf, %lf, %lf)\n", roughnessmap[i].multiplier[0], roughnessmap[i].multiplier[1], roughnessmap[i].multiplier[2]);
 		}
+		fprintf(f, "nb_transpmaps: %u\n", transparent_map.size());
+		for (int i = 0; i < transparent_map.size(); i++) {
+			fprintf(f, "texture: %s\n", transparent_map[i].filename.c_str());
+			fprintf(f, "multiplier: %lf)\n", transparent_map[i].multiplier[0]);
+		}
+		fprintf(f, "nb_refrindexmaps: %u\n", refr_index_map.size());
+		for (int i = 0; i < refr_index_map.size(); i++) {
+			fprintf(f, "texture: %s\n", refr_index_map[i].filename.c_str());
+			fprintf(f, "multiplier: %lf)\n", refr_index_map[i].multiplier[0]);
+		}
 	}
 
 	virtual void load_from_file(FILE* f) {
@@ -498,9 +532,7 @@ public:
 		int mybool;
 		fscanf(f, "name: %[^\n]\n", line);
 		name = std::string(line);
-		fscanf(f, "refr_index: %lf\n", &refr_index);
 		fscanf(f, "miroir: %u\n", &mybool); miroir = mybool;
-		fscanf(f, "transparent: %u\n", &mybool); transparent = mybool;
 		fscanf(f, "translation: (%lf, %lf, %lf)\n", &max_translation[0], &max_translation[1], &max_translation[2]);
 		fscanf(f, "rotation: (%lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf)\n", &mat_rotation[0], &mat_rotation[1], &mat_rotation[2], &mat_rotation[3], &mat_rotation[4], &mat_rotation[5], &mat_rotation[6], &mat_rotation[7], &mat_rotation[8]);
 		fscanf(f, "center: (%lf, %lf, %lf)\n", &rotation_center[0], &rotation_center[1], &rotation_center[2]);
@@ -568,6 +600,19 @@ public:
 			}
 			fscanf(f, "multiplier: (%lf, %lf, %lf)\n", &roughnessmap[roughnessmap.size() - 1].multiplier[0], &roughnessmap[roughnessmap.size() - 1].multiplier[1], &roughnessmap[roughnessmap.size() - 1].multiplier[2]);
 		}
+		
+		fscanf(f, "nb_transpmaps: %u\n", &n);
+		for (int i = 0; i < n; i++) {
+			fscanf(f, "texture: %[^\n]\n", line);
+			add_transp_map(line);			
+			fscanf(f, "multiplier: %lf)\n", &transparent_map[i].multiplier[0]);
+		}
+		fscanf(f, "nb_refrindexmaps: %u\n", &n);
+		for (int i = 0; i < n; i++) {
+			fscanf(f, "texture: %[^\n]\n", line);
+			add_refr_map(line);
+			fscanf(f, "multiplier: %lf)\n", &refr_index_map[i].multiplier[0]);
+		}
 	}
 
 	static Object* create_from_file(FILE* f);
@@ -578,18 +623,30 @@ public:
 	virtual void set_specularmap(const char* filename, int idx);
 	virtual void add_normalmap(const char* filename);
 	virtual void set_normalmap(const char* filename, int idx);
-	virtual void add_roughnessmap(const char* filename);
+	virtual void add_roughnessmap(const char* filename);	
 	virtual void set_roughnessmap(const char* filename, int idx);
+	virtual void add_transp_map(const char* filename);
+	virtual void set_transp_map(const char* filename, int idx);
+	virtual void set_col_transp(double col, int idx);
+	virtual void add_col_transp(double col);
+	virtual void add_refr_map(const char* filename);
+	virtual void set_refr_map(const char* filename, int idx);
+	virtual void set_col_refr(double col, int idx);
+	virtual void add_col_refr(double col);
 	virtual void add_col_roughness(const Vector &col);
 	virtual void set_col_roughness(const Vector &col, int idx);
 	virtual void add_alphamap(const char* filename);
 	virtual void set_alphamap(const char* filename, int idx);
 	virtual void set_col_alpha(double col, int idx);
+	virtual void remove_refr(int id);
+	virtual void remove_transp(int id);
 	virtual void remove_texture(int id);
 	virtual void remove_normal(int id);
 	virtual void remove_specular(int id);
 	virtual void remove_alpha(int id);
 	virtual void remove_roughness(int id);
+	virtual void swap_refr(int id1, int id2);
+	virtual void swap_transp(int id1, int id2);
 	virtual void swap_alpha(int id1, int id2);
 	virtual void swap_textures(int id1, int id2);
 	virtual void swap_normal(int id1, int id2);
@@ -604,26 +661,14 @@ public:
 	virtual void add_col_alpha(double col);
 
 	std::string name;
-	double refr_index;
-	bool miroir;
-	bool transparent;
+	bool miroir;	
 	Vector max_translation;
 	Matrix<3, 3> mat_rotation; // Euler angles
 	Vector rotation_center;
 	double scale;
 	bool display_edges, interp_normals, flip_normals;
 
-	/*std::vector<std::vector<unsigned char> > textures;
-	std::vector<std::vector<unsigned char> > specularmap;
-	std::vector<std::vector<unsigned char> > alphamap;
-	std::vector<std::vector<unsigned char> > roughnessmap;
-	std::vector<std::vector<double> > normal_map;
-
-	std::vector<std::string> textures_filenames, normalmap_filenames, alphamap_filenames, specularmap_filenames, roughnessmap_filenames;
-	std::vector<int> w, h, normalW, normalH, alphamapW, alphamapH, specularmapW, specularmapH, roughnessmapW, roughnessmapH;*/
-
-
-	std::vector<Texture> textures, specularmap, alphamap, roughnessmap, normal_map;
+	std::vector<Texture> textures, specularmap, alphamap, roughnessmap, normal_map, transparent_map, refr_index_map;
 	double trans_matrix[12], inv_trans_matrix[12], rot_matrix[9];
 };
 
@@ -633,15 +678,14 @@ public:
 class Sphere : public Object {
 public:
 	Sphere() {};
-	Sphere(const Vector &origin, double rayon, bool mirror = false, bool transp = false, bool normal_swapped = false, const char* envmap_file = NULL) {
-		init(origin, rayon, mirror, transp, normal_swapped, envmap_file);
+	Sphere(const Vector &origin, double rayon, bool mirror = false, bool normal_swapped = false, const char* envmap_file = NULL) {
+		init(origin, rayon, mirror, normal_swapped, envmap_file);
 	};
 
-	void init(const Vector &origin, double rayon, bool mirror = false, bool transp = false, bool normal_swapped = false, const char* envmap_file = NULL) {
+	void init(const Vector &origin, double rayon, bool mirror = false, bool normal_swapped = false, const char* envmap_file = NULL) {
 		O = origin;
 		R = rayon;
 		miroir = mirror;
-		transparent = transp;
 		flip_normals = normal_swapped;
 		has_envmap = (envmap_file != NULL);
 		envmapfilename = "";
@@ -687,7 +731,7 @@ public:
 		fscanf(f, "O: (%lf, %lf, %lf)\n", &O[0], &O[1], &O[2]);
 		fscanf(f, "R: %lf\n", &R);
 
-		result->init(O, R, result->miroir, result->transparent, result->flip_normals, has_envmap ? envmapfilename.c_str() : NULL);
+		result->init(O, R, result->miroir, result->flip_normals, has_envmap ? envmapfilename.c_str() : NULL);
 		return result;
 	}
 
@@ -799,15 +843,14 @@ public:
 class Plane : public Object {
 public:
 	Plane() {};
-	Plane(const Vector& A, const Vector &N, bool mirror = false, bool transp = false) {
-		init(A, N, mirror, transp);
+	Plane(const Vector& A, const Vector &N, bool mirror = false) {
+		init(A, N, mirror);
 	};
 
-	void init(const Vector& A, const Vector &N, bool mirror = false, bool transp = false) {
+	void init(const Vector& A, const Vector &N, bool mirror = false) {
 		this->A = A;
 		this->vecN = N;
 		miroir = mirror;
-		transparent = transp;
 		name = "Plane";
 	}
 
@@ -857,7 +900,7 @@ public:
 		fscanf(f, "N: (%lf, %lf, %lf)\n", &N[0], &N[1], &N[2]);
 		
 
-		result->init(Point, N, result->transparent);
+		result->init(Point, N);
 		return result;
 	}
 

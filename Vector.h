@@ -110,6 +110,11 @@ public:
 		os << "Color(" << coord[0] << ", " << coord[1] << ", " << coord[2] << ")";
 		return os.str();
 	}
+	std::string toRedValueStr() {
+		std::ostringstream os;
+		os << coord[0];
+		return os.str();
+	}
 
 	Vector& operator+=(const Vector& b) {
 		coord[0] += b[0];

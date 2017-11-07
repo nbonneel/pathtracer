@@ -458,6 +458,8 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 			add_col_roughness(Vector(0., 0., 0.));
 			add_null_normalmap();
 			add_col_alpha(1.);
+			add_col_refr(1.3);
+			add_col_transp(1.);
 		}
 
 		std::string filenamemat = extractFilePathWithEndingSlash(std::string(obj)) + std::string(matfile);
@@ -671,15 +673,14 @@ void Geometry::setup_tangents() {
 }
 
 
-Geometry::Geometry(const char* obj, double scaling, const Vector& offset, bool mirror, bool transp, const char* colors_csv_filename) {
-	init(obj, scaling, offset, mirror, transp, colors_csv_filename, true);
+Geometry::Geometry(const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename) {
+	init(obj, scaling, offset, mirror, colors_csv_filename, true);
 }
 
-void Geometry::init(const char* obj, double scaling, const Vector& offset, bool mirror, bool transp, const char* colors_csv_filename, bool load_textures) {
+void Geometry::init(const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool load_textures) {
 	display_edges = false;
 	interp_normals = true;
 	miroir = mirror;
-	transparent = transp;
 	name = obj;
 
 	std::string filename(obj);
@@ -994,7 +995,7 @@ bool Geometry::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 			mat.shadingN = normals[indices[i].ni] * alpha + normals[indices[i].nj] * beta + normals[indices[i].nk] * gamma;
 			mat.shadingN.normalize();
 		}
-		if (dot(mat.shadingN, d.direction) > 0 && !transparent) mat.shadingN = -mat.shadingN;
+		if (dot(mat.shadingN, d.direction) > 0 && mat.transp) mat.shadingN = -mat.shadingN;
 		if (flip_normals) mat.shadingN = -mat.shadingN;
 
 

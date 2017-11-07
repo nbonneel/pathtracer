@@ -100,9 +100,9 @@ public:
 class Geometry : public Object {
 public:
 	Geometry() {};
-	Geometry(const char* obj, double scaling, const Vector& offset, bool mirror = false, bool transp = false, const char* colors_csv_filename = NULL);
+	Geometry(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL);
 
-	void init(const char* obj, double scaling, const Vector& offset, bool mirror = false, bool transp = false, const char* colors_csv_filename = NULL, bool load_textures = true);
+	void init(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool load_textures = true);
 
 	void readOBJ(const char* obj, bool load_textures);
 	void readVRML(const char* obj);
@@ -132,7 +132,7 @@ public:
 		else
 			fscanf(f, "csv_file: \n");
 
-		result->init(result->name.c_str(), 1., Vector(0, 0, 0), result->miroir, result->transparent, hascsv ? line : NULL, false);
+		result->init(result->name.c_str(), 1., Vector(0, 0, 0), result->miroir, hascsv ? line : NULL, false);
 		return result;
 	}
 

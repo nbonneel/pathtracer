@@ -107,14 +107,14 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, bool sho
 				intensite_pixel += getColor(rayon_miroir, s, nbrebonds - 1);// / 0.9;
 
 			} else
-				if (s.objects[sphere_id]->transparent) {
+				if (mat.transp) {
 					double n1 = 1;
-					double n2 = s.objects[sphere_id]->refr_index;
+					double n2 = mat.refr_index;
 					Vector normale_pour_transparence(N);
 					Ray new_ray;
 					bool entering = true;
 					if (dot(r.direction, N) > 0) {  // on sort de la sphere
-						n1 = s.objects[sphere_id]->refr_index;
+						n1 = mat.refr_index;
 						n2 = 1;
 						normale_pour_transparence = -N;
 						entering = false;
