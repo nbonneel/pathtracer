@@ -696,9 +696,11 @@ void Geometry::init(const char* obj, double scaling, const Vector& offset, bool 
 
 	for (int i = 0; i < vertices.size(); i++) {
 		std::swap(vertices[i][0], vertices[i][2]);
+		vertices[i][0] = -vertices[i][0];
 	}
 	for (int i = 0; i < normals.size(); i++) {
 		std::swap(normals[i][0], normals[i][2]);
+		normals[i][0] = -normals[i][0];
 	}
 
 	BBox bb(Vector(1E9, 1E9, 1E9), Vector(-1E9, -1E9, -1E9));
