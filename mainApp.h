@@ -84,6 +84,22 @@
 #define ID_EXPORT_MTL 46
 #define ID_MESHINFO 47
 
+#define ID_GOLD 49
+#define ID_GOLD_NGAN 491
+#define ID_SILVER 50
+#define ID_SILVER_NGAN 501
+#define ID_PEARL 51
+#define ID_PEARL_NGAN 511
+#define ID_WHITE_PLASTIC 52
+#define ID_WHITE_PLASTIC_NGAN 521
+#define ID_CHROME 53
+#define ID_CHROME_NGAN 531
+#define ID_BRONZE 54
+#define ID_BRONZE_NGAN 541
+#define ID_COPPER 55
+#define ID_COPPER_NGAN 551
+
+
 
 class RaytracerApp;
 class RenderPanel;
@@ -117,14 +133,18 @@ public:
 	void OnListRightClickNormal(wxListEvent &evt);
 	void OnListRightClickAlpha(wxListEvent &evt);
 	void OnListRightClickRoughness(wxListEvent &evt);
+	void OnListSelected(wxListEvent &evt);
+
 
 	void SaveAs(wxCommandEvent &evt);
 	void SaveImage(wxCommandEvent &evt);
 	void ExportMtl(wxCommandEvent &evt);
 	void Open(wxCommandEvent &evt);
 	void ShowMeshInfo(wxCommandEvent &evt);
+	void DeselectAll(wxListCtrl* list);
 
 	RenderPanel *render_panel;
+	bool programHandling;
 private:
 
 	wxDECLARE_EVENT_TABLE();
