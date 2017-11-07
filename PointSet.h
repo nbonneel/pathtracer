@@ -2,8 +2,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "Geometry.h"
 #include "nanoflann.hpp"
-
-
+#include "TriangleMesh.h"
 
 // only for NanoFlann
 template <typename T>
@@ -39,36 +38,67 @@ struct PointCloud
 class PointSet : public Object {
 public:
 	PointSet() {};
-	PointSet(const char* filename, double radius, bool mirror = false, bool transp = false, bool normal_swapped = false) {
-		init(filename, radius, mirror, transp, normal_swapped);
+	PointSet(const char* filename, int nbcols, int *cols, bool mirror = false, bool transp = false, bool normal_swapped = false) {
+		init(filename, nbcols, cols, mirror, transp, normal_swapped);
 	};
 
-	void init(const char* filename, double radius, bool mirror = false, bool transp = false, bool normal_swapped = false) {
+	void init(const char* filename, int nbcols, int *cols, bool mirror = false, bool transp = false, bool normal_swapped = false) {
 		miroir = mirror;
 		transparent = transp;
-		this->radius = radius;
 		flip_normals = normal_swapped;
+		this->nbcols = nbcols;
+		memcpy(this->cols, cols, nbcols * sizeof(int));
 
-
+		// cols[i] : -1: ignore, 0:x 1:y, 2:z, 3:nx,4:ny,5:nz, 6:colr, 7:colg, 8:colb
 		FILE* f = fopen(filename, "r");
-		char* line = new char[1000];
+		double values[100];
 		while (!feof(f)) {
-			if (!fgets(line, 1000, f)) break;
-			std::string s(line);
 
-			Vector p;
-			int r, g, b;
-			int tmp1, tmp2;
-			sscanf(line, "%u %u %lf %lf %lf %u %u %u", &tmp1, &tmp2, &p[0], &p[1], &p[2], &r, &g, &b);
+			for (int i = 0; i < nbcols; i++)
+				if (fscanf(f, "%lf", &values[i])!=1) break;
+
+			Vector p, c(1.,1.,1.), n(0.,0.,0.);
+
+			for (int i = 0; i < nbcols; i++) {
+				switch (cols[i]) {
+				case 0:
+					p[0] = values[i];
+					break;
+				case 1:
+					p[1] = values[i];
+					break;
+				case 2:
+					p[2] = values[i];
+					break;
+				case 3:
+					n[0] = values[i];
+					break;
+				case 4:
+					n[1] = values[i];
+					break;
+				case 5:
+					n[2] = values[i];
+					break;
+				case 6:
+					c[0] = values[i];
+					break;
+				case 7:
+					c[1] = values[i];
+					break;
+				case 8:
+					c[2] = values[i];
+					break;
+				}
+			}
+
 			vertices.push_back(p);
-			colors.push_back(Vector(r / 255., g / 255., b / 255.));
-			Vector n = Vector(uniform(engine), uniform(engine), uniform(engine));
-			n.normalize();
+			colors.push_back(c/255.);
 			normals.push_back(n);
 		}
 		fclose(f);
 
-		estimate_normals();
+		if (normals[0][0]==0. && normals[0][1]==0. && normals[0][2]==0.)
+			estimate_normals();
 
 		BBox b = build_centers_bbox(0, vertices.size());
 		Vector center(0., 0., 0.);
@@ -82,7 +112,7 @@ public:
 
 
 		this->rotation_center = center;
-		name = "PointSet";
+		name = std::string(filename);
 	}
 
 	void estimate_normals() {
@@ -90,6 +120,7 @@ public:
 		int N = vertices.size();
 		PointCloud<double> cloud;
 		cloud.pts.resize(N);
+		radius.resize(N);
 		for (size_t i = 0; i < N; i++) {
 			cloud.pts[i].x = vertices[i][0];
 			cloud.pts[i].y = vertices[i][1];
@@ -105,7 +136,7 @@ public:
 		std::vector<double> allNNDist(N);
 		for (int i = 0; i < N; i++) {
 
-			const size_t num_results = 5;
+			const size_t num_results = 15;
 			size_t ret_index[num_results];
 			double out_dist_sqr[num_results];
 			nanoflann::KNNResultSet<double> resultSet(num_results);
@@ -130,11 +161,12 @@ public:
 			cimg_library::CImg<double> mat(cov, 3, 3), val(3), vec(3, 3);
 			mat.symmetric_eigen(val, vec);
 			normals[i] = Vector(vec(2, 0), vec(2, 1), vec(2, 2));
+			radius[i] = 5.*std::max(1E-8, sqrt(out_dist_sqr[6]));
 		}
 
-		std::sort(allNNDist.begin(), allNNDist.end());
+		//std::sort(allNNDist.begin(), allNNDist.end());
 
-		radius = allNNDist[allNNDist.size() / 2] * 0.3;
+		//radius = allNNDist[allNNDist.size() / 2] *0.3*3;
 
 	}
 
@@ -144,17 +176,26 @@ public:
 
 		Object::save_to_file(f);
 
-		fprintf(f, "radius: %lf\n", radius);
+
+		fprintf(f, "radius: %lf\n", 1);
+		fprintf(f, "nbcols: %u\ncolumns: ", nbcols);
+		for (int i = 0; i < nbcols; i++) {
+			fprintf(f, "%d ", cols[i]);
+		}
+		fprintf(f, "\n");
 
 	}
 
 	static PointSet* create_from_file(FILE* f) {
 		PointSet* result = new PointSet();
 		result->Object::load_from_file(f);
-
-		fscanf(f, "radius: %lf\n", &result->radius);
-
-		result->init(result->name.c_str(), result->radius, result->miroir, result->transparent, result->flip_normals);
+		double unused;
+		fscanf(f, "radius: %lf\n", &unused);
+		fscanf(f, "nbcols: %u\ncolumns: ", &result->nbcols);
+		for (int i = 0; i <result->nbcols; i++) {
+			fscanf(f, "%d", &result->cols[i]);
+		}
+		result->init(result->name.c_str(), result->nbcols, result->cols, result->miroir, result->transparent, result->flip_normals);
 		return result;
 	}
 
@@ -170,6 +211,8 @@ public:
 	std::vector<Vector> vertices;
 	std::vector<Vector> normals;
 	std::vector<Vector> colors;
-	double radius;
+	std::vector<double> radius;
 	BVH bvh;
+	int nbcols;
+	int cols[100];
 };

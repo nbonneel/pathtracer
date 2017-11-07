@@ -1,5 +1,6 @@
 #include "mainApp.h"
-
+#include <wx/msgdlg.h> 
+#include <wx/textdlg.h> 
 
 wxIMPLEMENT_APP(RaytracerApp);
 
@@ -67,6 +68,7 @@ bool RaytracerApp::OnInit()
 	m_AlbedoFile->SetDropTarget(new DnDAlbedoFile(m_AlbedoFile, frame));
 	Connect(ALBEDO_FILES, wxEVT_LIST_ITEM_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClick), NULL, frame);
 	Connect(ALBEDO_FILES, wxEVT_LIST_COL_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClick), NULL, frame);
+	Connect(ALBEDO_FILES, wxEVT_LIST_ITEM_SELECTED, wxListEventHandler(RaytracerFrame::OnListSelected), NULL, frame);
 
 	m_SpecularFile = new wxListCtrl(panelObject, SPECULAR_FILES, wxDefaultPosition, wxSize(-1, 100), wxLC_REPORT);
 	wxListItem itCol4;
@@ -81,6 +83,7 @@ bool RaytracerApp::OnInit()
 	m_SpecularFile->SetDropTarget(new DnDSpecularFile(m_SpecularFile, frame));
 	Connect(SPECULAR_FILES, wxEVT_LIST_ITEM_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickSpecular), NULL, frame);
 	Connect(SPECULAR_FILES, wxEVT_LIST_COL_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickSpecular), NULL, frame);
+	Connect(SPECULAR_FILES, wxEVT_LIST_ITEM_SELECTED, wxListEventHandler(RaytracerFrame::OnListSelected), NULL, frame);
 
 	m_RoughnessFile = new wxListCtrl(panelObject, ROUGHNESS_FILES, wxDefaultPosition, wxSize(-1, 100), wxLC_REPORT);
 	wxListItem itCol5;
@@ -95,6 +98,7 @@ bool RaytracerApp::OnInit()
 	m_RoughnessFile->SetDropTarget(new DnDRoughnessFile(m_RoughnessFile, frame));
 	Connect(ROUGHNESS_FILES, wxEVT_LIST_ITEM_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickRoughness), NULL, frame);
 	Connect(ROUGHNESS_FILES, wxEVT_LIST_COL_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickRoughness), NULL, frame);
+	Connect(ROUGHNESS_FILES, wxEVT_LIST_ITEM_SELECTED, wxListEventHandler(RaytracerFrame::OnListSelected), NULL, frame);
 
 	m_NormalFile = new wxListCtrl(panelObject, NORMAL_FILES, wxDefaultPosition, wxSize(-1, 100), wxLC_REPORT);
 	itCol2.SetId(0);
@@ -104,6 +108,7 @@ bool RaytracerApp::OnInit()
 	m_NormalFile->SetDropTarget(new DnDNormalFile(m_NormalFile, frame));
 	Connect(NORMAL_FILES, wxEVT_LIST_ITEM_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickNormal), NULL, frame);
 	Connect(NORMAL_FILES, wxEVT_LIST_COL_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickNormal), NULL, frame);
+	Connect(NORMAL_FILES, wxEVT_LIST_ITEM_SELECTED, wxListEventHandler(RaytracerFrame::OnListSelected), NULL, frame);
 
 	//albedoColorPicker = new wxColourPickerCtrl(panelObject, ALBEDO_COLORPICKER, wxColour(255,255,255), wxDefaultPosition, wxDefaultSize, wxCLRP_USE_TEXTCTRL | wxCLRP_SHOW_LABEL);
 	//Connect(ALBEDO_COLORPICKER, wxEVT_COLOURPICKER_CHANGED, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
@@ -117,6 +122,7 @@ bool RaytracerApp::OnInit()
 	m_AlphaFile->SetDropTarget(new DnDAlphaFile(m_AlphaFile, frame));
 	Connect(ALPHA_FILES, wxEVT_LIST_ITEM_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickAlpha), NULL, frame);
 	Connect(ALPHA_FILES, wxEVT_LIST_COL_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickAlpha), NULL, frame);
+	Connect(ALPHA_FILES, wxEVT_LIST_ITEM_SELECTED, wxListEventHandler(RaytracerFrame::OnListSelected), NULL, frame);
 
 	/*wxBoxSizer * ks_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* ks_text = new wxStaticText(panelObject, 9999, "Ks : ");
@@ -314,7 +320,7 @@ RaytracerFrame::RaytracerFrame()
     SetIcon(wxICON(sample));
 
     CreateStatusBar();
-
+	programHandling = false;
     // construct menu
     wxMenu *file_menu = new wxMenu();
     file_menu->Append(ID_SAVE, wxT("&Save scene as..."));
@@ -326,8 +332,13 @@ RaytracerFrame::RaytracerFrame()
 	file_menu->Append(ID_EXPORT_MTL, wxT("&Export .mtl (selected object)..."));
 	Connect(ID_EXPORT_MTL, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(RaytracerFrame::ExportMtl), NULL, this);
 
+	wxMenu *info_menu = new wxMenu();
+	info_menu->Append(ID_MESHINFO, wxT("&Mesh information..."));
+	Connect(ID_MESHINFO, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(RaytracerFrame::ShowMeshInfo), NULL, this);
+
 	wxMenuBar* menu_bar = new wxMenuBar();
 	menu_bar->Append(file_menu, wxT("&File"));	
+	menu_bar->Append(info_menu, wxT("&Info"));
 
     SetMenuBar(menu_bar);
 
@@ -638,15 +649,16 @@ void RaytracerFrame::SaveImage(wxCommandEvent &evt) {
 	if (saveFileDialog.ShowModal() == wxID_CANCEL)
 		return;
 
+	int nbr = render_panel->raytracer.current_nb_rays;
 	int W = render_panel->raytracer.W;
 	int H = render_panel->raytracer.H;
 	std::vector<unsigned char> image(W*H * 3);
 #pragma omp parallel for 
 	for (int i = 0; i < H; i++) {
 		for (int j = 0; j < W; j++) {
-			image[((H - i - 1)*W + j) * 3 + 0] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 0] / (render_panel->raytracer.nrays + 1), 1 / 2.2)));   // rouge
-			image[((H - i - 1)*W + j) * 3 + 1] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 1] / (render_panel->raytracer.nrays + 1), 1 / 2.2))); // vert
-			image[((H - i - 1)*W + j) * 3 + 2] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 2] / (render_panel->raytracer.nrays + 1), 1 / 2.2))); // bleu
+			image[((H - i - 1)*W + j) * 3 + 0] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 0] / (nbr + 1.), 1 / 2.2)));   // rouge
+			image[((H - i - 1)*W + j) * 3 + 1] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 1] / (nbr + 1.), 1 / 2.2))); // vert
+			image[((H - i - 1)*W + j) * 3 + 2] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 2] / (nbr + 1.), 1 / 2.2))); // bleu
 		}
 	}
 	save_img(saveFileDialog.GetPath().c_str(), &image[0], W, H);
@@ -680,6 +692,43 @@ void RaytracerFrame::Open(wxCommandEvent &evt) {
 	render_panel->raytracer.load_scene(openFileDialog.GetPath());
 	render_panel->update_gui();
 	render_panel->start_render();
+}
+
+
+void RaytracerFrame::ShowMeshInfo(wxCommandEvent &evt) {
+	int obj_id = render_panel->selected_object;
+	if (obj_id < 0) return;
+	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
+	Geometry* g = dynamic_cast<Geometry*>(render_panel->raytracer.s.objects[obj_id]);
+	if (!g) return;
+
+	int nbE, nbNonM, nbBoundaries;
+	int nbC = g->getNbConnected(nbE, nbNonM, nbBoundaries);
+	int Euler = (int)g->vertices.size() - nbE + (int)g->indices.size();
+	int nbRealEdges, nbOthers, nbTri;
+	g->findQuads(nbTri, nbOthers, nbRealEdges);
+
+	std::ostringstream os;
+	os << "Object ID: " << obj_id << std::endl;
+	os << "Nb Triangles in Triangulated Mesh: " << g->indices.size() << std::endl;
+	os << "Nb Polygons in Original Mesh: " << nbTri+ nbOthers<<" (including "<<nbTri<<" triangles and "<<nbOthers<<" other polygons)" << std::endl;	
+	os << "Nb Vertices: " << g->vertices.size() << std::endl;
+	os << "Nb Edges in Triangulated Mesh: " << nbE << std::endl;
+	os << "Nb Edges in Original Mesh: " << nbRealEdges << std::endl;
+	os << "Nb Connected Components: " << nbC << std::endl;
+	os << "Non Manifold Edges: " << nbNonM << std::endl;
+	os << "Boundary edges: " << nbBoundaries << std::endl;
+	os << "Euler Number: " << Euler << std::endl;
+	os << "Genus: " << (2 - Euler)/2 << std::endl;
+	os << " BVH max depth: " << g->bvh_depth << std::endl;
+	os << " BVH avg depth: " << g->bvh_avg_depth << std::endl;
+	os << " BVH nb nodes: " << g->bvh_nb_nodes << std::endl;
+	os << " BVH max triangles per leaf: " << g->max_bvh_triangles << std::endl;
+	os << " Nb materials: " << g->textures.size() << std::endl;
+
+	wxMessageBox(os.str().c_str(), "Mesh information");
+
+
 }
 
 void RaytracerFrame::OnPopupClick(wxCommandEvent &evt) {
@@ -748,14 +797,116 @@ void RaytracerFrame::OnPopupClick(wxCommandEvent &evt) {
 		}
 		break;
 	}
+	case ID_GOLD:
+		render_panel->stop_render();
+		//http://devernay.free.fr/cours/opengl/materials.html
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(0.75164, 0.60648, 0.22648), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.628281, 0.555802, 0.366065), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(0.4 * 128, 0.4 * 128, 0.4 * 128), item_id);
+		render_panel->start_render();
+		break;
+	case ID_GOLD_NGAN:
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(0.069, 0.0323, 0.00638), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.0738, 0.0434, 0.0104), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(41.9, 41.9, 41.9), item_id);
+		render_panel->start_render();
+		break;
+	case ID_SILVER:
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(0.50754, 0.50754, 0.50754), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.508273, 0.508273, 0.508273), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(0.4 * 128, 0.4 * 128, 0.4 * 128), item_id);
+		render_panel->start_render();
+		break;
+	case ID_SILVER_NGAN:
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(0.0695, 0.0628, 0.0446), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.0742, 0.0615, 0.0412), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(75, 75, 75), item_id);
+		render_panel->start_render();
+		break;
+	case ID_PEARL:
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(1, 0.829, 0.829), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.296648, 0.296648, 0.296648), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(0.088 * 128, 0.088 * 128, 0.088 * 128), item_id);
+		render_panel->start_render();
+		break;
+	case ID_PEARL_NGAN:
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(0.189, 0.146, 0.0861), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.0485, 0.0346, 0.0161), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(27.7, 27.7, 27.7), item_id);
+		render_panel->start_render();
+		break;
+	case ID_WHITE_PLASTIC:
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(0.55, 0.55, 0.55), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.70, 0.70, 0.70), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(0.25 * 128, 0.25 * 128, 0.25 * 128), item_id);
+		render_panel->start_render();
+		break;
+	case ID_WHITE_PLASTIC_NGAN: // actually gray
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(0.102, 0.0887, 0.0573), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.00699, 0.00566, 0.0036), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(1040, 1040, 1040), item_id);
+		render_panel->start_render();
+		break;
+	case ID_CHROME:
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(0.4, 0.4, 0.4), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.774597, 0.774597, 0.774597), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(0.6 * 128, 0.6 * 128, 0.6 * 128), item_id);
+		render_panel->start_render();
+		break;
+	case ID_CHROME_NGAN:
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(0.00817, 0.0063, 0.00474), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.0213, 0.0151, 0.00766), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(17900, 17900, 17900), item_id);
+		render_panel->start_render();
+		break;
+	case ID_BRONZE:
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(0.714, 0.4284, 0.18144), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.393548, 0.271906, 0.166721), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(0.2 * 128, 0.2 * 128, 0.2 * 128), item_id);
+		render_panel->start_render();
+		break;
+	case ID_BRONZE_NGAN: // alum bronze
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(0.0864, 0.0597, 0.0302), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.015, 0.00818, 0.00381), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(1290, 1290, 1290), item_id);
+		render_panel->start_render();
+		break;
+	case ID_COPPER:
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(0.7038, 0.27048, 0.0828), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.256777, 0.137622, 0.086014), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(0.1 * 128, 0.1 * 128, 0.1 * 128), item_id);
+		render_panel->start_render();
+		break;
+	case ID_COPPER_NGAN:
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->set_col_texture(Vector(0.0749, 0.0414, 0.027), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_specular(Vector(0.0756, 0.0437, 0.0202), item_id);
+		render_panel->raytracer.s.objects[obj_id]->set_col_roughness(Vector(33200, 33200, 33200), item_id);
+		render_panel->start_render();
+		break;
 	}
 	render_panel->update_gui();
 }
+
+
+
 void RaytracerFrame::OnPopupClickSpecular(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	int item_id = (int)static_cast<wxMenu *>(evt.GetEventObject())->GetClientData();
+	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
 	int itemIndex = -1;
 	int firstSel = render_panel->raytracer_app->m_SpecularFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
 
@@ -822,7 +973,7 @@ void RaytracerFrame::OnPopupClickRoughness(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	int item_id = (int)static_cast<wxMenu *>(evt.GetEventObject())->GetClientData();
+	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
 	int itemIndex = -1;
 	int firstSel = render_panel->raytracer_app->m_RoughnessFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
 
@@ -889,7 +1040,7 @@ void RaytracerFrame::OnPopupClickNormal(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	int item_id = (int)static_cast<wxMenu *>(evt.GetEventObject())->GetClientData();
+	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
 
 	int itemIndex = -1;
 	int firstSel = render_panel->raytracer_app->m_NormalFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
@@ -948,7 +1099,7 @@ void RaytracerFrame::OnPopupClickAlpha(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	int item_id = (int)static_cast<wxMenu *>(evt.GetEventObject())->GetClientData();
+	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
 	int itemIndex = -1;
 	int firstSel = render_panel->raytracer_app->m_AlphaFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
 	switch (evt.GetId()) {
@@ -1005,6 +1156,56 @@ void RaytracerFrame::OnPopupClickAlpha(wxCommandEvent &evt) {
 	render_panel->update_gui();
 }
 
+void RaytracerFrame::DeselectAll(wxListCtrl* list) {
+
+	long item = -1;
+	for (;; ) {
+		item = list->GetNextItem(item, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+		if (item == -1)
+			break;
+
+		list->SetItemState(item, 0, wxLIST_STATE_SELECTED);
+	}
+}
+
+void RaytracerFrame::OnListSelected(wxListEvent &evt) {
+	//int sel = evt.GetItem();
+	std::vector<int> selected_items;
+	long item = -1;
+	for (;; ) {
+		item = ((wxListCtrl*)evt.GetEventObject())->GetNextItem(item, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+		if (item == -1)
+			break;
+
+		selected_items.push_back(item);
+	}
+	
+	if (programHandling) { return; }  // this is because SetItemState invokes an OnSelectedItem event, which in turn calls this function indefinitely
+	programHandling = true;
+	DeselectAll(render_panel->raytracer_app->m_AlbedoFile);
+	DeselectAll(render_panel->raytracer_app->m_NormalFile);
+	DeselectAll(render_panel->raytracer_app->m_AlphaFile);
+	DeselectAll(render_panel->raytracer_app->m_SpecularFile);
+	DeselectAll(render_panel->raytracer_app->m_RoughnessFile);
+
+	for (int i = 0; i < selected_items.size(); i++) {
+		render_panel->raytracer_app->m_AlbedoFile->SetItemState(selected_items[i], wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+		render_panel->raytracer_app->m_NormalFile->SetItemState(selected_items[i], wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+		render_panel->raytracer_app->m_AlphaFile->SetItemState(selected_items[i], wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+		render_panel->raytracer_app->m_SpecularFile->SetItemState(selected_items[i], wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+		render_panel->raytracer_app->m_RoughnessFile->SetItemState(selected_items[i], wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+	}
+
+	int id = evt.GetItem();
+	render_panel->raytracer_app->m_AlbedoFile->EnsureVisible(id);
+	render_panel->raytracer_app->m_NormalFile->EnsureVisible(id);
+	render_panel->raytracer_app->m_AlphaFile->EnsureVisible(id);
+	render_panel->raytracer_app->m_SpecularFile->EnsureVisible(id);
+	render_panel->raytracer_app->m_RoughnessFile->EnsureVisible(id);
+	evt.Skip();
+	programHandling = false;
+}
+
 void RaytracerFrame::OnListRightClick(wxListEvent &evt) {
 	int sel = evt.GetItem();
 	void *data = reinterpret_cast<void *>(sel);
@@ -1018,7 +1219,46 @@ void RaytracerFrame::OnListRightClick(wxListEvent &evt) {
 	mnu.Append(ID_CHANGE_COLOR, "Change Color");
 	mnu.Append(ID_CHANGE_TEXTURE, "Change Texture");
 	
-	mnu.Connect(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(RaytracerFrame::OnPopupClick), NULL, this);
+
+	wxMenu submnu;
+	wxMenu subsubmnu;
+	subsubmnu.Append(ID_GOLD_NGAN, "Ngan");
+	subsubmnu.Append(ID_GOLD, "OpenGL");
+	submnu.AppendSubMenu(&subsubmnu, "Gold");
+
+	wxMenu subsubmnu2;
+	subsubmnu2.Append(ID_SILVER_NGAN, "Ngan");
+	subsubmnu2.Append(ID_SILVER, "OpenGL");
+	submnu.AppendSubMenu(&subsubmnu2, "Silver");
+
+	wxMenu subsubmnu3;
+	subsubmnu3.Append(ID_CHROME_NGAN, "Ngan");
+	subsubmnu3.Append(ID_CHROME, "OpenGL");
+	submnu.AppendSubMenu(&subsubmnu3, "Chrome");
+
+	wxMenu subsubmnu4;
+	subsubmnu4.Append(ID_BRONZE_NGAN, "Ngan");
+	subsubmnu4.Append(ID_BRONZE, "OpenGL");
+	submnu.AppendSubMenu(&subsubmnu4, "Bronze");
+
+	wxMenu subsubmnu5;
+	subsubmnu5.Append(ID_COPPER_NGAN, "Ngan");
+	subsubmnu5.Append(ID_COPPER, "OpenGL");
+	submnu.AppendSubMenu(&subsubmnu5, "Copper");
+
+	wxMenu subsubmnu6;
+	subsubmnu6.Append(ID_WHITE_PLASTIC_NGAN, "Ngan");
+	subsubmnu6.Append(ID_WHITE_PLASTIC, "OpenGL");
+	submnu.AppendSubMenu(&subsubmnu6, "White Plastic");
+
+	wxMenu subsubmnu7;
+	subsubmnu7.Append(ID_PEARL_NGAN, "Ngan");
+	subsubmnu7.Append(ID_PEARL, "OpenGL");
+	submnu.AppendSubMenu(&subsubmnu7, "Pearl");
+	
+	mnu.AppendSubMenu(&submnu, "Change Whole Material Color to...");
+
+	mnu.Connect(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(RaytracerFrame::OnPopupClick), NULL, this);	
 	PopupMenu(&mnu);
 }
 
@@ -1092,7 +1332,19 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 		for (size_t n = 0; n < nFiles; n++) {		
 
 			if (filenames[n].find(".xyz") != std::string::npos) {
-				PointSet* g = new PointSet(filenames[n], 0.005);
+
+				std::string values = wxGetTextFromUser("Space separated, -1: ignore, 0:x 1:y, 2:z, 3:nx,4:ny,5:nz, 6:colr, 7:colg, 8:colb",
+					"Enter XYZ file format", "-1 -1 0 1 2 6 7 8");
+				const char* line = &values.c_str()[0];
+				int cols[100];
+				int nbcols = 0;
+				int offset;
+				while (sscanf(line, "%d%n", &cols[nbcols], &offset) == 1) {
+					nbcols++;
+					line += offset;
+				}
+
+				PointSet* g = new PointSet(filenames[n], nbcols, cols, 0.005);
 				g->scale = 30;
 				Vector c = (g->bvh.bbox.bounds[0] + g->bvh.bbox.bounds[1])*0.5; // c is at 0
 				double s = std::max(g->bvh.bbox.bounds[1][0] - g->bvh.bbox.bounds[0][0], std::max(g->bvh.bbox.bounds[1][1] - g->bvh.bbox.bounds[0][1], g->bvh.bbox.bounds[1][2] - g->bvh.bbox.bounds[0][2]));

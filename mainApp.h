@@ -82,6 +82,23 @@
 #define ID_REMOVE_TEXTURE_SPECULAR 44
 #define ID_SAVEIMAGE 45
 #define ID_EXPORT_MTL 46
+#define ID_MESHINFO 47
+
+#define ID_GOLD 49
+#define ID_GOLD_NGAN 491
+#define ID_SILVER 50
+#define ID_SILVER_NGAN 501
+#define ID_PEARL 51
+#define ID_PEARL_NGAN 511
+#define ID_WHITE_PLASTIC 52
+#define ID_WHITE_PLASTIC_NGAN 521
+#define ID_CHROME 53
+#define ID_CHROME_NGAN 531
+#define ID_BRONZE 54
+#define ID_BRONZE_NGAN 541
+#define ID_COPPER 55
+#define ID_COPPER_NGAN 551
+
 
 
 class RaytracerApp;
@@ -116,13 +133,18 @@ public:
 	void OnListRightClickNormal(wxListEvent &evt);
 	void OnListRightClickAlpha(wxListEvent &evt);
 	void OnListRightClickRoughness(wxListEvent &evt);
+	void OnListSelected(wxListEvent &evt);
+
 
 	void SaveAs(wxCommandEvent &evt);
 	void SaveImage(wxCommandEvent &evt);
 	void ExportMtl(wxCommandEvent &evt);
 	void Open(wxCommandEvent &evt);
+	void ShowMeshInfo(wxCommandEvent &evt);
+	void DeselectAll(wxListCtrl* list);
 
 	RenderPanel *render_panel;
+	bool programHandling;
 private:
 
 	wxDECLARE_EVENT_TABLE();
@@ -426,12 +448,17 @@ public:
 				}
 				if (middle_mouse_down) {
 					if (selected_object >= 0 && selected_object < raytracer.s.objects.size()) {
-						raytracer.s.objects[selected_object]->max_rotation += Vector(0., 0., dy*M_PI / 180.*3.);
+						//raytracer.s.objects[selected_object]->max_rotation += Vector(0., 0., dy*M_PI / 180.*3.);
+						Matrix<3, 3> R = createRotationMatrixZ(dy*M_PI / 180.*3.);
+
+						raytracer.s.objects[selected_object]->mat_rotation = R * raytracer.s.objects[selected_object]->mat_rotation;
 					}
 				}
 				if (right_mouse_down) {
 					if (selected_object >= 0 && selected_object < raytracer.s.objects.size()) {
-						raytracer.s.objects[selected_object]->max_rotation += Vector(dy*M_PI / 180.*3., dx*M_PI / 180.*3., 0.);
+						//raytracer.s.objects[selected_object]->max_rotation += Vector(dy*M_PI / 180.*3., dx*M_PI / 180.*3., 0.);
+						Matrix<3, 3> R = createRotationMatrixX(dy*M_PI / 180.*3.)*createRotationMatrixY(dx*M_PI / 180.*3.);
+						raytracer.s.objects[selected_object]->mat_rotation = R * raytracer.s.objects[selected_object]->mat_rotation;
 					}
 				}
 			} else { // camera motion

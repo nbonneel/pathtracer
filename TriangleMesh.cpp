@@ -5,7 +5,7 @@
 #include <fstream>
 #include <string>
 #include <set>
-
+#include <list>
 
 void Geometry::readVRML(const char* obj) {
 	bool shuffle_colors = true;
@@ -225,6 +225,11 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 	while (!feof(f)) {
 		char line[255];
 		if (!fgets(line, 255, f)) break;
+
+		std::string linetrim(line);
+		linetrim.erase(linetrim.find_last_not_of(" \r\t") + 1);
+		strcpy(line, linetrim.c_str());
+
 		if (line[0] == 'u' && line[1] == 's') {
 			sscanf(line, "usemtl %[^\n]\n", grp);
 
@@ -293,8 +298,6 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 
 			char* consumedline = line + 1;
 			int offset;
-			std::string consumedlinetrim(consumedline);
-			consumedlinetrim.erase(consumedlinetrim.find_last_not_of(" \r\t") + 1);
 
 			nn = sscanf(consumedline, "%u/%u/%u %u/%u/%u %u/%u/%u%n", &i0, &j0, &k0, &i1, &j1, &k1, &i2, &j2, &k2, &offset);
 			if (nn == 9) {
@@ -310,7 +313,7 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 				if (k0 < 0) t.ni = normals.size() + k0; else	t.ni = k0 - 1;
 				if (k1 < 0) t.nj = normals.size() + k1; else	t.nj = k1 - 1;
 				if (k2 < 0) t.nk = normals.size() + k2; else	t.nk = k2 - 1;
-				t.showEdges[2] = (consumedlinetrim[offset] == '\n');
+				t.showEdges[2] = (consumedline[offset] == '\n') || ((consumedline[offset] == ' ' && consumedline[offset + 1] == '\n')); // ugly hack cause ppl put spaces before \n sometimes.
 				indices.push_back(t);
 			} else {
 				nn = sscanf(consumedline, "%u/%u %u/%u %u/%u%n", &i0, &j0, &i1, &j1, &i2, &j2, &offset);
@@ -324,7 +327,7 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 					if (j0 < 0) t.uvi = uvs.size() + j0; else	t.uvi = j0 - 1;
 					if (j1 < 0) t.uvj = uvs.size() + j1; else	t.uvj = j1 - 1;
 					if (j2 < 0) t.uvk = uvs.size() + j2; else	t.uvk = j2 - 1;
-					t.showEdges[2] = (consumedlinetrim[offset] == '\n');
+					t.showEdges[2] = (consumedline[offset] == '\n') || ((consumedline[offset] == ' ' && consumedline[offset + 1] == '\n'));
 					indices.push_back(t);
 				} else {
 					nn = sscanf(consumedline, "%u %u %u%n", &i0, &i1, &i2, &offset);
@@ -335,7 +338,7 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 						if (i0 < 0) t.vtxi = vertices.size() + i0; else	t.vtxi = i0 - 1;
 						if (i1 < 0) t.vtxj = vertices.size() + i1; else	t.vtxj = i1 - 1;
 						if (i2 < 0) t.vtxk = vertices.size() + i2; else	t.vtxk = i2 - 1;
-						t.showEdges[2] = (consumedlinetrim[offset] == '\n');
+						t.showEdges[2] = (consumedline[offset] == '\n') || ((consumedline[offset] == ' ' && consumedline[offset + 1] == '\n'));
 						indices.push_back(t);
 					} else {
 						nn = sscanf(consumedline, "%u//%u %u//%u %u//%u%n", &i0, &k0, &i1, &k1, &i2, &k2, &offset);
@@ -348,7 +351,7 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 						if (k0 < 0) t.ni = normals.size() + k0; else	t.ni = k0 - 1;
 						if (k1 < 0) t.nj = normals.size() + k1; else	t.nj = k1 - 1;
 						if (k2 < 0) t.nk = normals.size() + k2; else	t.nk = k2 - 1;
-						t.showEdges[2] = (consumedlinetrim[offset] == '\n');
+						t.showEdges[2] = (consumedline[offset] == '\n') || ((consumedline[offset] == ' ' && consumedline[offset + 1] == '\n'));
 						indices.push_back(t);
 					}
 				}
@@ -357,8 +360,6 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 
 
 			consumedline = consumedline + offset;
-			consumedlinetrim = std::string(consumedline);
-			consumedlinetrim.erase(consumedlinetrim.find_last_not_of(" \r\t") + 1);
 
 			while (true) {
 				if (consumedline[0] == '\n') break;
@@ -378,7 +379,7 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 					if (k0 < 0) t2.ni = normals.size() + k0; else	t2.ni = k0 - 1;
 					if (k2 < 0) t2.nj = normals.size() + k2; else	t2.nj = k2 - 1;
 					if (k3 < 0) t2.nk = normals.size() + k3; else	t2.nk = k3 - 1;
-					t2.showEdges[2] = (consumedlinetrim[offset] == '\n');
+					t2.showEdges[2] = (consumedline[offset] == '\n') || ((consumedline[offset] == ' ' && consumedline[offset+1] == '\n'));
 					indices.push_back(t2);
 					consumedline = consumedline + offset;
 					i2 = i3;
@@ -393,7 +394,7 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 						if (j0 < 0) t2.uvi = uvs.size() + j0; else	t2.uvi = j0 - 1;
 						if (j2 < 0) t2.uvj = uvs.size() + j2; else	t2.uvj = j2 - 1;
 						if (j3 < 0) t2.uvk = uvs.size() + j3; else	t2.uvk = j3 - 1;
-						t2.showEdges[2] = (consumedlinetrim[offset] == '\n');
+						t2.showEdges[2] = (consumedline[offset] == '\n') || ((consumedline[offset] == ' ' && consumedline[offset + 1] == '\n'));
 						consumedline = consumedline + offset;
 						i2 = i3;
 						j2 = j3;
@@ -407,7 +408,7 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 							if (k0 < 0) t2.ni = normals.size() + k0; else	t2.ni = k0 - 1;
 							if (k2 < 0) t2.nj = normals.size() + k2; else	t2.nj = k2 - 1;
 							if (k3 < 0) t2.nk = normals.size() + k3; else	t2.nk = k3 - 1;
-							t2.showEdges[2] = (consumedlinetrim[offset] == '\n');
+							t2.showEdges[2] = (consumedline[offset] == '\n') || ((consumedline[offset] == ' ' && consumedline[offset + 1] == '\n'));
 							consumedline = consumedline + offset;
 							i2 = i3;
 							k2 = k3;
@@ -418,7 +419,7 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 								if (i0 < 0) t2.vtxi = vertices.size() + i0; else	t2.vtxi = i0 - 1;
 								if (i2 < 0) t2.vtxj = vertices.size() + i2; else	t2.vtxj = i2 - 1;
 								if (i3 < 0) t2.vtxk = vertices.size() + i3; else	t2.vtxk = i3 - 1;
-								t2.showEdges[2] = (consumedlinetrim[offset] == '\n');
+								t2.showEdges[2] = (consumedline[offset] == '\n') || ((consumedline[offset] == ' ' && consumedline[offset + 1] == '\n'));
 								consumedline = consumedline + offset;
 								i2 = i3;
 								indices.push_back(t2);
@@ -695,9 +696,11 @@ void Geometry::init(const char* obj, double scaling, const Vector& offset, bool 
 
 	for (int i = 0; i < vertices.size(); i++) {
 		std::swap(vertices[i][0], vertices[i][2]);
+		vertices[i][0] = -vertices[i][0];
 	}
 	for (int i = 0; i < normals.size(); i++) {
 		std::swap(normals[i][0], normals[i][2]);
+		normals[i][0] = -normals[i][0];
 	}
 
 	BBox bb(Vector(1E9, 1E9, 1E9), Vector(-1E9, -1E9, -1E9));
@@ -1150,6 +1153,86 @@ bool Geometry::intersection_shadow(const Ray& d, double &t, double cur_best_t, d
 }
 
 
+void Geometry::findQuads(int &nbTriangles, int &nbOthers, int &nbRealEdges) {
+	std::map<Edge, std::pair<bool, std::vector<int> > > edges_to_faces;
 
+	int nb_hidden = 0;
+	nbTriangles = 0;
+	for (int i = 0; i < indices.size(); i++) {
 
+		edges_to_faces[Edge(indices[i].vtxi, indices[i].vtxj)].second.push_back(i);
+		edges_to_faces[Edge(indices[i].vtxj, indices[i].vtxk)].second.push_back(i);
+		edges_to_faces[Edge(indices[i].vtxi, indices[i].vtxk)].second.push_back(i);
+
+		edges_to_faces[Edge(indices[i].vtxi, indices[i].vtxj)].first = indices[i].showEdges[0];
+		edges_to_faces[Edge(indices[i].vtxj, indices[i].vtxk)].first = indices[i].showEdges[1];
+		edges_to_faces[Edge(indices[i].vtxi, indices[i].vtxk)].first = indices[i].showEdges[2];
+
+		if (indices[i].showEdges[0] && indices[i].showEdges[1] && indices[i].showEdges[2])
+			nbTriangles++;
+	}
+	for (auto it = edges_to_faces.begin(); it != edges_to_faces.end(); ++it) {
+		if (!it->second.first) nb_hidden++;
+
+	}
+	nbRealEdges = edges_to_faces.size() - nb_hidden;
+	int nbFacets = indices.size() - nb_hidden;
+	nbOthers = nbFacets - nbTriangles;
+}
+
+int Geometry::getNbConnected(int &alsoReturnsNbEdges, int &nonManifoldFaces, int &nbBoundaryEdges) {
+
+	std::map<Edge, std::vector<int> > edges_to_faces;
+	for (int i = 0; i < indices.size(); i++) {		
+		edges_to_faces[Edge(indices[i].vtxi, indices[i].vtxj)].push_back(i);		
+		edges_to_faces[Edge(indices[i].vtxj, indices[i].vtxk)].push_back(i);		
+		edges_to_faces[Edge(indices[i].vtxi, indices[i].vtxk)].push_back(i);
+	}
+	alsoReturnsNbEdges = edges_to_faces.size();
+
+	nonManifoldFaces = 0;
+	nbBoundaryEdges = 0;
+	std::map<int, std::vector<int> > faces_to_neighbors;
+	for (std::map<Edge, std::vector<int> >::iterator it = edges_to_faces.begin(); it != edges_to_faces.end(); ++it) {
+		if (it->second.size() > 2) nonManifoldFaces++;
+		if (it->second.size() == 1) nbBoundaryEdges++;
+		for (int i = 0; i < it->second.size(); i++) {
+			for (int j = 0; j < it->second.size(); j++) {
+				if (it->second[i] == it->second[j]) continue;
+				faces_to_neighbors[it->second[i]].push_back(it->second[j]);
+			}
+		}
+	}
+
+	std::list<int> visited_faces;
+	std::vector<bool> visited(indices.size(), false);
+	int nbcomp = 0, last_non_visited = 0, nb_visited = 0;
+
+	while (nb_visited != indices.size()) {
+		for (int i = last_non_visited; i < indices.size(); i++) {
+			if (!visited[i]) {
+				visited_faces.push_back(i);
+				last_non_visited = i;
+				break;
+			}
+		}
+
+		nbcomp++;
+		while (visited_faces.size() != 0) {
+			int curface = visited_faces.front();
+			visited_faces.pop_front();
+			if (visited[curface]) continue;
+			visited[curface] = true;
+			nb_visited++;
+
+			for (int i = 0; i < faces_to_neighbors[curface].size(); i++) {
+				if (!visited[faces_to_neighbors[curface][i]]) {
+					visited_faces.push_back(faces_to_neighbors[curface][i]);
+				}
+			}
+		}
+	}
+
+	return nbcomp;
+}
 

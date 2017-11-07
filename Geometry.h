@@ -349,19 +349,21 @@ public:
 	virtual Vector get_translation(double time) const {
 		return max_translation;// *time;
 	}
-	virtual Vector get_rotation(double time) const {
-		return max_rotation; // *time;
+	virtual Matrix<3,3> get_rotation(double time) const {
+		return mat_rotation; // *time;
 	}
 	virtual Vector get_scale(double time) const {
 		return Vector(scale, scale, scale); // *time;
 	}
 	virtual void build_matrix(double time) {
 
+		Matrix<3, 3> m = get_rotation(time);
+		Matrix<3, 3> mt = m.getTransposed();
 		Vector v2;
 		for (int i = 0; i < 3; i++) {
 			Vector v(0, 0, 0);
 			v[i] = 1;
-			v2 = rotate_dir(v, get_rotation(time));
+			v2 = Vector(m[0*3+i], m[1 * 3 + i], m[2 * 3 + i]);// rotate_dir(v, get_rotation(time));
 			trans_matrix[0 * 4 + i] = v2[0] * scale;
 			trans_matrix[1 * 4 + i] = v2[1] * scale;
 			trans_matrix[2 * 4 + i] = v2[2] * scale;
@@ -370,18 +372,21 @@ public:
 			rot_matrix[1 * 3 + i] = v2[1];
 			rot_matrix[2 * 3 + i] = v2[2];
 						
-			v2 = inverse_rotate_dir(v2, get_rotation(time));
+			//v2 = inverse_rotate_dir(v2, get_rotation(time));
+			v2 = Vector(mt[0 * 3 + i], mt[1 * 3 + i], mt[2 * 3 + i]);
 			inv_trans_matrix[0 * 4 + i] = v2[0] / scale;
 			inv_trans_matrix[1 * 4 + i] = v2[1] / scale;
 			inv_trans_matrix[2 * 4 + i] = v2[2] / scale;
 		}
 
-		v2 = rotate_dir(-rotation_center, get_rotation(time));
+		//v2 = rotate_dir(-rotation_center, get_rotation(time));
+		v2 = m*(-rotation_center);
 		trans_matrix[0 * 4 + 3] = v2[0]*scale + rotation_center[0] + get_translation(time)[0];
 		trans_matrix[1 * 4 + 3] = v2[1] * scale + rotation_center[1] + get_translation(time)[1];
 		trans_matrix[2 * 4 + 3] = v2[2] * scale + rotation_center[2] + get_translation(time)[2];
 
-		v2 = inverse_rotate_dir(-rotation_center-get_translation(time), get_rotation(time));
+		//v2 = inverse_rotate_dir(-rotation_center-get_translation(time), get_rotation(time));
+		v2 = mt*(-rotation_center - get_translation(time));
 		inv_trans_matrix[0 * 4 + 3] = v2[0] /scale + rotation_center[0] ;
 		inv_trans_matrix[1 * 4 + 3] = v2[1] / scale + rotation_center[1];
 		inv_trans_matrix[2 * 4 + 3] = v2[2] / scale + rotation_center[2];		
@@ -455,7 +460,7 @@ public:
 		fprintf(f, "miroir: %u\n", miroir?1:0);
 		fprintf(f, "transparent: %u\n", transparent ? 1 : 0);
 		fprintf(f, "translation: (%lf, %lf, %lf)\n", max_translation[0], max_translation[1], max_translation[2]);
-		fprintf(f, "rotation: (%lf, %lf, %lf)\n", max_rotation[0], max_rotation[1], max_rotation[2]);
+		fprintf(f, "rotation: (%lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf)\n", mat_rotation[0], mat_rotation[1], mat_rotation[2], mat_rotation[3], mat_rotation[4], mat_rotation[5], mat_rotation[6], mat_rotation[7], mat_rotation[8]);
 		fprintf(f, "center: (%lf, %lf, %lf)\n", rotation_center[0], rotation_center[1], rotation_center[2]);
 		fprintf(f, "scale: %lf\n", scale);
 		fprintf(f, "display_edges: %u\n", display_edges ? 1 : 0);
@@ -497,7 +502,7 @@ public:
 		fscanf(f, "miroir: %u\n", &mybool); miroir = mybool;
 		fscanf(f, "transparent: %u\n", &mybool); transparent = mybool;
 		fscanf(f, "translation: (%lf, %lf, %lf)\n", &max_translation[0], &max_translation[1], &max_translation[2]);
-		fscanf(f, "rotation: (%lf, %lf, %lf)\n", &max_rotation[0], &max_rotation[1], &max_rotation[2]);
+		fscanf(f, "rotation: (%lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf)\n", &mat_rotation[0], &mat_rotation[1], &mat_rotation[2], &mat_rotation[3], &mat_rotation[4], &mat_rotation[5], &mat_rotation[6], &mat_rotation[7], &mat_rotation[8]);
 		fscanf(f, "center: (%lf, %lf, %lf)\n", &rotation_center[0], &rotation_center[1], &rotation_center[2]);
 		fscanf(f, "scale: %lf\n", &scale);
 		fscanf(f, "display_edges: %u\n", &mybool); display_edges = mybool;
@@ -603,7 +608,7 @@ public:
 	bool miroir;
 	bool transparent;
 	Vector max_translation;
-	Vector max_rotation; // Euler angles
+	Matrix<3, 3> mat_rotation; // Euler angles
 	Vector rotation_center;
 	double scale;
 	bool display_edges, interp_normals, flip_normals;
@@ -620,105 +625,6 @@ public:
 
 	std::vector<Texture> textures, specularmap, alphamap, roughnessmap, normal_map;
 	double trans_matrix[12], inv_trans_matrix[12], rot_matrix[9];
-};
-
-/*class BVH {
-public:	
-	int i0, i1;
-	BBox bbox;
-
-	BVH *fg, *fd;
-}; */
-
-class BVHNodes {
-public:
-	//int i0, i1;
-	bool isleaf;
-	int fg, fd;
-	BBox bbox;
-};
-
-class BVH {
-public:
-	BBox bbox;
-	std::vector<BVHNodes> nodes;
-};
-
-
-class Edge {
-public:
-	Edge(int i=0, int j=0) {
-		if (i<j) {
-			a = i; b = j;
-		} else {
-			a = j; b = i;
-		}
-	}
-	int a, b;
-	bool operator<(const Edge& r) const {
-		if (a < r.a) { return true; }
-		if (a > r.a) { return false; }
-		return (b < r.b);
-	}
-	bool operator==(const Edge& r) const {
-		if (a != r.a) return false;
-		if (b != r.b) return false;
-		return true;
-	}
-};
-
-class TriangleIndices {
-public:
-	TriangleIndices(int vtxi=-1, int vtxj = -1, int vtxk = -1, int ni = -1, int nj = -1, int nk = -1, int uvi = -1, int uvj=-1, int uvk=-1, int group = -1, bool added = false) : vtxi(vtxi), vtxj(vtxj), vtxk(vtxk), uvi(uvi), uvj(uvj), uvk(uvk), ni(ni), nj(nj), nk(nk), group(group) {
-		showEdges[0] = true;
-		showEdges[1] = true;
-		showEdges[2] = true;
-	};
-	int vtxi, vtxj, vtxk;
-	int uvi, uvj, uvk;
-	int ni, nj, nk;
-	int group;
-	bool showEdges[3];
-};
-
-class Triangle {
-public:
-	Triangle() {};
-	Triangle(const Vector& A, const Vector &B, const Vector& C) : A(A) {
-		u = B - A;
-		v = C - A;
-		N = cross(u, v); 
-		m11 = u.getNorm2();
-		m22 = v.getNorm2();
-		m12 = dot(u, v);
-		invdetm = 1. / (m11*m22 - m12*m12);
-	};
-	bool intersection(const Ray& d, Vector& P, double &t, double &alpha, double &beta, double &gamma) const {		
-		t = dot(A - d.origin, N) / dot(d.direction, N);
-		if (t < 0 || t!=t) return false;  //isnan
-
-		P = d.origin + t*d.direction;
-		Vector w(P - A);
-		double b11 = dot(w, u);
-		double b21 = dot(w, v);
-		double detb = b11*m22 - b21*m12;
-		beta = detb * invdetm;    // coord barycentrique w.r.t à B
-		if (beta < 0) return false;
-
-		double detg = b21*m11 - b11*m12;
-		gamma = detg * invdetm;   // coord barycentrique w.r.t à C
-		if (gamma < 0) return false;
-
-		alpha = 1 - beta - gamma;
-		if (alpha < 0) return false;
-
-		//N.normalize();
-		return true;
-
-	}
-
-	Vector A, u, v, N;
-	double m11, m12, m22, invdetm;
 };
 
 
