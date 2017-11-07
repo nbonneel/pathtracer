@@ -3,6 +3,7 @@
 #include <string>
 #include "hdrwriter.h"
 #include <vector>
+#define cimg_display 0
 #include "CImg.h"
 
 bool file_exists(const char* filename);

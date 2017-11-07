@@ -180,7 +180,7 @@ public:
     DnDFile(RaytracerFrame *pOwner = NULL) { m_pOwner = pOwner; }
 
     virtual bool OnDropFiles(wxCoord x, wxCoord y,
-                             const wxArrayString& filenames) wxOVERRIDE;
+                             const wxArrayString& filenames) ;
 
 private:
 	RaytracerFrame *m_pOwner;
@@ -196,7 +196,7 @@ public:
 	}
 
 	virtual bool OnDropFiles(wxCoord x, wxCoord y,
-		const wxArrayString& filenames) wxOVERRIDE;
+		const wxArrayString& filenames) ;
 
 private:
 	wxListCtrl *m_pOwner;
@@ -211,7 +211,7 @@ public:
 	}
 
 	virtual bool OnDropFiles(wxCoord x, wxCoord y,
-		const wxArrayString& filenames) wxOVERRIDE;
+		const wxArrayString& filenames) ;
 
 private:
 	wxListCtrl *m_pOwner;
@@ -226,7 +226,7 @@ public:
 	}
 
 	virtual bool OnDropFiles(wxCoord x, wxCoord y,
-		const wxArrayString& filenames) wxOVERRIDE;
+		const wxArrayString& filenames) ;
 
 private:
 	wxListCtrl *m_pOwner;
@@ -254,7 +254,7 @@ public:
 	}
 
 	virtual bool OnDropFiles(wxCoord x, wxCoord y,
-		const wxArrayString& filenames) wxOVERRIDE;
+		const wxArrayString& filenames) ;
 
 private:
 	wxTextCtrl *m_pOwner;
@@ -269,7 +269,7 @@ public:
 	}
 
 	virtual bool OnDropFiles(wxCoord x, wxCoord y,
-		const wxArrayString& filenames) wxOVERRIDE;
+		const wxArrayString& filenames) ;
 
 private:
 	wxListCtrl *m_pOwner;
@@ -284,7 +284,7 @@ public:
 	}
 
 	virtual bool OnDropFiles(wxCoord x, wxCoord y,
-		const wxArrayString& filenames) wxOVERRIDE;
+		const wxArrayString& filenames) ;
 
 private:
 	wxListCtrl *m_pOwner;
@@ -632,7 +632,7 @@ END_EVENT_TABLE()
 class RaytracerApp : public wxApp
 {
 public:
-	virtual bool OnInit() wxOVERRIDE;
+	virtual bool OnInit() ;
 	RenderPanel* renderPanel;
 	wxGauge *progressBar;
 	wxBookCtrlBase *m_bookCtrl;
@@ -674,7 +674,7 @@ public:
 };
 
 BEGIN_EVENT_TABLE(RaytracerApp, wxApp)
-EVT_IDLE(OnIdle)
+EVT_IDLE(RaytracerApp::OnIdle)
 END_EVENT_TABLE()
 
 
