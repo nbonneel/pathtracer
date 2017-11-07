@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <assert.h>
+#include <cmath>
 
 typedef  unsigned int uint32_t;
 
@@ -189,10 +190,10 @@ assert(floatsPerPixel >= 3); // we write only three floats (RGB) but support lar
    {
     int e;
     maxV = frexp(maxV, &e) * 256.0/maxV;
-    encodedPixel[0] = unsigned char(maxV * r);
-    encodedPixel[1] = unsigned char(maxV * g);
-    encodedPixel[2] = unsigned char(maxV * b);
-    encodedPixel[3] = unsigned char(e + 128);
+    encodedPixel[0] = (unsigned char)(maxV * r);
+    encodedPixel[1] = (unsigned char)(maxV * g);
+    encodedPixel[2] = (unsigned char)(maxV * b);
+    encodedPixel[3] = (unsigned char)(e + 128);
    }
  
    scanline[0][x] = encodedPixel[0];

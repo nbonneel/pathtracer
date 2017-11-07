@@ -686,7 +686,7 @@ void RaytracerFrame::OnPopupClick(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	int item_id = (int)static_cast<wxMenu *>(evt.GetEventObject())->GetClientData();
+	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
 	int itemIndex = -1;
 	int firstSel = render_panel->raytracer_app->m_AlbedoFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
 
