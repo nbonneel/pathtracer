@@ -55,10 +55,12 @@ Minimalist Quick'n Dirty Path Tracer. No keyboard needed, just drag'n drop files
   <td> 2.5 k polygons + normal map, alpha map and edges display</td>
   </tr>
   
-     <tr>  
+  <tr>  
+  <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/alien.jpg" width="300"> </td>
   <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/mepointcloud.jpg" width="300"> </td>
   </tr>
   <tr> 
+  <td> 240 k triangles</td>
   <td> 4.5 millions points Point Cloud</td>
   </tr>
   </table>
