@@ -1446,35 +1446,44 @@ void RaytracerFrame::createAlbedoMenu() {
 	albedomnu.Append(ID_CHANGE_COLOR, "Change Color");
 	albedomnu.Append(ID_CHANGE_TEXTURE, "Change Texture");
 
-	subsubmnu.Append(ID_GOLD_NGAN, "Ngan");
-	subsubmnu.Append(ID_GOLD, "OpenGL");
-	albedosubmnu.AppendSubMenu(&subsubmnu, "Gold");
+	subsubmnu = new wxMenu();
+	albedosubmnu = new wxMenu();
+	subsubmnu2 = new wxMenu();
+	subsubmnu3 = new wxMenu();
+	subsubmnu4 = new wxMenu();
+	subsubmnu5 = new wxMenu();
+	subsubmnu6 = new wxMenu();
+	subsubmnu7 = new wxMenu();
 
-	subsubmnu2.Append(ID_SILVER_NGAN, "Ngan");
-	subsubmnu2.Append(ID_SILVER, "OpenGL");
-	albedosubmnu.AppendSubMenu(&subsubmnu2, "Silver");
+	subsubmnu->Append(ID_GOLD_NGAN, "Ngan");
+	subsubmnu->Append(ID_GOLD, "OpenGL");
+	albedosubmnu->AppendSubMenu(subsubmnu, "Gold");
 
-	subsubmnu3.Append(ID_CHROME_NGAN, "Ngan");
-	subsubmnu3.Append(ID_CHROME, "OpenGL");
-	albedosubmnu.AppendSubMenu(&subsubmnu3, "Chrome");
+	subsubmnu2->Append(ID_SILVER_NGAN, "Ngan");
+	subsubmnu2->Append(ID_SILVER, "OpenGL");
+	albedosubmnu->AppendSubMenu(subsubmnu2, "Silver");
 
-	subsubmnu4.Append(ID_BRONZE_NGAN, "Ngan");
-	subsubmnu4.Append(ID_BRONZE, "OpenGL");
-	albedosubmnu.AppendSubMenu(&subsubmnu4, "Bronze");
+	subsubmnu3->Append(ID_CHROME_NGAN, "Ngan");
+	subsubmnu3->Append(ID_CHROME, "OpenGL");
+	albedosubmnu->AppendSubMenu(subsubmnu3, "Chrome");
 
-	subsubmnu5.Append(ID_COPPER_NGAN, "Ngan");
-	subsubmnu5.Append(ID_COPPER, "OpenGL");
-	albedosubmnu.AppendSubMenu(&subsubmnu5, "Copper");
+	subsubmnu4->Append(ID_BRONZE_NGAN, "Ngan");
+	subsubmnu4->Append(ID_BRONZE, "OpenGL");
+	albedosubmnu->AppendSubMenu(subsubmnu4, "Bronze");
 
-	subsubmnu6.Append(ID_WHITE_PLASTIC_NGAN, "Ngan");
-	subsubmnu6.Append(ID_WHITE_PLASTIC, "OpenGL");
-	albedosubmnu.AppendSubMenu(&subsubmnu6, "White Plastic");
+	subsubmnu5->Append(ID_COPPER_NGAN, "Ngan");
+	subsubmnu5->Append(ID_COPPER, "OpenGL");
+	albedosubmnu->AppendSubMenu(subsubmnu5, "Copper");
 
-	subsubmnu7.Append(ID_PEARL_NGAN, "Ngan");
-	subsubmnu7.Append(ID_PEARL, "OpenGL");
-	albedosubmnu.AppendSubMenu(&subsubmnu7, "Pearl");
+	subsubmnu6->Append(ID_WHITE_PLASTIC_NGAN, "Ngan");
+	subsubmnu6->Append(ID_WHITE_PLASTIC, "OpenGL");
+	albedosubmnu->AppendSubMenu(subsubmnu6, "White Plastic");
 
-	albedomnu.AppendSubMenu(&albedosubmnu, "Change Whole Material Color to...");
+	subsubmnu7->Append(ID_PEARL_NGAN, "Ngan");
+	subsubmnu7->Append(ID_PEARL, "OpenGL");
+	albedosubmnu->AppendSubMenu(subsubmnu7, "Pearl");
+
+	albedomnu.AppendSubMenu(albedosubmnu, "Change Whole Material Color to...");
 	albedomnu.Connect(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(RaytracerFrame::OnPopupClick), NULL, this);
 }
 

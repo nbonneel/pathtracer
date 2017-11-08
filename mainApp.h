@@ -168,8 +168,8 @@ public:
 	bool programHandling;
 private:
 	void createAlbedoMenu();
-	wxMenu albedomnu, albedosubmnu;
-	wxMenu subsubmnu, subsubmnu2, subsubmnu3, subsubmnu4, subsubmnu5, subsubmnu6, subsubmnu7;
+	wxMenu albedomnu, *albedosubmnu;
+	wxMenu *subsubmnu, *subsubmnu2, *subsubmnu3, *subsubmnu4, *subsubmnu5, *subsubmnu6, *subsubmnu7;
 
 	wxDECLARE_EVENT_TABLE();
 };
