@@ -11,6 +11,21 @@ Minimalist Quick'n Dirty Path Tracer. No keyboard needed, just drag'n drop files
 * Filtering, DoF, one spherical light source, Fresnel reflection on transparent objects.
 * Limited and buggy support of fog.
 
+## Compilation:
+* Dependency: Only wxWdiget 3.1.0
+* Windows: use .sln solution for Visual Studio. 
+* Linux/MacOS: in progress.
+
+## Usage:
+* Drag'n drop OBJ, VRML, XYZ files onto window
+* Mouse down (left, middle, right) for camera control, mouse wheel for moving forward
+* Click to select object
+* Shift+Mouse to move/rotate currently selected object
+* Drag'n drop texture files or envmap files onto their slot on the right panel, or use the popup menu to change their values.
+* If materials are changed, they can be re-exported into a new .MTL file (menu File)
+* Menu Info gives topological info on the currently selected mesh (only works for meshes, not point clouds or the default parametric geometries)
+* Scene can be saved in a .scn file
+
 ## Images:
 
 <table>
