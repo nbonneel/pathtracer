@@ -130,8 +130,7 @@ bool PointSet::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 	bool goleft, goright;
 	Vector localP, localN;
 	double localt;
-	double alpha, beta, gamma;
-
+	
 	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
 	char signs[3];
 	signs[0] = (invd.direction[0] >= 0) ? 1 : 0;
@@ -250,8 +249,7 @@ bool PointSet::intersection_shadow(const Ray& d, double &t, double cur_best_t, d
 	bool goleft, goright;
 	Vector localP, localN;
 	double localt;
-	double alpha, beta, gamma;
-
+	
 	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
 	char signs[3];
 	signs[0] = (invd.direction[0] >= 0) ? 1 : 0;
