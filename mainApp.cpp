@@ -338,7 +338,9 @@ bool RaytracerApp::OnInit()
 
 void RaytracerApp::activateRenderLoop(bool on)
 {
+#if !defined(__WXOSX__)&&!defined(__WXMAC__)&&!defined(__APPLE__)
 	renderPanel->SetDoubleBuffered(true);
+#endif
 	if (on && !render_loop_on)
 	{
 		Connect(wxID_ANY, wxEVT_IDLE, wxIdleEventHandler(RaytracerApp::OnIdle));
