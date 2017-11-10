@@ -79,6 +79,5 @@ int get_png_bitdepth(const char* filename) {
 	fread(&c, sizeof(c), 1, f);
 	fclose(f);
 	int bb = b;
-	int cc = c;
 	return bb;
 }

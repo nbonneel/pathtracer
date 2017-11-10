@@ -1618,8 +1618,6 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 				Geometry* g = new Geometry(filenames[n], 1, Vector(0, 0, 0));
 				g->scale = 30;
 				g->display_edges = false;
-				Vector c = (g->bvh.bbox.bounds[0] + g->bvh.bbox.bounds[1])*0.5; // c is at 0
-				double s = std::max(g->bvh.bbox.bounds[1][0] - g->bvh.bbox.bounds[0][0], std::max(g->bvh.bbox.bounds[1][1] - g->bvh.bbox.bounds[0][1], g->bvh.bbox.bounds[1][2] - g->bvh.bbox.bounds[0][2]));
 				g->max_translation = Vector(0, m_pOwner->render_panel->raytracer.s.objects[2]->get_translation(1)[1] - (g->bvh.bbox.bounds[0][1])*g->scale, 0);
 				m_pOwner->render_panel->raytracer.s.addObject(g);
 			}

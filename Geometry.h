@@ -233,12 +233,12 @@ public:
 	bool intersection_invd(const Ray& invd, const char signs[3], double &t) const {
 
 		double t_max;
-		t_max = (bounds[signs[0]][0] - invd.origin[0]) *invd.direction[0];
+		t_max = (bounds[(int)signs[0]][0] - invd.origin[0]) *invd.direction[0];
 		if (t_max < 0) return false;
 		t = (bounds[1-signs[0]][0] - invd.origin[0]) *invd.direction[0];
 
 		double t_min_y, t_max_y;
-		t_max_y = (bounds[signs[1]][1] - invd.origin[1]) *invd.direction[1];
+		t_max_y = (bounds[(int)signs[1]][1] - invd.origin[1]) *invd.direction[1];
 		if (t_max_y < 0) return false;
 		t_min_y = (bounds[1-signs[1]][1] - invd.origin[1]) *invd.direction[1];
 
@@ -247,7 +247,7 @@ public:
 		if (t_max_y < t_max) t_max = t_max_y;
 		
 		double t_min_z, t_max_z;
-		t_max_z = (bounds[signs[2]][2] - invd.origin[2]) *invd.direction[2];
+		t_max_z = (bounds[(int)signs[2]][2] - invd.origin[2]) *invd.direction[2];
 		if (t_max_z < 0) return false;
 		t_min_z = (bounds[1-signs[2]][2] - invd.origin[2]) *invd.direction[2];
 
@@ -269,7 +269,7 @@ public:
 		t = (bounds[0][0] - invd.origin[0]) *invd.direction[0];
 
 		double t_min_y, t_max_y;
-		t_max_y = (bounds[signs[1]][1] - invd.origin[1]) *invd.direction[1];
+		t_max_y = (bounds[(int)signs[1]][1] - invd.origin[1]) *invd.direction[1];
 		if (t_max_y < 0) return false;
 		t_min_y = (bounds[1 - signs[1]][1] - invd.origin[1]) *invd.direction[1];
 
@@ -278,7 +278,7 @@ public:
 		if (t_max_y < t_max) t_max = t_max_y;
 
 		double t_min_z, t_max_z;
-		t_max_z = (bounds[signs[2]][2] - invd.origin[2]) *invd.direction[2];
+		t_max_z = (bounds[(int)signs[2]][2] - invd.origin[2]) *invd.direction[2];
 		if (t_max_z < 0) return false;
 		t_min_z = (bounds[1 - signs[2]][2] - invd.origin[2]) *invd.direction[2];
 
@@ -300,7 +300,7 @@ public:
 		t = (bounds[1][0] - invd.origin[0]) *invd.direction[0];
 
 		double t_min_y, t_max_y;
-		t_max_y = (bounds[signs[1]][1] - invd.origin[1]) *invd.direction[1];
+		t_max_y = (bounds[(int)signs[1]][1] - invd.origin[1]) *invd.direction[1];
 		if (t_max_y < 0) return false;
 		t_min_y = (bounds[1 - signs[1]][1] - invd.origin[1]) *invd.direction[1];
 
@@ -309,7 +309,7 @@ public:
 		if (t_max_y < t_max) t_max = t_max_y;
 
 		double t_min_z, t_max_z;
-		t_max_z = (bounds[signs[2]][2] - invd.origin[2]) *invd.direction[2];
+		t_max_z = (bounds[(int)signs[2]][2] - invd.origin[2]) *invd.direction[2];
 		if (t_max_z < 0) return false;
 		t_min_z = (bounds[1 - signs[2]][2] - invd.origin[2]) *invd.direction[2];
 
@@ -325,12 +325,12 @@ public:
 
 	bool intersection_invd(const Ray& invd, const char signs[3], double &t, double &t_far) const {
 
-		t_far = (bounds[signs[0]][0] - invd.origin[0]) *invd.direction[0];
+		t_far = (bounds[(int)signs[0]][0] - invd.origin[0]) *invd.direction[0];
 		if (t_far < 0) return false;
 		t = (bounds[1 - signs[0]][0] - invd.origin[0]) *invd.direction[0];
 
 		double t_min_y, t_max_y;
-		t_max_y = (bounds[signs[1]][1] - invd.origin[1]) *invd.direction[1];
+		t_max_y = (bounds[(int)signs[1]][1] - invd.origin[1]) *invd.direction[1];
 		if (t_max_y < 0) return false;
 		t_min_y = (bounds[1 - signs[1]][1] - invd.origin[1]) *invd.direction[1];
 
@@ -339,7 +339,7 @@ public:
 		if (t_max_y < t_far) t_far = t_max_y;
 
 		double t_min_z, t_max_z;
-		t_max_z = (bounds[signs[2]][2] - invd.origin[2]) *invd.direction[2];
+		t_max_z = (bounds[(int)signs[2]][2] - invd.origin[2]) *invd.direction[2];
 		if (t_max_z < 0) return false;
 		t_min_z = (bounds[1 - signs[2]][2] - invd.origin[2]) *invd.direction[2];
 
@@ -490,37 +490,37 @@ public:
 		fprintf(f, "display_edges: %u\n", display_edges ? 1 : 0);
 		fprintf(f, "interp_normals: %u\n", interp_normals ? 1 : 0);
 		fprintf(f, "flip_normals: %u\n", flip_normals ? 1 : 0);
-		fprintf(f, "nb_textures: %u\n", textures.size());
+		fprintf(f, "nb_textures: %u\n", static_cast<unsigned int>(textures.size()));
 		for (int i = 0; i < textures.size(); i++) {
 			fprintf(f, "texture: %s\n", textures[i].filename.c_str());
 			fprintf(f, "multiplier: (%lf, %lf, %lf)\n", textures[i].multiplier[0], textures[i].multiplier[1], textures[i].multiplier[2]);
 		}
-		fprintf(f, "nb_normalmaps: %u\n", normal_map.size());
+		fprintf(f, "nb_normalmaps: %u\n", static_cast<unsigned int>(normal_map.size()));
 		for (int i = 0; i < normal_map.size(); i++) {
 			fprintf(f, "texture: %s\n", normal_map[i].filename.c_str());
 			fprintf(f, "multiplier: (%lf, %lf, %lf)\n", normal_map[i].multiplier[0], normal_map[i].multiplier[1], normal_map[i].multiplier[2]);
 		}
-		fprintf(f, "nb_specularmaps: %u\n", specularmap.size());
+		fprintf(f, "nb_specularmaps: %u\n", static_cast<unsigned int>(specularmap.size()));
 		for (int i = 0; i < specularmap.size(); i++) {
 			fprintf(f, "texture: %s\n", specularmap[i].filename.c_str());
 			fprintf(f, "multiplier: (%lf, %lf, %lf)\n", specularmap[i].multiplier[0], specularmap[i].multiplier[1], specularmap[i].multiplier[2]);
 		}
-		fprintf(f, "nb_alphamaps: %u\n", alphamap.size());
+		fprintf(f, "nb_alphamaps: %u\n", static_cast<unsigned int>(alphamap.size()));
 		for (int i = 0; i < alphamap.size(); i++) {
 			fprintf(f, "texture: %s\n", alphamap[i].filename.c_str());
 			fprintf(f, "multiplier: (%lf, %lf, %lf)\n", alphamap[i].multiplier[0], alphamap[i].multiplier[1], alphamap[i].multiplier[2]);
 		}
-		fprintf(f, "nb_expmaps: %u\n", roughnessmap.size());
+		fprintf(f, "nb_expmaps: %u\n", static_cast<unsigned int>(roughnessmap.size()));
 		for (int i = 0; i < roughnessmap.size(); i++) {
 			fprintf(f, "texture: %s\n", roughnessmap[i].filename.c_str());
 			fprintf(f, "multiplier: (%lf, %lf, %lf)\n", roughnessmap[i].multiplier[0], roughnessmap[i].multiplier[1], roughnessmap[i].multiplier[2]);
 		}
-		fprintf(f, "nb_transpmaps: %u\n", transparent_map.size());
+		fprintf(f, "nb_transpmaps: %u\n", static_cast<unsigned int>(transparent_map.size()));
 		for (int i = 0; i < transparent_map.size(); i++) {
 			fprintf(f, "texture: %s\n", transparent_map[i].filename.c_str());
 			fprintf(f, "multiplier: %lf)\n", transparent_map[i].multiplier[0]);
 		}
-		fprintf(f, "nb_refrindexmaps: %u\n", refr_index_map.size());
+		fprintf(f, "nb_refrindexmaps: %u\n", static_cast<unsigned int>(refr_index_map.size()));
 		for (int i = 0; i < refr_index_map.size(); i++) {
 			fprintf(f, "texture: %s\n", refr_index_map[i].filename.c_str());
 			fprintf(f, "multiplier: %lf)\n", refr_index_map[i].multiplier[0]);
@@ -893,8 +893,6 @@ public:
 		Plane* result = new Plane();
 		result->Object::load_from_file(f);
 
-		char line[512];
-
 		Vector Point, N;
 		fscanf(f, "Point: (%lf, %lf, %lf)\n", &Point[0], &Point[1], &Point[2]);
 		fscanf(f, "N: (%lf, %lf, %lf)\n", &N[0], &N[1], &N[2]);
@@ -966,7 +964,6 @@ public:
 
 	bool intersection_shadow(const Ray& d, double &min_t, double dist_light) const {
 
-		bool has_inter = false;
 		min_t = 1E99;
 
 		for (int i = 0; i < objects.size(); i++) {

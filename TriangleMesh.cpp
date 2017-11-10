@@ -12,7 +12,6 @@ void Geometry::readVRML(const char* obj) {
 
 	FILE* f;
 	f = fopen(obj, "r");
-	int curGroup = -1;
 	bool readpoints = false, readcolors = false, readfaces = false;
 
 	int max_line_size = 50000000;
@@ -528,7 +527,6 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 					roughnessmap[groupNames[std::string(grp)]].multiplier = Ns;
 				}
 				if (line[0] == 'i' && line[1] == 'l' && line[3] == 'u') {
-					int ret = sscanf(line, "illum %u\n", &illum);
 					if (illum == 0 || illum == 1) specularmap[groupNames[std::string(grp)]].multiplier = Vector(0., 0., 0.);
 
 				}
