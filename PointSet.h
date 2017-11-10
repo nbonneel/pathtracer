@@ -133,9 +133,10 @@ public:
 		index.buildIndex();
 
 		std::vector<double> allNNDist(N);
+#pragma omp parallel for
 		for (int i = 0; i < N; i++) {
 
-			const size_t num_results = 15;
+			const size_t num_results = 10;
 			size_t ret_index[num_results];
 			double out_dist_sqr[num_results];
 			nanoflann::KNNResultSet<double> resultSet(num_results);
@@ -160,7 +161,7 @@ public:
 			cimg_library::CImg<double> mat(cov, 3, 3), val(3), vec(3, 3);
 			mat.symmetric_eigen(val, vec);
 			normals[i] = Vector(vec(2, 0), vec(2, 1), vec(2, 2));
-			radius[i] = 5.*std::max(1E-8, sqrt(out_dist_sqr[6]));
+			radius[i] = 2*std::max(1E-8, sqrt(out_dist_sqr[5]));
 		}
 
 		//std::sort(allNNDist.begin(), allNNDist.end());

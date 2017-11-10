@@ -358,7 +358,7 @@ RaytracerFrame::RaytracerFrame()
 
 {
     // frame icon and status bar
-    SetIcon(wxICON(sample));
+    //SetIcon(wxICON(sample));
 
     CreateStatusBar();
 	programHandling = false;

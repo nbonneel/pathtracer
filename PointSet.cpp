@@ -196,6 +196,8 @@ bool PointSet::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 		Disk(vertices[i], normals[i], radius[i]).intersection(d, localP, localN, localt);
 		localN.normalize();
 		P = localP;
+
+		mat = queryMaterial(0, 0, 0);
 		mat.shadingN = localN;
 
 		if (dot(mat.shadingN, d.direction) > 0 && !mat.transp) mat.shadingN = -mat.shadingN;
