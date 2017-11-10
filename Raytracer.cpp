@@ -349,7 +349,7 @@ void Raytracer::save_scene(const char* filename) {
 	fprintf(f, "intensite_envmap: %lf\n", s.envmap_intensity);
 
 
-	fprintf(f, "nbobjects: %u\n", static<unsigned int>(s.objects.size()));
+	fprintf(f, "nbobjects: %u\n", static_cast<unsigned int>(s.objects.size()));
 	for (int i = 0; i < s.objects.size(); i++) {
 		s.objects[i]->save_to_file(f);
 	}
