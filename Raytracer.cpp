@@ -88,7 +88,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, bool sho
 	Vector T1 = cross(randV, N); T1.normalize();
 	Vector T2 = cross(T1, N);*/
 
-	Vector newOrigin = P+0.1*N;// +-log(uniform(engine))*0.15*T1 + -log(uniform(engine))*0.15*T2 + 0.1*N;   // BEWARE: not used for normal maps!
+//	Vector newOrigin = P+0.1*N;// +-log(uniform(engine))*0.15*T1 + -log(uniform(engine))*0.15*T2 + 0.1*N;   // BEWARE: not used for normal maps!
 
 	Vector intensite_pixel(0, 0, 0);
 	if (has_inter) {
@@ -349,7 +349,7 @@ void Raytracer::save_scene(const char* filename) {
 	fprintf(f, "intensite_envmap: %lf\n", s.envmap_intensity);
 
 
-	fprintf(f, "nbobjects: %u\n", s.objects.size());
+	fprintf(f, "nbobjects: %u\n", static<unsigned int>(s.objects.size()));
 	for (int i = 0; i < s.objects.size(); i++) {
 		s.objects[i]->save_to_file(f);
 	}
@@ -550,7 +550,6 @@ void Raytracer::render_image()
 							double ratio = 1. / sum_area_table(&filter_integral[0], filter_total_width, bmin_i - i + filter_size, bmax_i - i + filter_size, bmin_j - j + filter_size, bmax_j - j + filter_size);
 							double denom1 = ratio / (sigma_filter*sigma_filter*2.*M_PI);
 							double denom2 = 1. / (2.*sigma_filter*sigma_filter);
-							double sw = 0;
 							for (int i2 = bmin_i; i2 <= bmax_i; i2++) {
 								for (int j2 = bmin_j; j2 <= bmax_j; j2++) {
 									//double w = filter_value[(i2 - i + filter_size)*filter_total_width + j2-j + filter_size] * ratio; 

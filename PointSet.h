@@ -177,7 +177,7 @@ public:
 		Object::save_to_file(f);
 
 
-		fprintf(f, "radius: %lf\n", 1);
+		fprintf(f, "radius: %d\n", 1);
 		fprintf(f, "nbcols: %u\ncolumns: ", nbcols);
 		for (int i = 0; i < nbcols; i++) {
 			fprintf(f, "%d ", cols[i]);

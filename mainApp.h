@@ -489,8 +489,6 @@ public:
 
 			int dx = mouse_x - mouse_prev_x;
 			int dy = -mouse_y + mouse_prev_y;
-			int Dx = mouse_x - mouse_init_x;
-			int Dy = -mouse_y + mouse_init_y;
 			
 			if (shift_down) {
 				if (left_mouse_down) {

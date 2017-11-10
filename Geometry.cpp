@@ -24,6 +24,7 @@ Object* Object::create_from_file(FILE* f) {
 	if (line[4] == 'P' && line[5] == 'O') { // PointSet
 		return PointSet::create_from_file(f);
 	}
+  return nullptr;
 }
 
 
