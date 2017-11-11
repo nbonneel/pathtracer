@@ -693,7 +693,7 @@ void RenderPanel::render(wxDC& dc)
 		screenImage = wxImage(raytracer.W, raytracer.H, &(gamma_corrected_image[0]), true);
 	}
 
-	bmpBuf = wxBitmap(screenImage, dc);
+	bmpBuf = wxBitmap(screenImage/*, dc*/);
 
 
 	double scale_x = (double)displayW / raytracer.W;
@@ -808,7 +808,7 @@ void RaytracerFrame::OnPopupClick(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
+	size_t item_id = reinterpret_cast<size_t>((static_cast<wxMenu *>(evt.GetEventObject())->GetClientData()));
 	int itemIndex = -1;
 	int firstSel = render_panel->raytracer_app->m_AlbedoFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
 
@@ -979,7 +979,7 @@ void RaytracerFrame::OnPopupClickSpecular(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
+	int item_id = reinterpret_cast<size_t>((static_cast<wxMenu *>(evt.GetEventObject())->GetClientData()));
 	int itemIndex = -1;
 	int firstSel = render_panel->raytracer_app->m_SpecularFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
 
@@ -1046,7 +1046,7 @@ void RaytracerFrame::OnPopupClickRoughness(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
+	int item_id = reinterpret_cast<size_t>(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
 	int itemIndex = -1;
 	int firstSel = render_panel->raytracer_app->m_RoughnessFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
 
@@ -1116,7 +1116,7 @@ void RaytracerFrame::OnPopupClickRefrIndex(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
+	int item_id = reinterpret_cast<size_t>(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
 	int itemIndex = -1;
 	int firstSel = render_panel->raytracer_app->m_RefrFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
 	std::string ret;
@@ -1148,7 +1148,7 @@ void RaytracerFrame::OnPopupClickRefrIndex(wxCommandEvent &evt) {
 		render_panel->start_render();
 		break;
 	case ID_ADDWHITE_REFR:
-		ret = wxGetTextFromUser("Enter refraction index", "Refraction index", "1.3");
+		ret = wxGetTextFromUser("Enter refraction index", "Refraction index", "1.3").ToStdString();
 		if (ret.size() != 0) {
 			double val;
 			try {
@@ -1197,7 +1197,7 @@ void RaytracerFrame::OnPopupClickTransparent(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
+	int item_id = reinterpret_cast<size_t>(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
 	int itemIndex = -1;
 	int firstSel = render_panel->raytracer_app->m_TranspFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
 	wxArrayString choices; choices.push_back("Yes"); choices.push_back("No");
@@ -1266,7 +1266,7 @@ void RaytracerFrame::OnPopupClickNormal(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
+	int item_id = reinterpret_cast<size_t>(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
 
 	int itemIndex = -1;
 	int firstSel = render_panel->raytracer_app->m_NormalFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
@@ -1325,7 +1325,7 @@ void RaytracerFrame::OnPopupClickAlpha(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	int item_id = (int)(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
+	int item_id = reinterpret_cast<size_t>(static_cast<wxMenu *>(evt.GetEventObject())->GetClientData());
 	int itemIndex = -1;
 	int firstSel = render_panel->raytracer_app->m_AlphaFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
 	switch (evt.GetId()) {
@@ -1490,14 +1490,14 @@ void RaytracerFrame::createAlbedoMenu() {
 }
 
 void RaytracerFrame::OnListRightClick(wxListEvent &evt) {
-	int sel = evt.GetItem();
+	size_t sel = evt.GetItem();
 	void *data = reinterpret_cast<void *>(sel);
 	albedomnu.SetClientData(data);
 	PopupMenu(&albedomnu);
 }
 
 void RaytracerFrame::OnListRightClickSpecular(wxListEvent &evt) {
-	int sel = evt.GetItem();
+	size_t sel = evt.GetItem();
 	void *data = reinterpret_cast<void *>(sel);
 	wxMenu mnu;
 	mnu.SetClientData(data);
@@ -1513,7 +1513,7 @@ void RaytracerFrame::OnListRightClickSpecular(wxListEvent &evt) {
 	PopupMenu(&mnu);
 }
 void RaytracerFrame::OnListRightClickNormal(wxListEvent &evt) {
-	int sel = evt.GetItem();
+	size_t sel = evt.GetItem();
 	void *data = reinterpret_cast<void *>(sel);
 	wxMenu mnu;
 	mnu.SetClientData(data);
@@ -1528,7 +1528,7 @@ void RaytracerFrame::OnListRightClickNormal(wxListEvent &evt) {
 	PopupMenu(&mnu);
 }
 void RaytracerFrame::OnListRightClickAlpha(wxListEvent &evt) {
-	int sel = evt.GetItem();
+	size_t sel = evt.GetItem();
 	void *data = reinterpret_cast<void *>(sel);
 	wxMenu mnu;
 	mnu.SetClientData(data);
@@ -1543,7 +1543,7 @@ void RaytracerFrame::OnListRightClickAlpha(wxListEvent &evt) {
 	PopupMenu(&mnu);
 }
 void RaytracerFrame::OnListRightClickRoughness(wxListEvent &evt) {
-	int sel = evt.GetItem();
+	size_t sel = evt.GetItem();
 	void *data = reinterpret_cast<void *>(sel);
 	wxMenu mnu;
 	mnu.SetClientData(data);
@@ -1559,7 +1559,7 @@ void RaytracerFrame::OnListRightClickRoughness(wxListEvent &evt) {
 }
 
 void RaytracerFrame::OnListRightClickRefrIndex(wxListEvent &evt) {
-	int sel = evt.GetItem();
+	size_t sel = evt.GetItem();
 	void *data = reinterpret_cast<void *>(sel);
 	wxMenu mnu;
 	mnu.SetClientData(data);
@@ -1574,7 +1574,7 @@ void RaytracerFrame::OnListRightClickRefrIndex(wxListEvent &evt) {
 	PopupMenu(&mnu);
 }
 void RaytracerFrame::OnListRightClickTransparent(wxListEvent &evt) {
-	int sel = evt.GetItem();
+	size_t sel = evt.GetItem();
 	void *data = reinterpret_cast<void *>(sel);
 	wxMenu mnu;
 	mnu.SetClientData(data);
@@ -1598,7 +1598,7 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 			if (filenames[n].find(".xyz") != std::string::npos) {
 
 				std::string values = wxGetTextFromUser("Space separated, -1: ignore, 0:x 1:y, 2:z, 3:nx,4:ny,5:nz, 6:colr, 7:colg, 8:colb",
-					"Enter XYZ file format", "-1 -1 0 1 2 6 7 8");
+					"Enter XYZ file format", "-1 -1 0 1 2 6 7 8").ToStdString();
 				const char* line = &values.c_str()[0];
 				int cols[100];
 				int nbcols = 0;
@@ -1608,7 +1608,7 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 					line += offset;
 				}
 
-				PointSet* g = new PointSet(filenames[n], nbcols, cols, 0.005);
+				PointSet* g = new PointSet(filenames[n], nbcols, cols);
 				g->scale = 30;
 				Vector c = (g->bvh.bbox.bounds[0] + g->bvh.bbox.bounds[1])*0.5; // c is at 0
 				double s = std::max(g->bvh.bbox.bounds[1][0] - g->bvh.bbox.bounds[0][0], std::max(g->bvh.bbox.bounds[1][1] - g->bvh.bbox.bounds[0][1], g->bvh.bbox.bounds[1][2] - g->bvh.bbox.bounds[0][2]));
