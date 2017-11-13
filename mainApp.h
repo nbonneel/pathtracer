@@ -117,6 +117,9 @@
 #define ID_COPPER_NGAN 551
 
 
+#if !defined(wxOVERRIDE)
+		#define wxOVERRIDE override;
+#endif
 
 class RaytracerApp;
 class RenderPanel;

@@ -104,7 +104,7 @@ template<typename T>
 bool load_image(const char* filename, std::vector<T> &val, size_t &W, size_t &H, bool bits16 = false) {
 
 	if (!file_exists(filename)) return false;
-	if (bits16 || (std::string(filename).find('.png') != std::string::npos && get_png_bitdepth(filename) == 16)) {
+	if (bits16 || (std::string(filename).find(".png") != std::string::npos && get_png_bitdepth(filename) == 16)) {
 		cimg_library::CImg<float> cimg(filename);
 		W = cimg.width();
 		H = cimg.height();

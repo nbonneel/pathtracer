@@ -1,8 +1,9 @@
 #include "hdrwriter.h"
 #include <vector>
 #include <string>
-#include <assert.h>
+#include <cassert>
 #include <cmath>
+#include <limits>
 
 typedef  unsigned int uint32_t;
 

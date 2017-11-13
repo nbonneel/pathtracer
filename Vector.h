@@ -2,6 +2,7 @@
 #include <math.h>
 #include <vector>
 #include <sstream>
+#include <cstring>
 #include <random>
 
 #ifndef M_PI
