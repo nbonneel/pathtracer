@@ -9,10 +9,23 @@ wxIMPLEMENT_APP(RaytracerApp);
 
 bool RaytracerApp::OnInit()
 {
+
+	int arc = wxApp::argc;
+	//wxCmdLineArgsArray argv(wxApp::argv);
+
+	if (argc > 1) {
+		Raytracer raytracer;
+		raytracer.loadScene();
+		raytracer.load_scene(wxApp::argv[1]);
+		raytracer.render_image();
+		if (arc>2)
+			save_img(wxApp::argv[2], &raytracer.image[0], raytracer.W, raytracer.H);
+		exit(0);
+	}
+
+
 	if (!wxApp::OnInit())
 		return false;
-
-
 
 	// create the main frame window
 	RaytracerFrame* frame = new RaytracerFrame();
