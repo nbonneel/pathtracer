@@ -206,7 +206,12 @@ public:
 class Camera {
 public:
 	Camera() {};
-	Camera(const Vector& position, const Vector &direction, const Vector& up): position(position), direction(direction), up(up), initial_position(position), initial_direction(direction), initial_up(up) {};
+	Camera(const Vector& position, const Vector &direction, const Vector& up): position(position), direction(direction), up(up), initial_position(position), initial_direction(direction), initial_up(up) {
+		lenticular_max_angle = 35 * M_PI / 180.*0.25;
+		lenticular_nb_images = 10;
+		lenticular_pixel_width = 1;
+		is_lenticular = false;
+	};
 
 	void translate(const Vector& translation, double time) {
 		position = initial_position + time*translation;
@@ -265,21 +270,45 @@ public:
 	
 
 	Ray generateDirection(int i, int j, double time, double dx_sensor, double dy_sensor, double dx_aperture, double dy_aperture, int W, int H) {
-		Vector direction_vec(j - W / 2 + 0.5 + dx_sensor, i - H / 2 + 0.5 + dy_sensor, W / (2 * tan(fov / 2)));
+		double k = W / (2 * tan(fov / 2));
+		Vector camera_right = cross(direction, up);		
+
+		Vector direction_vec;
+		Vector C1;
+		if (is_lenticular) {
+			double L = focus_distance*tan(lenticular_max_angle / 2) / (lenticular_nb_images / 2.0);
+
+			int offset = -((j / lenticular_pixel_width) % lenticular_nb_images - lenticular_nb_images / 2);
+
+			Vector P = position + focus_distance*Vector(0, 0, 1);
+			C1 = position + offset*L * camera_right;
+			Vector v1 = (P - C1).getNormalized(); // direction we want central in offseted camera 
+			Vector PprojCam1 = (k / dot(v1, direction)) * v1 + C1;
+			double pixProjCam1_j = PprojCam1[0] + W / 2 - 0.5;
+			double pixProjCam1_i = PprojCam1[1] + H / 2 - 0.5;  // new offset : this pixel should be the central pixel in camera 
+
+
+			//Vector direction_vec(j - W / 2 + 0.0 + dx_sensor, i - H / 2 + 0.5 + dy_sensor, k);			
+			direction_vec = Vector((j - pixProjCam1_j) + dx_sensor, (i - pixProjCam1_i) + dy_sensor, k);
+		} else {
+			C1 = position;
+			direction_vec = Vector(j - W / 2 + 0.5 + dx_sensor, i - H / 2 + 0.5 + dy_sensor, k);
+
+		}
 		direction_vec.normalize();
-		Vector camera_right = cross(direction, up);
 		direction_vec = camera_right * direction_vec[0] + up*direction_vec[1] + direction*direction_vec[2];
-
-		Vector destination = position + focus_distance * direction_vec;
-		Vector new_origin = position + dx_aperture*camera_right +  dy_aperture*up;
+		Vector destination = C1 + focus_distance * direction_vec;
+		Vector new_origin = C1 + dx_aperture*camera_right + dy_aperture*up;
 		return Ray(new_origin, (destination - new_origin).getNormalized(), time);
-
 	}
 
 	Vector position, direction, up;
 	double fov;             // field of view 
 	double focus_distance; // distance mise au point
 	double aperture;       // ouverture, pour depth of field (faible valeur = net partout)
+	double lenticular_max_angle;
+	int lenticular_nb_images, lenticular_pixel_width;
+	bool is_lenticular;
 
 private:
 	Vector initial_position, initial_direction, initial_up;

@@ -46,6 +46,10 @@
 #define FOCUS_SLIDER 1020
 #define NBRAYS 1021
 #define LAUNCH_RENDER 1022
+#define IS_LENTICULAR_CHECKBOX 1023
+#define MAXANGLE_SLIDER 1024
+#define NBVIEWS 1025
+#define NBPIXPERSLICE 1026
 
 #define ID_ALBEDO_DELETE 10
 #define ID_MOVEUP 11
@@ -637,15 +641,15 @@ public:
 	RenderPanel* renderPanel;
 	wxGauge *progressBar;
 	wxBookCtrlBase *m_bookCtrl;
-	wxCheckBox *show_edges, *interp_normals, *transparent, *flipnormals;
+	wxCheckBox *show_edges, *interp_normals, *transparent, *flipnormals, *isLenticularCheck;
 	wxTextCtrl *objectName, *envmapName;
-	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider;
+	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider, *maxangle_slider;
 	wxListCtrl *m_AlbedoFile, *m_SpecularFile, *m_NormalFile, *m_AlphaFile, *m_RoughnessFile, *m_TranspFile, *m_RefrFile;
 	//wxColourPickerCtrl *albedoColorPicker;
 	wxRadioButton *uniformFogRadio, *expFogRadio;
 	wxColourDialog* colPicker;
 	wxFileDialog* texOpenDlg;
-	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays;
+	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays, *nbviews, *nbpixslice;
 	wxSpinCtrlDouble* refractionIndex;
 	wxButton *deleteObject, *launchRender;
 	wxStaticText* infoModel;

@@ -100,13 +100,14 @@ public:
 class Geometry : public Object {
 public:
 	Geometry() {};
-	Geometry(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL);
+	Geometry(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool preserve_input = false);
 
-	void init(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool load_textures = true);
+	void init(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool load_textures = true, bool preserve_input = false);
 
 	void readOBJ(const char* obj, bool load_textures);
 	void readVRML(const char* obj);
 	void exportMTL(const char* mtlfile);
+	void saveOBJ(const char* obj);
 
 	int getNbConnected(int &alsoReturnsNbEdges, int &nonManifoldFaces, int &nbBoundaryEdges);
 	void findQuads(int &nbTriangles, int &nbOthers, int &nbRealEdges); //nbOthers = nb of quads or higher order polygons

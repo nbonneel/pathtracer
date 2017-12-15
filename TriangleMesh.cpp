@@ -255,6 +255,7 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 				col[2] = std::min(1., std::max(0., col[2]));
 
 				//if (col[1] > 0.6 && col[0]<0.3) { marked_vertices.insert(vertices.size()); }
+				//if ((col-Vector(0.,1,0.)).getNorm2()<(col-Vector(1,1,1)).getNorm2()) { marked_vertices.insert(vertices.size()); }
 
 				vertices.push_back(vec);
 				vertexcolors.push_back(col);
@@ -671,11 +672,11 @@ void Geometry::setup_tangents() {
 }
 
 
-Geometry::Geometry(const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename) {
-	init(obj, scaling, offset, mirror, colors_csv_filename, true);
+Geometry::Geometry(const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool preserve_input) {
+	init(obj, scaling, offset, mirror, colors_csv_filename, true, preserve_input);
 }
 
-void Geometry::init(const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool load_textures) {
+void Geometry::init(const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool load_textures, bool preserve_input) {
 	display_edges = false;
 	interp_normals = true;
 	miroir = mirror;
@@ -693,13 +694,15 @@ void Geometry::init(const char* obj, double scaling, const Vector& offset, bool 
 		}
 	}
 
-	for (int i = 0; i < vertices.size(); i++) {
-		std::swap(vertices[i][0], vertices[i][2]);
-		vertices[i][0] = -vertices[i][0];
-	}
-	for (int i = 0; i < normals.size(); i++) {
-		std::swap(normals[i][0], normals[i][2]);
-		normals[i][0] = -normals[i][0];
+	if (!preserve_input) {
+		for (int i = 0; i < vertices.size(); i++) {
+			std::swap(vertices[i][0], vertices[i][2]);
+			vertices[i][0] = -vertices[i][0];
+		}
+		for (int i = 0; i < normals.size(); i++) {
+			std::swap(normals[i][0], normals[i][2]);
+			normals[i][0] = -normals[i][0];
+		}
 	}
 
 	BBox bb(Vector(1E9, 1E9, 1E9), Vector(-1E9, -1E9, -1E9));
@@ -709,14 +712,16 @@ void Geometry::init(const char* obj, double scaling, const Vector& offset, bool 
 		bb.bounds[0][2] = std::min(bb.bounds[0][2], vertices[i][2]); bb.bounds[1][2] = std::max(bb.bounds[1][2], vertices[i][2]);
 	}
 
-	double s = std::max(bb.bounds[1][0] - bb.bounds[0][0], std::max(bb.bounds[1][1] - bb.bounds[0][1], bb.bounds[1][2] - bb.bounds[0][2]));
-	Vector c = (bb.bounds[0] + bb.bounds[1])*0.5;
-	//rotation_center = Vector(0., 0., 0.);
-	for (int i = 0; i < vertices.size(); i++) {
-		vertices[i][0] = (vertices[i][0] - c[0]) / s * scaling + offset[0];
-		vertices[i][1] = (vertices[i][1] - c[1]) / s * scaling + offset[1];
-		vertices[i][2] = (vertices[i][2] - c[2]) / s * scaling + offset[2];
-		//rotation_center += vertices[i];
+	if (!preserve_input) {
+		double s = std::max(bb.bounds[1][0] - bb.bounds[0][0], std::max(bb.bounds[1][1] - bb.bounds[0][1], bb.bounds[1][2] - bb.bounds[0][2]));
+		Vector c = (bb.bounds[0] + bb.bounds[1])*0.5;
+		//rotation_center = Vector(0., 0., 0.);
+		for (int i = 0; i < vertices.size(); i++) {
+			vertices[i][0] = (vertices[i][0] - c[0]) / s * scaling + offset[0];
+			vertices[i][1] = (vertices[i][1] - c[1]) / s * scaling + offset[1];
+			vertices[i][2] = (vertices[i][2] - c[2]) / s * scaling + offset[2];
+			//rotation_center += vertices[i];
+		}
 	}
 	//rotation_center *= 1. / vertices.size();
 	if (colors_csv_filename)
@@ -726,7 +731,9 @@ void Geometry::init(const char* obj, double scaling, const Vector& offset, bool 
 	load_edge_colors(colors_csv_filename);
 
 	max_bvh_triangles = 0;
-	build_bvh(&bvh, 0, indices.size());
+	if (!preserve_input) {
+		build_bvh(&bvh, 0, indices.size());
+	}
 	triangleSoup.resize(indices.size());
 	for (int i = 0; i < indices.size(); i++) {
 		triangleSoup[i] = Triangle(vertices[indices[i].vtxi], vertices[indices[i].vtxj], vertices[indices[i].vtxk]);
@@ -734,7 +741,9 @@ void Geometry::init(const char* obj, double scaling, const Vector& offset, bool 
 
 	rotation_center = (bvh.bbox.bounds[0] + bvh.bbox.bounds[1])*0.5;
 
-	setup_tangents();
+	if (!preserve_input) {
+		setup_tangents();
+	}
 }
 
 BBox Geometry::build_bbox(int i0, int i1) {
@@ -777,6 +786,36 @@ void Geometry::build_bvh(BVH* b, int i0, int i1) {
 	bvh_nb_nodes = 0;
 	build_bvh_recur(b, 0, i0, i1, 0);
 	bvh_avg_depth /= (double)bvh_nb_nodes;
+}
+
+void Geometry::saveOBJ(const char* obj) {
+	FILE* f = fopen(obj, "w+");
+	for (int i = 0; i < vertices.size(); i++) {
+		fprintf(f, "v %f %f %f", vertices[i][0], vertices[i][1], vertices[i][2]);
+		if (vertexcolors.size() > 0) {
+			fprintf(f, " %f %f %f", vertexcolors[i][0], vertexcolors[i][1], vertexcolors[i][2]);
+		}
+		fprintf(f, "\n");
+	}
+	for (int i = 0; i < normals.size(); i++) {
+		fprintf(f, "vn %f %f %f\n", normals[i][0], normals[i][1], normals[i][2]);
+	}
+	for (int i = 0; i < uvs.size(); i++) {
+		fprintf(f, "vt %f %f\n", uvs[i][0], uvs[i][1]);
+	}
+	for (int i = 0; i < indices.size(); i++) {
+		if (indices[i].uvi>=0 && indices[i].ni>=0)
+			fprintf(f, "f %u/%u/%u %u/%u/%u %u/%u/%u\n", indices[i].vtxi+1, indices[i].uvi+1, indices[i].ni+1, indices[i].vtxj+1, indices[i].uvj+1, indices[i].nj+1, indices[i].vtxk+1, indices[i].uvk+1, indices[i].nk+1);
+		else
+			if (indices[i].uvi >= 0 && indices[i].ni < 0)
+				fprintf(f, "f %u/%u %u/%u %u/%u\n", indices[i].vtxi+1, indices[i].uvi+1, indices[i].vtxj+1, indices[i].uvj+1, indices[i].vtxk+1, indices[i].uvk+1);
+			else
+				if (indices[i].uvi < 0 && indices[i].ni >= 0)
+					fprintf(f, "f %u//%u %u//%u %u//%u\n", indices[i].vtxi+1, indices[i].ni+1, indices[i].vtxj+1, indices[i].nj+1, indices[i].vtxk+1, indices[i].nk+1);
+				else
+					fprintf(f, "f %u %u %u\n", indices[i].vtxi+1, indices[i].vtxj+1, indices[i].vtxk+1);
+	}
+	fclose(f);
 }
 
 void Geometry::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {

@@ -9,7 +9,6 @@ wxIMPLEMENT_APP(RaytracerApp);
 
 bool RaytracerApp::OnInit()
 {
-
 	int arc = wxApp::argc;
 	//wxCmdLineArgsArray argv(wxApp::argv);
 
@@ -266,7 +265,7 @@ bool RaytracerApp::OnInit()
 
 	wxBoxSizer * envmapintensity_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* envmapintensity_text = new wxStaticText(panelRenderer, 9999 - 1, "envmap intensity: ");
-	envmapintensity_slider = new wxSlider(panelRenderer, ENVMAPINTENSITY_SLIDER, 100, 0, 1000, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL | wxSL_LABELS);
+	envmapintensity_slider = new wxSlider(panelRenderer, ENVMAPINTENSITY_SLIDER, 100, 0, 10000, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL | wxSL_LABELS);
 	Connect(ENVMAPINTENSITY_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	envmapintensity_sizer->Add(envmapintensity_text, 0, wxEXPAND);
 	envmapintensity_sizer->Add(envmapintensity_slider, 1, wxEXPAND);
@@ -327,6 +326,40 @@ bool RaytracerApp::OnInit()
 
 	m_bookCtrl->AddPage(panelFog, wxT("Fog"), false);
 
+
+
+	wxPanel *panelLenticular = new wxPanel(m_bookCtrl);
+	wxBoxSizer * panelLenticular_sizer = new wxBoxSizer(wxVERTICAL);
+	isLenticularCheck = new wxCheckBox(panelLenticular, IS_LENTICULAR_CHECKBOX, "Lenticular Camera", wxDefaultPosition, wxDefaultSize);
+	Connect(IS_LENTICULAR_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	panelLenticular_sizer->Add(isLenticularCheck, 0, wxEXPAND);
+
+	wxBoxSizer * nbviews_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* nbviews_text = new wxStaticText(panelLenticular, 9999 - 1, "nb views: ");
+	nbviews = new wxSpinCtrl(panelLenticular, NBVIEWS, wxString("10"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 200, 10);
+	Connect(NBVIEWS, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	nbviews_sizer->Add(nbviews_text, 0, wxEXPAND);
+	nbviews_sizer->Add(nbviews, 1, wxEXPAND);
+	panelLenticular_sizer->Add(nbviews_sizer, 0, wxEXPAND);
+
+	wxBoxSizer * nbpixslice_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* nbpixslice_text = new wxStaticText(panelLenticular, 9999 - 1, "nb pixels per slice: ");
+	nbpixslice = new wxSpinCtrl(panelLenticular, NBPIXPERSLICE, wxString("1"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 200, 1);
+	Connect(NBPIXPERSLICE, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	nbpixslice_sizer->Add(nbpixslice_text, 0, wxEXPAND);
+	nbpixslice_sizer->Add(nbpixslice, 1, wxEXPAND);
+	panelLenticular_sizer->Add(nbpixslice_sizer, 0, wxEXPAND);
+
+	wxBoxSizer * maxangle_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* maxangle_text = new wxStaticText(panelLenticular, 9999 - 1, "max disparity (angle) : ");
+	maxangle_slider = new wxSlider(panelLenticular, MAXANGLE_SLIDER, 38, 0, 180, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL | wxSL_LABELS);
+	Connect(MAXANGLE_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	maxangle_sizer->Add(maxangle_text, 0, wxEXPAND);
+	maxangle_sizer->Add(maxangle_slider, 1, wxEXPAND);
+	panelLenticular_sizer->Add(maxangle_sizer, 0, wxEXPAND);
+
+	panelLenticular->SetSizer(panelLenticular_sizer);
+	m_bookCtrl->AddPage(panelLenticular, wxT("Lenticular"), false);
 
 
 	m_bookCtrl->SetSelection(0);
@@ -426,6 +459,7 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 	raytracer.cam.fov = raytracer_app->fov_slider->GetValue() * M_PI / 180.;
 	raytracer.cam.aperture = raytracer_app->aperture_slider->GetValue() / 1000.;
 	raytracer.cam.focus_distance = raytracer_app->focus_slider->GetValue() / 100.;
+	raytracer.cam.is_lenticular = raytracer_app->isLenticularCheck->IsChecked();
 	raytracer.sigma_filter = raytracer_app->filter_slider->GetValue() / 10.;
 	//wxColour alb = raytracer_app->albedoColorPicker->GetColour();
 	//raytracer.s.objects[selected_object]->albedo = Vector(alb.Red()/255., alb.Green()/255., alb.Blue()/255.);
@@ -435,6 +469,9 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 
 	raytracer.s.intensite_lumiere = raytracer_app->lightintensity_slider->GetValue() / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
 	raytracer.s.envmap_intensity = raytracer_app->envmapintensity_slider->GetValue() / 100.;
+	raytracer.cam.lenticular_max_angle = raytracer_app->maxangle_slider->GetValue()*M_PI / 180;
+	raytracer.cam.lenticular_nb_images = raytracer_app->nbviews->GetValue();
+	raytracer.cam.lenticular_pixel_width = raytracer_app->nbpixslice->GetValue();
 
 	raytracer.s.fog_type = raytracer_app->uniformFogRadio->GetValue() ? 0 : 1;
 	raytracer.nb_bounces = raytracer_app->bounces->GetValue();
@@ -480,6 +517,8 @@ void RenderPanel::update_gui() {
 	raytracer_app->nbrays->SetValue(raytracer.nrays);
 	raytracer_app->objectName->SetLabelText(raytracer.s.objects[selected_object]->name);
 	raytracer_app->show_edges->SetValue(raytracer.s.objects[selected_object]->display_edges);
+	raytracer_app->isLenticularCheck->SetValue(raytracer.cam.is_lenticular);
+	raytracer_app->maxangle_slider->SetValue(raytracer.cam.lenticular_max_angle*180./M_PI);
 	raytracer_app->interp_normals->SetValue(raytracer.s.objects[selected_object]->interp_normals);
 	raytracer_app->fov_slider->SetValue(raytracer.cam.fov * 180. / M_PI);
 	raytracer_app->aperture_slider->SetValue(raytracer.cam.aperture * 1000);
@@ -488,6 +527,10 @@ void RenderPanel::update_gui() {
 	raytracer_app->filter_slider->SetValue(raytracer.sigma_filter*10.);
 	raytracer_app->bounces->SetValue(raytracer.nb_bounces);	
 	raytracer_app->flipnormals->SetValue(raytracer.s.objects[selected_object]->flip_normals);	
+
+	raytracer_app->nbviews->SetValue(raytracer.cam.lenticular_nb_images);
+	raytracer_app->nbpixslice->SetValue(raytracer.cam.lenticular_pixel_width);	
+
 
 	//Vector alb = raytracer.s.objects[selected_object]->albedo;
 	//raytracer_app->albedoColorPicker->SetColour(wxColour(alb[0] * 255., alb[1] * 255., alb[2] * 255.));
