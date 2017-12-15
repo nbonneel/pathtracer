@@ -1,7 +1,7 @@
 # pathtracer
-Minimalist Quick'n Dirty Path Tracer. No keyboard needed, just drag'n drop files.
+Minimalist Quick'n Dirty Path Tracer. (almost) No keyboard needed, just drag'n drop files.
 
-## Handles:
+## Supports:
 * Phong BRDF model ; some defaults materials from Ngan's fits
 * Environment maps
 * Normal maps, Alpha maps, textures for Albedo, Specular Ks, Shininess, Refraction, Refraction Index
@@ -9,22 +9,23 @@ Minimalist Quick'n Dirty Path Tracer. No keyboard needed, just drag'n drop files
 * Display of edges, supports non-triangular faces
 * Topological information
 * Filtering, DoF, one spherical light source, Fresnel reflection on transparent objects.
+* Rendering for lenticular images (can buy sheets at vuethru.com or dplenticular.com)
 * Limited and buggy support of fog.
 
 ## Compilation:
-* Dependency: Only wxWdiget 3.1.0
+* Dependency: Only wxWidget 3.1.0 (to download), CImg (included) and Nanoflann (included)
 * Windows: use .sln solution for Visual Studio. 
-* Linux/MacOS: in progress.
+* Linux/MacOS: use CMake, should work too.
 
 ## Usage:
 * Drag'n drop OBJ, VRML, XYZ files onto window
 * Mouse down (left, middle, right) for camera control, mouse wheel for moving forward
-* Click to select object
+* Click to select object ; see the cursor depth in the status bar (useful to change the focus distance)
 * Shift+Mouse to move/rotate currently selected object
 * Drag'n drop texture files or envmap files onto their slot on the right panel, or use the popup menu to change their values.
 * If materials are changed, they can be re-exported into a new .MTL file (menu File)
-* Menu Info gives topological info on the currently selected mesh (only works for meshes, not point clouds or the default parametric geometries)
-* Scene can be saved in a .scn file
+* Menu Info gives topological info on the currently selected mesh (only works for meshes, not point clouds nor the default parametric geometries)
+* Scene can be saved in an .scn file
 
 ## Images:
 
