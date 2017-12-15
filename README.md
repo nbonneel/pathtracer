@@ -74,9 +74,12 @@ Minimalist Quick'n Dirty Path Tracer. (almost) No keyboard needed, just drag'n d
   <tr>  
   <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/alien.jpg" width="300"> </td>
   <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/mepointcloud.jpg" width="300"> </td>
+  <td><iframe width="854" height="480" src="https://www.youtube.com/embed/_L8Au4MOjr8" frameborder="0" gesture="media" allow="encrypted-media" allowfullscreen></iframe></td>  
   </tr>
   <tr> 
   <td> 240 k triangles</td>
   <td> 4.5 millions points Point Cloud</td>
+  <td> Lenticular images</td>
   </tr>
+  
   </table>
