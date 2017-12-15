@@ -74,7 +74,7 @@ Minimalist Quick'n Dirty Path Tracer. (almost) No keyboard needed, just drag'n d
   <tr>  
   <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/alien.jpg" width="300"> </td>
   <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/mepointcloud.jpg" width="300"> </td>
-  <td><iframe width="854" height="480" src="https://www.youtube.com/embed/_L8Au4MOjr8" frameborder="0" gesture="media" allow="encrypted-media" allowfullscreen></iframe></td>  
+  <td><a href="https://www.youtube.com/watch?v=_L8Au4MOjr8"><img src="https://img.youtube.com/vi/_L8Au4MOjr8/0.jpg" width="300"></a></td>  
   </tr>
   <tr> 
   <td> 240 k triangles</td>
