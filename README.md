@@ -36,9 +36,9 @@ Minimalist Quick'n Dirty Path Tracer. (almost) No keyboard needed, just drag'n d
   <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/botTransp.jpg" width="300"> </td>
   </tr>
   <tr> 
-  <td> 2.5 million triangles</td>
-  <td> 2.5 million triangles</td>
-  <td> 2.5 million triangles, entirely transparent</td>
+  <td> 2.5 million triangles <a href="https://www.cgtrader.com/free-3d-models/character/sci-fi/24h-burnoutbot">(src)</a></td>
+  <td> 2.5 million triangles <a href="https://www.cgtrader.com/free-3d-models/character/sci-fi/24h-burnoutbot">(src)</a></td>
+  <td> 2.5 million triangles, entirely transparent <a href="https://www.cgtrader.com/free-3d-models/character/sci-fi/24h-burnoutbot">(src)</a></td>
   </tr>
   <tr>  
   <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/babyroom.jpg" width="300"> </td>
@@ -46,9 +46,9 @@ Minimalist Quick'n Dirty Path Tracer. (almost) No keyboard needed, just drag'n d
   <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/theBuilding.jpg" width="300"> </td>
   </tr>
   <tr> 
-  <td> 1.8 million triangles</td>
-  <td> 1.6 million triangles</td>
-  <td> 3.1 million triangles, includes transparency</td>
+  <td> 1.8 million triangles <a href="https://www.cgtrader.com/free-3d-models/interior/bedroom/decor-for-children">(src)</a></td>
+  <td> 1.6 million triangles <a href="https://www.turbosquid.com/3d-models/free-obj-model-american-beauty/904057">(src)</a></td>
+  <td> 3.1 million triangles, includes transparency <a href="https://www.blendswap.com/blends/view/73806">(src)</a></td>
   </tr>
   <tr>  
   <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/ponies.jpg" width="300"> </td>
@@ -56,9 +56,9 @@ Minimalist Quick'n Dirty Path Tracer. (almost) No keyboard needed, just drag'n d
   <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/lion.jpg" width="300"> </td>
   </tr>
   <tr> 
-  <td> 133 k triangles</td>
-  <td> 260 k polygons</td>
-  <td> 1.8 k triangles + normal map</td>
+  <td> 133 k triangles <a href="https://www.blendswap.com/blends/view/70960">(src)</a></td>
+  <td> 260 k polygons <a href="https://www.cgtrader.com/free-3d-models/character/man/3d-scan-man">(src)</a> </td>
+  <td> 1.8 k triangles + normal map <a href="https://www.cgtrader.com/free-3d-models/animals/mammal/lion-statue-low-poly">(src)</a></td>
   </tr>
    <tr>  
   <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/antiqueOffice.jpg" width="300"> </td>
@@ -66,9 +66,9 @@ Minimalist Quick'n Dirty Path Tracer. (almost) No keyboard needed, just drag'n d
   <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/ship.jpg" width="300"> </td>
   </tr>
   <tr> 
-  <td> 23.7 million triangles</td>
-  <td> 1.8 million triangles</td>
-  <td> 2.5 k polygons + normal map, alpha map and edges display</td>
+  <td> 23.7 million triangles <a href="https://www.blendswap.com/blends/view/83895">(src)</a></td>
+  <td> 1.8 million triangles <a href="https://www.blendswap.com/blends/view/86774">(src)</a></td>
+  <td> 2.5 k polygons + normal map, alpha map and edges display <a href="https://www.cgtrader.com/free-3d-models/watercraft/other/ghost-ship">(src)</a></td>
   </tr>
   
   <tr>  
@@ -77,7 +77,7 @@ Minimalist Quick'n Dirty Path Tracer. (almost) No keyboard needed, just drag'n d
   <td><a href="https://www.youtube.com/watch?v=_L8Au4MOjr8"><img src="https://img.youtube.com/vi/_L8Au4MOjr8/0.jpg" width="300"></a></td>  
   </tr>
   <tr> 
-  <td> 240 k triangles</td>
+  <td> 240 k triangles <a href="https://www.cgtrader.com/free-3d-print-models/miniatures/figurines/raisher-the-sky-reaper-printable-bust">(src)</a></td>
   <td> 4.5 millions points Point Cloud</td>
   <td> Lenticular images</td>
   </tr>
