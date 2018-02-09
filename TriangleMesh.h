@@ -100,9 +100,9 @@ public:
 class Geometry : public Object {
 public:
 	Geometry() {};
-	Geometry(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool preserve_input = false);
+	Geometry(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
 
-	void init(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool load_textures = true, bool preserve_input = false);
+	void init(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool load_textures = true, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
 
 	void readOBJ(const char* obj, bool load_textures);
 	void readVRML(const char* obj);
@@ -118,6 +118,7 @@ public:
 
 		Object::save_to_file(f);
 
+		fprintf(f, "is_centered: %u\n", is_centered ? 1 : 0);
 		fprintf(f, "has_csv: %u\n", (csv_file.size() != 0) ? 1 : 0);
 		fprintf(f, "csv_file: %s\n", csv_file.c_str());
 	}
@@ -127,13 +128,23 @@ public:
 		result->Object::load_from_file(f);
 		int hascsv;
 		char line[512];
-		fscanf(f, "has_csv: %u\n", &hascsv);
+		fscanf(f, "%[^\n]\n", line);
+		bool is_centered = true;
+		if (line[0] == 'i' && line[1] == 's') { //for backward compatibility
+			int c;
+			sscanf(line, "is_centered: %u\n", &c);
+			is_centered = (c == 1);
+			fscanf(f, "has_csv: %u\n", &hascsv);
+		} else {
+			sscanf(line, "has_csv: %u\n", &hascsv);
+		}
+		
 		if (hascsv)
 			fscanf(f, "csv_file: %[^\n]\n", line);
 		else
 			fscanf(f, "csv_file: \n");
 
-		result->init(result->name.c_str(), 1., Vector(0, 0, 0), result->miroir, hascsv ? line : NULL, false);
+		result->init(result->name.c_str(), 1., Vector(0, 0, 0), result->miroir, hascsv ? line : NULL, false, false, is_centered, result->rotation_center);
 		return result;
 	}
 
@@ -161,6 +172,8 @@ public:
 
 	void build_bvh(BVH* node, int i0, int i1);
 	void build_bvh_recur(BVH* b, int node, int i0, int i1, int depth);
+
+	bool is_centered;
 
 	BVH bvh;
 	int max_bvh_triangles;

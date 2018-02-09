@@ -672,15 +672,16 @@ void Geometry::setup_tangents() {
 }
 
 
-Geometry::Geometry(const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool preserve_input) {
-	init(obj, scaling, offset, mirror, colors_csv_filename, true, preserve_input);
+Geometry::Geometry(const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool preserve_input, bool center, Vector rot_center) {
+	init(obj, scaling, offset, mirror, colors_csv_filename, true, preserve_input, center, rot_center);
 }
 
-void Geometry::init(const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool load_textures, bool preserve_input) {
+void Geometry::init(const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool load_textures, bool preserve_input, bool center, Vector rot_center) {
 	display_edges = false;
 	interp_normals = true;
 	miroir = mirror;
 	name = obj;
+	is_centered = center;
 
 	std::string filename(obj);
 	std::string lowerFilename = filename;
@@ -712,7 +713,7 @@ void Geometry::init(const char* obj, double scaling, const Vector& offset, bool 
 		bb.bounds[0][2] = std::min(bb.bounds[0][2], vertices[i][2]); bb.bounds[1][2] = std::max(bb.bounds[1][2], vertices[i][2]);
 	}
 
-	if (!preserve_input) {
+	if (!preserve_input && center) {
 		double s = std::max(bb.bounds[1][0] - bb.bounds[0][0], std::max(bb.bounds[1][1] - bb.bounds[0][1], bb.bounds[1][2] - bb.bounds[0][2]));
 		Vector c = (bb.bounds[0] + bb.bounds[1])*0.5;
 		//rotation_center = Vector(0., 0., 0.);
@@ -739,7 +740,12 @@ void Geometry::init(const char* obj, double scaling, const Vector& offset, bool 
 		triangleSoup[i] = Triangle(vertices[indices[i].vtxi], vertices[indices[i].vtxj], vertices[indices[i].vtxk]);
 	}
 
-	rotation_center = (bvh.bbox.bounds[0] + bvh.bbox.bounds[1])*0.5;
+	if (isnan(rot_center[0])) {
+		rotation_center = (bvh.bbox.bounds[0] + bvh.bbox.bounds[1])*0.5;
+	} else {
+		rotation_center = rot_center;
+	}
+	
 
 	if (!preserve_input) {
 		setup_tangents();
