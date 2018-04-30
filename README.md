@@ -84,7 +84,7 @@ Minimalist Quick'n Dirty Path Tracer. (almost) No keyboard needed, just drag'n d
   </tr>
   
   <tr>  
-  <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/lionPhoto" width="300"> </td>
+  <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/lionPhoto.jpg" width="300"> </td>
   <td> </td>
   <td> </td>  
   </tr>
