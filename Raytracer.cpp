@@ -71,7 +71,7 @@ double int_exponential(double y0, double ysol, double beta, double s, double uy)
 	return result;
 }
 
-Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, bool show_lights) {
+Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int screenI, int screenJ, bool show_lights) {
 
 	if (nbrebonds == 0) return Vector(0, 0, 0);
 
@@ -90,9 +90,18 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, bool sho
 
 //	Vector newOrigin = P+0.1*N;// +-log(uniform(engine))*0.15*T1 + -log(uniform(engine))*0.15*T2 + 0.1*N;   // BEWARE: not used for normal maps!
 
+	// we just replace the envmap by the background image for direct rays
+	if ( (nbrebonds == nb_bounces) && (s.backgroundW > 0) && (s.background.size() == s.backgroundW*s.backgroundH * 3) && (!has_inter || (has_inter && sphere_id==1 && dynamic_cast<Sphere*>(s.objects[1]) ))) {
+		int i = std::min(s.backgroundH - 1, std::max(0, (int)(screenI / (double)H*s.backgroundH)));
+		int j = std::min(s.backgroundW - 1, std::max(0, (int)(screenJ / (double)W*s.backgroundW)));
+		double r = s.background[i*s.backgroundW * 3 + j * 3];
+		double g = s.background[i*s.backgroundW * 3 + j * 3 + 1];
+		double b = s.background[i*s.backgroundW * 3 + j * 3 + 2];
+		return Vector(r, g, b);
+	}
+
 	Vector intensite_pixel(0, 0, 0);
 	if (has_inter) {
-
 		if (sphere_id == 0) {
 			intensite_pixel = show_lights ? (/*s.lumiere->albedo **/Vector(1.,1.,1.)* (s.intensite_lumiere / sqr(s.lumiere->scale))) : Vector(0., 0., 0.);
 		} else {
@@ -104,7 +113,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, bool sho
 				Ray rayon_miroir(P + 0.001*N, direction_miroir, r.time);
 
 				//if (uniform(engine) < 0.9)
-				intensite_pixel += getColor(rayon_miroir, s, nbrebonds - 1);// / 0.9;
+				intensite_pixel += getColor(rayon_miroir, s, nbrebonds - 1, screenI, screenJ);// / 0.9;
 
 			} else
 				if (mat.transp) {
@@ -141,7 +150,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, bool sho
 						new_ray = Ray(P + 0.001*normale_pour_transparence, r.direction.reflect(N), r.time);
 						//return Vector(0, 0, 0);
 					}
-					intensite_pixel += getColor(new_ray, s, nbrebonds - 1);
+					intensite_pixel += getColor(new_ray, s, nbrebonds - 1, screenI, screenJ);
 				} else {
 
 					//if (dot(N, r.direction) > 0) N = -N;
@@ -160,12 +169,17 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, bool sho
 				else {
 					intensite_pixel = albedo / M_PI * s.intensite_lumiere * std::max(0., dot((s.lumiere->O - P).getNormalized(), N)) / d_light2;
 				}*/
+	
 					Vector axeOP = (P - centerLight).getNormalized();
 					Vector dir_aleatoire = random_cos(axeOP);
 					Vector point_aleatoire = dir_aleatoire * s.lumiere->R*s.lumiere->scale + centerLight;
 					Vector wi = (point_aleatoire - P).getNormalized();
 					double d_light2 = (point_aleatoire - P).getNorm2();
 					Vector Np = dir_aleatoire;
+					Vector kd =  mat.Kd;
+					Vector tr;
+					if (s.objects[sphere_id]->ghost)
+						tr = getColor(Ray(P + r.direction*0.001, r.direction, r.time), s, nbrebonds, screenI, screenJ, show_lights);
 
 					Ray ray_light(P + 0.01*wi, wi, r.time);
 					double t_light;
@@ -177,11 +191,18 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, bool sho
 						//intensite_pixel = (s.intensite_lumiere / (4.*M_PI*d_light2) * std::max(0., dot(N, wi)) * dot(Np, -wi) / dot(axeOP, dir_aleatoire))*(M_PI) * ((1. - s.objects[sphere_id]->ks)*albedo/ (M_PI) + Phong_BRDF(wi, r.direction, N, s.objects[sphere_id]->phong_exponent)*s.objects[sphere_id]->ks * albedo);
 
 						//Vector BRDF = albedo / M_PI   * (1. - s.objects[sphere_id]->ks)   + s.objects[sphere_id]->ks*Phong_BRDF(wi, r.direction, N, s.objects[sphere_id]->phong_exponent)*albedo;
-						Vector BRDF = mat.Kd / M_PI + Phong_BRDF(wi, r.direction, N, mat.Ne)*mat.Ks;
+						Vector BRDF = kd / M_PI + Phong_BRDF(wi, r.direction, N, mat.Ne)*mat.Ks;
 						double J = 1.*dot(Np, -wi) / d_light2;
 						double proba = dot(axeOP, dir_aleatoire) / (M_PI * s.lumiere->R*s.lumiere->R*s.lumiere->scale*s.lumiere->scale);
-						if (proba > 0)
-							intensite_pixel += s.intensite_lumiere / sqr(s.lumiere->scale) * std::max(0., dot(N, wi)) * J * BRDF / proba;
+						if (proba > 0) {
+							if (s.objects[sphere_id]->ghost) {
+								intensite_pixel += tr;
+							} else {
+								intensite_pixel += (s.intensite_lumiere / sqr(s.lumiere->scale) * std::max(0., dot(N, wi)) * J / proba)  * BRDF ;
+							}
+						}
+						
+							
 					}
 
 					// ajout de la contribution indirecte
@@ -206,11 +227,20 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, bool sho
 					double proba_phong = (avgNe + 1) / (2.*M_PI) * pow(dot(R, direction_aleatoire), avgNe);
 					double proba_globale = p * dot(N, direction_aleatoire) / (M_PI)+(1. - p)*proba_phong;
 					if (proba_globale <= 0) return intensite_pixel;
-					if (sample_diffuse)
-						intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, false) * mat.Kd * (dot(N, direction_aleatoire) / (M_PI) / proba_globale);
-					else
-						intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, false)  * (dot(N, direction_aleatoire) * Phong_BRDF(direction_aleatoire, r.direction, N, mat.Ne) / proba_globale) *mat.Ks;
 
+					if (s.objects[sphere_id]->ghost) {
+						/*if (nbrebonds != nb_bounces)
+							return intensite_pixel;*/
+						if (sample_diffuse)
+							intensite_pixel += tr/ 196964.7/ M_PI *getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false)  / proba_globale;
+						else
+							intensite_pixel += tr / 196964.7 / M_PI*getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false)  * Phong_BRDF(direction_aleatoire, r.direction, N, mat.Ne) / proba_globale *mat.Ks;
+					} else {
+						if (sample_diffuse)
+							intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false) * ((dot(N, direction_aleatoire) / (M_PI) / proba_globale)) * kd;
+						else
+							intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false)  * ((dot(N, direction_aleatoire) / proba_globale)) *mat.Ks * Phong_BRDF(direction_aleatoire, r.direction, N, mat.Ne);
+					}
 					//intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, false)  * dot(N, direction_aleatoire) * Phong_BRDF(direction_aleatoire, r.direction, N, s.objects[sphere_id]->phong_exponent)*s.objects[sphere_id]->ks * albedo / proba_globale;
 				}
 		}
@@ -320,7 +350,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, bool sho
 		double pdf_light = (interinter && interid==0) ? (dot((interP - centerLight).getNormalized(), axeOP) / (M_PI * sqr(s.lumiere->R*s.lumiere->scale)) / J) : 0.;
 		proba_dir = p_uniform * pdf_uniform + (1 - p_uniform)*pdf_light;
 
-		Vector L = getColor(L_ray, s, nbrebonds - 1);
+		Vector L = getColor(L_ray, s, nbrebonds - 1, screenI, screenJ);
 
 		double ext;
 		if (is_uniform_fog) {
@@ -347,7 +377,9 @@ void Raytracer::save_scene(const char* filename) {
 	fprintf(f, "bounces: %u\n", nb_bounces);
 	fprintf(f, "intensite_lum: %le\n", s.intensite_lumiere);
 	fprintf(f, "intensite_envmap: %lf\n", s.envmap_intensity);
-
+	if (s.backgroundfilename.size()>0)
+		fprintf(f, "background: %s\n", s.backgroundfilename.c_str());
+	
 
 	fprintf(f, "nbobjects: %u\n", static_cast<unsigned int>(s.objects.size()));
 	for (int i = 0; i < s.objects.size(); i++) {
@@ -375,9 +407,18 @@ void Raytracer::load_scene(const char* filename) {
 	fscanf(f, "bounces: %u\n", &nb_bounces);
 	fscanf(f, "intensite_lum: %le\n", &s.intensite_lumiere);
 	fscanf(f, "intensite_envmap: %lf\n", &s.envmap_intensity);
-
+	char line[255], bg[255];
 	int nbo;
-	fscanf(f, "nbobjects: %u\n", &nbo);
+
+	fscanf(f, "%[^\n]\n", line);
+	if (line[0] == 'n') {
+		sscanf(line, "nbobjects: %u\n", &nbo);
+		s.clear_background();
+	} else {
+		sscanf(line, "background: %[^\n]\n", bg);
+		s.load_background(bg);
+		fscanf(f, "nbobjects: %u\n", &nbo);
+	}
 
 	for (int i = 0; i < nbo; i++) {
 		s.objects.push_back(Object::create_from_file(f));
@@ -541,7 +582,7 @@ void Raytracer::render_image()
 
 							Ray r = cam.generateDirection(i, j, time, dx, dy, dx_aperture, dy_aperture, W, H);
 
-							Vector color = getColor(r, s, nb_bounces);
+							Vector color = getColor(r, s, nb_bounces, i, j);
 
 							int bmin_i = std::max(0, i - filter_size);
 							int bmax_i = std::min(i + filter_size, H - 1);

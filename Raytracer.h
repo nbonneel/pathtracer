@@ -30,7 +30,7 @@ public:
 	void save_scene(const char* filename);
 	void load_scene(const char* filename);
 
-	Vector getColor(const Ray &r, const Scene &s, int nbrebonds, bool show_lights = true);
+	Vector getColor(const Ray &r, const Scene &s, int nbrebonds, int screenI, int screenJ, bool show_lights = true);
 
 	int W, H, Wlr, Hlr;
 	int nrays;  

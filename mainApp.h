@@ -39,6 +39,7 @@
 #define BOUNCES_SPIN 1013
 #define TRANSPARENT_CHECKBOX 1014
 #define FLIPNORMALS_CHECKBOX 1015
+#define GHOST_CHECKBOX 10151
 #define REFRACTION_INDEX 1016
 #define DELETE_OBJECT 1017
 #define RENDER_WIDTH 1018
@@ -267,6 +268,22 @@ private:
 	wxTextCtrl *m_pOwner;
 	RaytracerFrame *m_rtFrame;
 };
+
+class DnDBackgroundFile : public wxFileDropTarget
+{
+public:
+	DnDBackgroundFile(wxTextCtrl* pOwner = NULL, RaytracerFrame *rtFrame = NULL) {
+		m_pOwner = pOwner; m_rtFrame = rtFrame;
+	}
+
+	virtual bool OnDropFiles(wxCoord x, wxCoord y,
+		const wxArrayString& filenames);
+
+private:
+	wxTextCtrl *m_pOwner;
+	RaytracerFrame *m_rtFrame;
+};
+
 
 class DnDNormalFile : public wxFileDropTarget
 {
@@ -641,8 +658,8 @@ public:
 	RenderPanel* renderPanel;
 	wxGauge *progressBar;
 	wxBookCtrlBase *m_bookCtrl;
-	wxCheckBox *show_edges, *interp_normals, *transparent, *flipnormals, *isLenticularCheck;
-	wxTextCtrl *objectName, *envmapName;
+	wxCheckBox *show_edges, *interp_normals, *transparent, *flipnormals, *isLenticularCheck, *ghost;
+	wxTextCtrl *objectName, *envmapName, *backgroundName;
 	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider, *maxangle_slider;
 	wxListCtrl *m_AlbedoFile, *m_SpecularFile, *m_NormalFile, *m_AlphaFile, *m_RoughnessFile, *m_TranspFile, *m_RefrFile;
 	//wxColourPickerCtrl *albedoColorPicker;

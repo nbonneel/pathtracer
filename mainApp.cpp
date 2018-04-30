@@ -66,6 +66,8 @@ bool RaytracerApp::OnInit()
 	flipnormals = new wxCheckBox(panelObject, FLIPNORMALS_CHECKBOX, "Flip normals for transparency", wxDefaultPosition, wxDefaultSize);
 	Connect(FLIPNORMALS_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 
+	ghost = new wxCheckBox(panelObject, GHOST_CHECKBOX, "Ghost object", wxDefaultPosition, wxDefaultSize);
+	Connect(GHOST_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 
 	m_AlbedoFile = new wxListCtrl(panelObject, ALBEDO_FILES, wxDefaultPosition, wxSize(-1, 100), wxLC_REPORT);
 	wxListItem itCol;
@@ -188,6 +190,7 @@ bool RaytracerApp::OnInit()
 	panelObject_sizer->Add(interp_normals, 0, wxEXPAND);
 	//panelObject_sizer->Add(transp_sizer, 0, wxEXPAND);
 	panelObject_sizer->Add(flipnormals, 0, wxEXPAND);
+	panelObject_sizer->Add(ghost, 0, wxEXPAND);
 	panelObject_sizer->Add(m_AlbedoFile, 0, wxEXPAND);
 	//panelObject_sizer->Add(albedoColorPicker, 0, wxEXPAND);
 	panelObject_sizer->Add(m_SpecularFile, 0, wxEXPAND);
@@ -270,6 +273,13 @@ bool RaytracerApp::OnInit()
 	envmapintensity_sizer->Add(envmapintensity_text, 0, wxEXPAND);
 	envmapintensity_sizer->Add(envmapintensity_slider, 1, wxEXPAND);
 
+	wxBoxSizer * background_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* background_text = new wxStaticText(panelRenderer, 9999 - 1, "backgrd image: ");
+	backgroundName = new wxTextCtrl(panelRenderer, 1000, "", wxDefaultPosition, wxDefaultSize);
+	backgroundName->SetDropTarget(new DnDBackgroundFile(backgroundName, frame));
+	background_sizer->Add(background_text, 0, wxEXPAND);
+	background_sizer->Add(backgroundName, 1, wxEXPAND);
+
 	wxBoxSizer * lightintensity_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* lightintensity_text = new wxStaticText(panelRenderer, 9999 - 1, "light intensity: ");
 	lightintensity_slider = new wxSlider(panelRenderer, LIGHTINTENSITY_SLIDER, 100, 0, 1000, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL | wxSL_LABELS);
@@ -295,6 +305,7 @@ bool RaytracerApp::OnInit()
 	panelRenderer_sizer->Add(filter_sizer, 0, wxEXPAND);
 	panelRenderer_sizer->Add(envmap_sizer, 0, wxEXPAND);
 	panelRenderer_sizer->Add(envmapintensity_sizer, 0, wxEXPAND);
+	panelRenderer_sizer->Add(background_sizer, 0, wxEXPAND);
 	panelRenderer_sizer->Add(lightintensity_sizer, 0, wxEXPAND);
 	panelRenderer_sizer->Add(bounces_sizer, 0, wxEXPAND);
 	panelRenderer_sizer->Add(launchRender, 0, wxEXPAND);
@@ -477,6 +488,7 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 	raytracer.nb_bounces = raytracer_app->bounces->GetValue();
 
 	raytracer.s.objects[selected_object]->flip_normals = raytracer_app->flipnormals->IsChecked();	
+	raytracer.s.objects[selected_object]->ghost = raytracer_app->ghost->IsChecked();
 
 
 
@@ -527,6 +539,7 @@ void RenderPanel::update_gui() {
 	raytracer_app->filter_slider->SetValue(raytracer.sigma_filter*10.);
 	raytracer_app->bounces->SetValue(raytracer.nb_bounces);	
 	raytracer_app->flipnormals->SetValue(raytracer.s.objects[selected_object]->flip_normals);	
+	raytracer_app->ghost->SetValue(raytracer.s.objects[selected_object]->ghost);
 
 	raytracer_app->nbviews->SetValue(raytracer.cam.lenticular_nb_images);
 	raytracer_app->nbpixslice->SetValue(raytracer.cam.lenticular_pixel_width);	
@@ -560,6 +573,7 @@ void RenderPanel::update_gui() {
 			raytracer_app->m_NormalFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
 	}
 	raytracer_app->envmapName->SetLabelText(((Sphere*)raytracer.s.objects[1])->envmapfilename);
+	raytracer_app->backgroundName->SetLabelText(raytracer.s.backgroundfilename);
 
 	raytracer_app->m_AlphaFile->DeleteAllItems();
 	for (int i = 0; i < raytracer.s.objects[selected_object]->alphamap.size(); i++) {
@@ -1821,6 +1835,20 @@ bool DnDEnvmapFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames
 	return true;
 }
 
+bool DnDBackgroundFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
+{
+	size_t nFiles = filenames.GetCount();
+	if (nFiles < 1) return true;
+
+	if (m_pOwner != NULL) {
+		m_rtFrame->render_panel->stop_render();
+		m_rtFrame->render_panel->raytracer.s.load_background(filenames[0]);
+		m_rtFrame->render_panel->update_gui();
+		m_rtFrame->render_panel->start_render();
+	}
+
+	return true;
+}
 void RaytracerFrame::OnClose(wxCloseEvent& event)
 {
 	render_panel->stop_render();

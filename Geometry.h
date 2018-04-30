@@ -358,7 +358,7 @@ public:
 
 class Object {
 public:
-	Object() { scale = 1; flip_normals = false; miroir = false; };
+	Object() { scale = 1; flip_normals = false; miroir = false; ghost = false;  };
 	virtual bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const = 0;
 	virtual bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const = 0;
 
@@ -482,7 +482,8 @@ public:
 
 	virtual void save_to_file(FILE* f) {
 		fprintf(f, "name: %s\n", name.c_str());		
-		fprintf(f, "miroir: %u\n", miroir?1:0);
+		fprintf(f, "miroir: %u\n", miroir?1:0);		
+		fprintf(f, "ghost: %u\n", ghost ? 1 : 0);
 		fprintf(f, "translation: (%lf, %lf, %lf)\n", max_translation[0], max_translation[1], max_translation[2]);
 		fprintf(f, "rotation: (%lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf)\n", mat_rotation[0], mat_rotation[1], mat_rotation[2], mat_rotation[3], mat_rotation[4], mat_rotation[5], mat_rotation[6], mat_rotation[7], mat_rotation[8]);
 		fprintf(f, "center: (%lf, %lf, %lf)\n", rotation_center[0], rotation_center[1], rotation_center[2]);
@@ -533,7 +534,13 @@ public:
 		fscanf(f, "name: %[^\n]\n", line);
 		name = std::string(line);
 		fscanf(f, "miroir: %u\n", &mybool); miroir = mybool;
-		fscanf(f, "translation: (%lf, %lf, %lf)\n", &max_translation[0], &max_translation[1], &max_translation[2]);
+		fscanf(f, "%[^\n]\n", line);
+		if (line[0] == 'g') {
+			sscanf(line, "ghost: %u\n", &mybool); ghost = mybool;
+			fscanf(f, "translation: (%lf, %lf, %lf)\n", &max_translation[0], &max_translation[1], &max_translation[2]);
+		} else {
+			sscanf(line, "translation: (%lf, %lf, %lf)\n", &max_translation[0], &max_translation[1], &max_translation[2]);
+		}
 		fscanf(f, "rotation: (%lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf)\n", &mat_rotation[0], &mat_rotation[1], &mat_rotation[2], &mat_rotation[3], &mat_rotation[4], &mat_rotation[5], &mat_rotation[6], &mat_rotation[7], &mat_rotation[8]);
 		fscanf(f, "center: (%lf, %lf, %lf)\n", &rotation_center[0], &rotation_center[1], &rotation_center[2]);
 		fscanf(f, "scale: %lf\n", &scale);
@@ -666,7 +673,7 @@ public:
 	Matrix<3, 3> mat_rotation; // Euler angles
 	Vector rotation_center;
 	double scale;
-	bool display_edges, interp_normals, flip_normals;
+	bool display_edges, interp_normals, flip_normals, ghost;
 
 	std::vector<Texture> textures, specularmap, alphamap, roughnessmap, normal_map, transparent_map, refr_index_map;
 	double trans_matrix[12], inv_trans_matrix[12], rot_matrix[9];
@@ -910,7 +917,7 @@ public:
 
 class Scene {
 public:
-	Scene() {};
+	Scene() { backgroundW = 0; backgroundH = 0; };
 
 	void addObject(Object* o) { objects.push_back(o); }
 
@@ -984,8 +991,26 @@ public:
 
 		return false;
 	}
+	void clear_background() {
+		background.clear();
+		backgroundW = 0;
+		backgroundH = 0;
+		backgroundfilename = std::string("");
+	}
+
+	void load_background(const char* filename) {
+		std::vector<unsigned char> bg;
+		backgroundfilename = std::string(filename);
+		load_bmp(filename, bg, backgroundW, backgroundH);
+		background.resize(bg.size());
+		for (int i = 0; i < backgroundW*backgroundH * 3; i++)
+			background[i] = std::pow(bg[i], 2.2); // will be gamma corrected during rendering ; beware: values are kept between [0,255^2.2] for consistency with the renderer
+	}
 
 	std::vector<Object*> objects;
+	std::vector<double> background;
+	int backgroundW, backgroundH;
+	std::string backgroundfilename;
 	Sphere *lumiere;
 	double intensite_lumiere;
 	double envmap_intensity;
