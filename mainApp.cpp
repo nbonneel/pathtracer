@@ -1669,6 +1669,7 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 
 				std::string values = wxGetTextFromUser("Space separated, -1: ignore, 0:x 1:y, 2:z, 3:nx,4:ny,5:nz, 6:colr, 7:colg, 8:colb",
 					"Enter XYZ file format", "-1 -1 0 1 2 6 7 8").ToStdString();
+				bool center = (wxMessageBox("Should the model be normalized / centered ?", "Normalization ?", wxYES_NO | wxCENTRE) == wxYES);
 				const char* line = &values.c_str()[0];
 				int cols[100];
 				int nbcols = 0;
@@ -1678,7 +1679,7 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 					line += offset;
 				}
 
-				PointSet* g = new PointSet(filenames[n], nbcols, cols);
+				PointSet* g = new PointSet(filenames[n], nbcols, cols, false, false, center);
 				g->scale = 30;
 				Vector c = (g->bvh.bbox.bounds[0] + g->bvh.bbox.bounds[1])*0.5; // c is at 0
 				double s = std::max(g->bvh.bbox.bounds[1][0] - g->bvh.bbox.bounds[0][0], std::max(g->bvh.bbox.bounds[1][1] - g->bvh.bbox.bounds[0][1], g->bvh.bbox.bounds[1][2] - g->bvh.bbox.bounds[0][2]));
