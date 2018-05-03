@@ -647,7 +647,7 @@ void Raytracer::render_image()
 
 		std::ostringstream os;
 		//os << "testFog_" << time_step << ".bmp";
-		os << "export" << time_step << ".bmp";
+		os << "export" << s.current_frame << ".bmp";
 		save_image(os.str().c_str(), &image[0], W, H);
 	}
 

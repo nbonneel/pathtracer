@@ -414,6 +414,10 @@ bool RaytracerApp::OnInit()
 	Connect(ADD_KEYFRAME, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::add_keyframe), NULL, renderPanel);
 	panelAnimation_sizer->Add(addKeyframe, 0, wxEXPAND);
 
+	renderVideo = new wxButton(panelAnimation, RENDER_VIDEO, "Offline render video (freezes)", wxDefaultPosition, wxDefaultSize);
+	Connect(RENDER_VIDEO, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::render_video), NULL, renderPanel);
+	panelAnimation_sizer->Add(renderVideo, 0, wxEXPAND);
+
 	m_bookCtrl->AddPage(panelAnimation, wxT("Animation"), false);
 
 

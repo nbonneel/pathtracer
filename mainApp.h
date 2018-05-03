@@ -57,6 +57,7 @@
 #define TIME_SLIDER 1029
 #define DURATION 1030
 #define RECORD_KEYFRAME 1031
+#define RENDER_VIDEO 1032
 
 #define ID_ALBEDO_DELETE 10
 #define ID_MOVEUP 11
@@ -472,6 +473,20 @@ public:
 		start_render();
 	}
 
+	void render_video(wxCommandEvent& event) {
+		stop_render();
+		PerfChrono perf;
+		perf.Start();
+		raytracer.stopped = false;
+		for (int i = 0; i < raytracer.s.nbframes; i++) {
+			raytracer.s.current_frame = i;
+			raytracer.s.current_time = i*raytracer.s.duration / (double)raytracer.s.nbframes;
+			raytracer.render_image();
+		}
+		raytracer.stopped = true;
+		start_render();
+	}
+
 	void update_textures_and_render(wxCommandEvent& event);
 	void update_parameters_and_render(wxCommandEvent& event);
 	void update_gui();
@@ -682,7 +697,7 @@ public:
 	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays, *nbviews, *nbpixslice, *nbframesctrl;
 	wxSpinCtrlDouble *duration;
 	wxSpinCtrlDouble* refractionIndex;
-	wxButton *deleteObject, *launchRender, *addKeyframe;
+	wxButton *deleteObject, *launchRender, *addKeyframe, *renderVideo;
 	wxToggleButton*recordKeyframes;
 	wxStaticText* infoModel;
 	wxStaticText* infoPerf;
