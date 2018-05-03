@@ -7,7 +7,7 @@
 #include <map>
 #include "utils.h"
 
-
+#define cimg_display 0
 #include "CImg.h"
 #include "utils.h"
 
@@ -358,6 +358,7 @@ public:
 
 class Object {
 public:
+  virtual ~Object() {};
 	Object() { scale = 1; flip_normals = false; miroir = false; ghost = false;  };
 	virtual bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const = 0;
 	virtual bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const = 0;

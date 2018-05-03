@@ -55,7 +55,7 @@ Quaternion<T> operator*(const Quaternion<T>& q1, const Quaternion<T>& q2) {
 	y3 = w1*y2 + y1*w2 + z1*x2 - x1*z2;
 	z3 = w1*z2 + z1*w2 + x1*y2 - y1*x2;
 
-	return Quaternion(w3, x3, y3, z3);
+	return Quaternion<T>(w3, x3, y3, z3);
 }
 
 
@@ -132,9 +132,9 @@ public:
 		return Quaternion<double>(qw, qx, qy, qz);
 	}
 	double det() const {
-		return m(0, 0) * (m(1, 1) * m(2, 2) - m(2, 1) * m(1, 2)) -
-			m(0, 1) * (m(1, 0) * m(2, 2) - m(1, 2) * m(2, 0)) +
-			m(0, 2) * (m(1, 0) * m(2, 1) - m(1, 1) * m(2, 0));
+		return (*this)(0, 0) * ((*this)(1, 1) * (*this)(2, 2) - (*this)(2, 1) * (*this)(1, 2)) -
+			(*this)(0, 1) * ((*this)(1, 0) * (*this)(2, 2) - (*this)(1, 2) * (*this)(2, 0)) +
+			(*this)(0, 2) * ((*this)(1, 0) * (*this)(2, 1) - (*this)(1, 1) * (*this)(2, 0));
 	}
 	double &operator()(int i, int j) {
 		return values[i*N + j];
@@ -149,15 +149,15 @@ public:
 		double invdet = 1 / determinant;
 
 		Matrix<3,3> minv; // inverse of matrix m
-		minv(0, 0) = (m(1, 1) * m(2, 2) - m(2, 1) * m(1, 2)) * invdet;
-		minv(0, 1) = (m(0, 2) * m(2, 1) - m(0, 1) * m(2, 2)) * invdet;
-		minv(0, 2) = (m(0, 1) * m(1, 2) - m(0, 2) * m(1, 1)) * invdet;
-		minv(1, 0) = (m(1, 2) * m(2, 0) - m(1, 0) * m(2, 2)) * invdet;
-		minv(1, 1) = (m(0, 0) * m(2, 2) - m(0, 2) * m(2, 0)) * invdet;
-		minv(1, 2) = (m(1, 0) * m(0, 2) - m(0, 0) * m(1, 2)) * invdet;
-		minv(2, 0) = (m(1, 0) * m(2, 1) - m(2, 0) * m(1, 1)) * invdet;
-		minv(2, 1) = (m(2, 0) * m(0, 1) - m(0, 0) * m(2, 1)) * invdet;
-		minv(2, 2) = (m(0, 0) * m(1, 1) - m(1, 0) * m(0, 1)) * invdet;
+		minv(0, 0) = ((*this)(1, 1) * (*this)(2, 2) - (*this)(2, 1) * (*this)(1, 2)) * invdet;
+		minv(0, 1) = ((*this)(0, 2) * (*this)(2, 1) - (*this)(0, 1) * (*this)(2, 2)) * invdet;
+		minv(0, 2) = ((*this)(0, 1) * (*this)(1, 2) - (*this)(0, 2) * (*this)(1, 1)) * invdet;
+		minv(1, 0) = ((*this)(1, 2) * (*this)(2, 0) - (*this)(1, 0) * (*this)(2, 2)) * invdet;
+		minv(1, 1) = ((*this)(0, 0) * (*this)(2, 2) - (*this)(0, 2) * (*this)(2, 0)) * invdet;
+		minv(1, 2) = ((*this)(1, 0) * (*this)(0, 2) - (*this)(0, 0) * (*this)(1, 2)) * invdet;
+		minv(2, 0) = ((*this)(1, 0) * (*this)(2, 1) - (*this)(2, 0) * (*this)(1, 1)) * invdet;
+		minv(2, 1) = ((*this)(2, 0) * (*this)(0, 1) - (*this)(0, 0) * (*this)(2, 1)) * invdet;
+		minv(2, 2) = ((*this)(0, 0) * (*this)(1, 1) - (*this)(1, 0) * (*this)(0, 1)) * invdet;
 		return minv;
 	}	
 	double operator[](int i) const { return values[i]; }

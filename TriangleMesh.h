@@ -99,6 +99,7 @@ public:
 
 class Geometry : public Object {
 public:
+  ~Geometry() {}
 	Geometry() {};
 	Geometry(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
 
