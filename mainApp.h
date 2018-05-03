@@ -9,6 +9,7 @@
 #include <wx/colordlg.h>
 #include <wx/spinctrl.h>
 #include <wx/button.h>
+#include <wx/tglbtn.h>
 #include <ostream>
 #include <sstream>
 #include "chrono.h"
@@ -51,6 +52,11 @@
 #define MAXANGLE_SLIDER 1024
 #define NBVIEWS 1025
 #define NBPIXPERSLICE 1026
+#define NBFRAMES 1027
+#define ADD_KEYFRAME 1028
+#define TIME_SLIDER 1029
+#define DURATION 1030
+#define RECORD_KEYFRAME 1031
 
 #define ID_ALBEDO_DELETE 10
 #define ID_MOVEUP 11
@@ -445,6 +451,13 @@ public:
 		start_render();
 	}
 
+	void add_keyframe(wxCommandEvent& event) {
+		if (selected_object < 0) return;
+		if (selected_object >= raytracer.s.objects.size()) return;
+
+		raytracer.s.objects[selected_object]->add_keyframe(raytracer.s.current_frame);
+	}
+
 	void launch_render(wxCommandEvent& event) {
 		stop_render();
 		PerfChrono perf;
@@ -660,15 +673,17 @@ public:
 	wxBookCtrlBase *m_bookCtrl;
 	wxCheckBox *show_edges, *interp_normals, *transparent, *flipnormals, *isLenticularCheck, *ghost;
 	wxTextCtrl *objectName, *envmapName, *backgroundName;
-	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider, *maxangle_slider;
+	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider, *maxangle_slider, *time_slider;
 	wxListCtrl *m_AlbedoFile, *m_SpecularFile, *m_NormalFile, *m_AlphaFile, *m_RoughnessFile, *m_TranspFile, *m_RefrFile;
 	//wxColourPickerCtrl *albedoColorPicker;
 	wxRadioButton *uniformFogRadio, *expFogRadio;
 	wxColourDialog* colPicker;
 	wxFileDialog* texOpenDlg;
-	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays, *nbviews, *nbpixslice;
+	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays, *nbviews, *nbpixslice, *nbframesctrl;
+	wxSpinCtrlDouble *duration;
 	wxSpinCtrlDouble* refractionIndex;
-	wxButton *deleteObject, *launchRender;
+	wxButton *deleteObject, *launchRender, *addKeyframe;
+	wxToggleButton*recordKeyframes;
 	wxStaticText* infoModel;
 	wxStaticText* infoPerf;
 	bool render_loop_on;

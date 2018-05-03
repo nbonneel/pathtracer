@@ -18,7 +18,7 @@ bool RaytracerApp::OnInit()
 		raytracer.load_scene(wxApp::argv[1]);
 		raytracer.render_image();
 		if (arc>2)
-			save_img(wxApp::argv[2], &raytracer.image[0], raytracer.W, raytracer.H);
+			save_image(wxApp::argv[2], &raytracer.image[0], raytracer.W, raytracer.H);
 		exit(0);
 	}
 
@@ -213,10 +213,18 @@ bool RaytracerApp::OnInit()
 
 	wxBoxSizer * rendersize_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* renderwidth_text = new wxStaticText(panelRenderer, 9999 - 1, "W: ");
-	renderwidth = new wxSpinCtrl(panelRenderer, RENDER_WIDTH, wxString("1000"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 2, 10000, 1000);	
+#ifdef _DEBUG
+	renderwidth = new wxSpinCtrl(panelRenderer, RENDER_WIDTH, wxString("100"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 2, 10000, 100);	
+#else
+	renderwidth = new wxSpinCtrl(panelRenderer, RENDER_WIDTH, wxString("1000"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 2, 10000, 1000);
+#endif
 	Connect(RENDER_WIDTH, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	wxStaticText* renderheight_text = new wxStaticText(panelRenderer, 9999 - 1, "H: ");
+#ifdef _DEBUG
+	renderheight = new wxSpinCtrl(panelRenderer, RENDER_HEIGHT, wxString("80"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 2, 10000, 80);
+#else
 	renderheight = new wxSpinCtrl(panelRenderer, RENDER_HEIGHT, wxString("800"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 2, 10000, 800);
+#endif
 	Connect(RENDER_HEIGHT, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	rendersize_sizer->Add(renderwidth_text, 0, wxEXPAND);
 	rendersize_sizer->Add(renderwidth, 1, wxEXPAND);
@@ -373,13 +381,63 @@ bool RaytracerApp::OnInit()
 	m_bookCtrl->AddPage(panelLenticular, wxT("Lenticular"), false);
 
 
+
+
+
+
+	wxPanel *panelAnimation = new wxPanel(m_bookCtrl);
+	wxBoxSizer * panelAnimation_sizer = new wxBoxSizer(wxVERTICAL);
+	panelAnimation->SetSizer(panelAnimation_sizer);
+
+	wxBoxSizer * nbframes_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* nbframes_text = new wxStaticText(panelAnimation, 9999 - 1, "nb frames: ");
+	nbframesctrl = new wxSpinCtrl(panelAnimation, NBFRAMES, wxString("1"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 10000, 1);
+	Connect(NBFRAMES, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	nbframes_sizer->Add(nbframes_text, 0, wxEXPAND);
+	nbframes_sizer->Add(nbframesctrl, 1, wxEXPAND);
+
+	wxBoxSizer * duration_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* duration_text = new wxStaticText(panelAnimation, 9999 - 1, "duration (s): ");
+	duration = new wxSpinCtrlDouble(panelAnimation, DURATION, "1", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.001, 1000, 1, 0.1);
+	Connect(DURATION, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	duration_sizer->Add(duration_text, 0, wxEXPAND);
+	duration_sizer->Add(duration, 1, wxEXPAND);
+
+	panelAnimation_sizer->Add(nbframes_sizer, 0, wxEXPAND);
+	panelAnimation_sizer->Add(duration_sizer, 0, wxEXPAND);
+
+	recordKeyframes = new wxToggleButton(panelAnimation, RECORD_KEYFRAME, "Enable Record keyframes", wxDefaultPosition, wxDefaultSize);
+	Connect(RECORD_KEYFRAME, wxEVT_TOGGLEBUTTON, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	panelAnimation_sizer->Add(recordKeyframes, 0, wxEXPAND);
+
+	addKeyframe = new wxButton(panelAnimation, ADD_KEYFRAME, "Add object keyframe", wxDefaultPosition, wxDefaultSize);
+	Connect(ADD_KEYFRAME, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::add_keyframe), NULL, renderPanel);
+	panelAnimation_sizer->Add(addKeyframe, 0, wxEXPAND);
+
+	m_bookCtrl->AddPage(panelAnimation, wxT("Animation"), false);
+
+
+
 	m_bookCtrl->SetSelection(0);
 
+	wxBoxSizer * renderSuperSizer_sizer = new wxBoxSizer(wxVERTICAL);
+	renderSuperSizer_sizer->Add(renderPanel,5, wxEXPAND);
+
+	wxBoxSizer * time_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* time_text = new wxStaticText(frame, 9999, "timeline ");
+	time_slider = new wxSlider(frame, FOV_SLIDER, 0, 0, 1, wxDefaultPosition, wxSize(600,32), wxSL_HORIZONTAL | wxSL_LABELS);
+	Connect(TIME_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	time_sizer->Add(time_text, 0, wxEXPAND);
+	time_sizer->Add(time_slider, 1, wxEXPAND);
+
+	renderSuperSizer_sizer->Add(time_sizer);
 
 	wxBoxSizer * sizer = new wxBoxSizer(wxHORIZONTAL);
 	frame->SetSizer(sizer);
-	sizer->Add(renderPanel, 2, wxEXPAND);
+	sizer->Add(renderSuperSizer_sizer, 2, wxEXPAND);
 	sizer->Add(m_bookCtrl, 1, wxEXPAND);
+
+
 
 
 	colPicker = new wxColourDialog(frame);
@@ -490,6 +548,18 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 	raytracer.s.objects[selected_object]->flip_normals = raytracer_app->flipnormals->IsChecked();	
 	raytracer.s.objects[selected_object]->ghost = raytracer_app->ghost->IsChecked();
 
+	raytracer.s.nbframes = raytracer_app->nbframesctrl->GetValue();
+	raytracer_app->time_slider->SetMax(raytracer.s.nbframes);
+	raytracer.s.duration = raytracer_app->duration->GetValue();
+	raytracer.s.current_frame = raytracer_app->time_slider->GetValue();
+	raytracer.s.current_time = raytracer.s.current_frame / (double)raytracer.s.nbframes*raytracer.s.duration;
+	raytracer.is_recording = raytracer_app->recordKeyframes->GetValue();
+
+	for (int i = 0; i < raytracer.s.objects.size(); i++) {
+		raytracer.s.objects[i]->max_translation = raytracer.s.objects[i]->get_translation(raytracer.s.current_frame, false);
+		raytracer.s.objects[i]->mat_rotation = raytracer.s.objects[i]->get_rotation(raytracer.s.current_frame, false);
+		raytracer.s.objects[i]->scale = raytracer.s.objects[i]->get_scale(raytracer.s.current_frame, false);
+	}
 
 
 	start_render();
@@ -543,7 +613,8 @@ void RenderPanel::update_gui() {
 
 	raytracer_app->nbviews->SetValue(raytracer.cam.lenticular_nb_images);
 	raytracer_app->nbpixslice->SetValue(raytracer.cam.lenticular_pixel_width);	
-
+	raytracer_app->nbframesctrl->SetValue(raytracer.s.nbframes);
+	raytracer_app->time_slider->SetMax(raytracer.s.nbframes);
 
 	//Vector alb = raytracer.s.objects[selected_object]->albedo;
 	//raytracer_app->albedoColorPicker->SetColour(wxColour(alb[0] * 255., alb[1] * 255., alb[2] * 255.));
@@ -668,6 +739,10 @@ void RenderPanel::update_gui() {
 	double factor = 1. / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
 	raytracer_app->lightintensity_slider->SetValue(raytracer.s.intensite_lumiere / factor);
 	raytracer_app->envmapintensity_slider->SetValue(raytracer.s.envmap_intensity * 100);
+
+	raytracer_app->duration->SetValue(raytracer.s.duration);
+	raytracer_app->time_slider->SetValue(raytracer.s.current_frame );
+	raytracer_app->recordKeyframes->SetValue(raytracer.is_recording);
 }
 
 void RenderPanel::render(wxDC& dc)
@@ -751,9 +826,9 @@ void RenderPanel::render(wxDC& dc)
 			/*gamma_corrected_image[(i*raytracer.W + j) * 3 + 0] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 0] / (raytracer.current_nb_rays + 1)), 1 / 2.2));   // rouge
 			gamma_corrected_image[(i*raytracer.W + j) * 3 + 1] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 1] / (raytracer.current_nb_rays + 1)), 1 / 2.2)); // vert
 			gamma_corrected_image[(i*raytracer.W + j) * 3 + 2] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 2] / (raytracer.current_nb_rays + 1)), 1 / 2.2)); // bleu*/
-			gamma_corrected_image[(i*raytracer.W + j) * 3 + 0] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 0] * normalization), 1 / 2.2));   // rouge
-			gamma_corrected_image[(i*raytracer.W + j) * 3 + 1] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 1] * normalization), 1 / 2.2)); // vert
-			gamma_corrected_image[(i*raytracer.W + j) * 3 + 2] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 2] * normalization), 1 / 2.2)); // bleu
+			gamma_corrected_image[(i*raytracer.W + j) * 3 + 0] = std::min(255., 255.*fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 0] / 196964.699 * normalization), 1 / raytracer.gamma));   // rouge
+			gamma_corrected_image[(i*raytracer.W + j) * 3 + 1] = std::min(255., 255.*fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 1] / 196964.699 * normalization), 1 / raytracer.gamma)); // vert
+			gamma_corrected_image[(i*raytracer.W + j) * 3 + 2] = std::min(255., 255.*fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 2] / 196964.699 * normalization), 1 / raytracer.gamma)); // bleu
 
 		}
 	}
@@ -799,12 +874,12 @@ void RaytracerFrame::SaveImage(wxCommandEvent &evt) {
 #pragma omp parallel for 
 	for (int i = 0; i < H; i++) {
 		for (int j = 0; j < W; j++) {
-			image[((H - i - 1)*W + j) * 3 + 0] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 0] / (nbr + 1.), 1 / 2.2)));   // rouge
-			image[((H - i - 1)*W + j) * 3 + 1] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 1] / (nbr + 1.), 1 / 2.2))); // vert
-			image[((H - i - 1)*W + j) * 3 + 2] = std::min(255., std::max(0., std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 2] / (nbr + 1.), 1 / 2.2))); // bleu
+			image[((H - i - 1)*W + j) * 3 + 0] = std::min(255., std::max(0., 255.*std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 0] / 196964.7 / (nbr + 1.), 1 / render_panel->raytracer.gamma)));   // rouge
+			image[((H - i - 1)*W + j) * 3 + 1] = std::min(255., std::max(0., 255.*std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 1] / 196964.7 / (nbr + 1.), 1 / render_panel->raytracer.gamma))); // vert
+			image[((H - i - 1)*W + j) * 3 + 2] = std::min(255., std::max(0., 255.*std::pow(render_panel->raytracer.imagedouble[((H - i - 1)*W + j) * 3 + 2] / 196964.7 / (nbr + 1.), 1 / render_panel->raytracer.gamma))); // bleu
 		}
 	}
-	save_img(saveFileDialog.GetPath().c_str(), &image[0], W, H);
+	save_image(saveFileDialog.GetPath().c_str(), &image[0], W, H);
 }
 
 
@@ -1683,14 +1758,14 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 				g->scale = 30;
 				Vector c = (g->bvh.bbox.bounds[0] + g->bvh.bbox.bounds[1])*0.5; // c is at 0
 				double s = std::max(g->bvh.bbox.bounds[1][0] - g->bvh.bbox.bounds[0][0], std::max(g->bvh.bbox.bounds[1][1] - g->bvh.bbox.bounds[0][1], g->bvh.bbox.bounds[1][2] - g->bvh.bbox.bounds[0][2]));
-				g->max_translation = Vector(0, m_pOwner->render_panel->raytracer.s.objects[2]->get_translation(1)[1] - (g->bvh.bbox.bounds[0][1])*g->scale, 0);
+				g->max_translation = Vector(0, m_pOwner->render_panel->raytracer.s.objects[2]->get_translation(m_pOwner->render_panel->raytracer.s.current_time, m_pOwner->render_panel->raytracer.is_recording)[1] - (g->bvh.bbox.bounds[0][1])*g->scale, 0);
 				m_pOwner->render_panel->raytracer.s.addObject(g);
 			} else {
 				bool center = (wxMessageBox("Should the model be normalized / centered ?", "Normalization ?", wxYES_NO | wxCENTRE) == wxYES);
 				Geometry* g = new Geometry(filenames[n], 1, Vector(0, 0, 0), false, NULL, false, center);
 				g->scale = 30;
 				g->display_edges = false;
-				g->max_translation = Vector(0, m_pOwner->render_panel->raytracer.s.objects[2]->get_translation(1)[1] - (g->bvh.bbox.bounds[0][1])*g->scale, 0);
+				g->max_translation = Vector(0, m_pOwner->render_panel->raytracer.s.objects[2]->get_translation(m_pOwner->render_panel->raytracer.s.current_time, m_pOwner->render_panel->raytracer.is_recording)[1] - (g->bvh.bbox.bounds[0][1])*g->scale, 0);
 				m_pOwner->render_panel->raytracer.s.addObject(g);
 			}
 		}		
@@ -1843,7 +1918,7 @@ bool DnDBackgroundFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filen
 
 	if (m_pOwner != NULL) {
 		m_rtFrame->render_panel->stop_render();
-		m_rtFrame->render_panel->raytracer.s.load_background(filenames[0]);
+		m_rtFrame->render_panel->raytracer.s.load_background(filenames[0], m_rtFrame->render_panel->raytracer.gamma);
 		m_rtFrame->render_panel->update_gui();
 		m_rtFrame->render_panel->start_render();
 	}

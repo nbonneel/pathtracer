@@ -362,27 +362,84 @@ public:
 	virtual bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const = 0;
 	virtual bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const = 0;
 
-	virtual Vector get_translation(double time) const {
-		return max_translation;// *time;
-	}
-	virtual Matrix<3,3> get_rotation(double time) const {
-		return mat_rotation; // *time;
-	}
-	virtual Vector get_scale(double time) const {
-		return Vector(scale, scale, scale); // *time;
-	}
-	virtual void build_matrix(double time) {
+	virtual Vector get_translation(double frame, bool is_recording) const {
 
-		Matrix<3, 3> m = get_rotation(time);
+		if (is_recording) return max_translation;
+
+		std::map<double, Vector>::const_iterator it1 = translation_keyframes.upper_bound(frame); 
+		std::map<double, Vector>::const_iterator it2 = it1;
+		if (it1 == translation_keyframes.end()) {
+			if (translation_keyframes.size() != 0) {
+				return translation_keyframes.rbegin()->second;
+			} else
+				return max_translation;
+		}
+		if (it1 == translation_keyframes.begin()) { 
+			return it1->second;
+		}
+		it1--;		
+		double t = (frame - it1->first) / (it2->first - it1->first);
+		return (1 - t)*it1->second + t*it2->second;		
+	}
+	virtual Matrix<3,3> get_rotation(double frame, bool is_recording) const {
+		if (is_recording) return mat_rotation;
+
+		std::map<double, Matrix<3, 3> >::const_iterator it1 = rotation_keyframes.upper_bound(frame);
+		std::map<double, Matrix<3, 3> >::const_iterator it2 = it1;
+		if (it1 == rotation_keyframes.end()) {
+			if (rotation_keyframes.size() != 0) {
+				return rotation_keyframes.rbegin()->second;
+			} else
+				return mat_rotation;
+		}
+		if (it1 == rotation_keyframes.begin()) {
+			return it1->second;
+		}
+		it1--;
+		double t = (frame - it1->first) / (it2->first - it1->first);
+		return Slerp(it1->second, it2->second, t);
+	}
+	virtual double get_scale(double frame, bool is_recording) const {
+		if (is_recording) return scale;
+
+		std::map<double, double >::const_iterator it1 = scale_keyframes.upper_bound(frame);
+		std::map<double, double >::const_iterator it2 = it1;
+		if (it1 == scale_keyframes.end()) {
+			if (scale_keyframes.size() != 0) {
+				return scale_keyframes.rbegin()->second;
+			} else
+				return scale;
+		}
+		if (it1 == scale_keyframes.begin()) {
+			return it1->second;
+		}
+		it1--;
+		double t = (frame - it1->first) / (it2->first - it1->first);
+		return (1 - t)*it1->second + t*it2->second;
+	}
+	virtual void add_keyframe(int frame) {
+		rotation_keyframes[frame] = mat_rotation;
+		translation_keyframes[frame] = max_translation;
+		scale_keyframes[frame] = scale;
+	}
+	std::map<double, Matrix<3, 3> > rotation_keyframes; // should do one Transform class.  Frames are double in case I do motion blur later.
+	std::map<double, Vector > translation_keyframes;
+	std::map<double, double > scale_keyframes;
+
+	virtual void build_matrix(double frame, bool is_recording) {
+
+		Matrix<3, 3> m = get_rotation(frame, is_recording);
 		Matrix<3, 3> mt = m.getTransposed();
 		Vector v2;
+		double s = get_scale(frame, is_recording);
+		Vector tr = get_translation(frame, is_recording);
 		for (int i = 0; i < 3; i++) {
 			Vector v(0, 0, 0);
 			v[i] = 1;
 			v2 = Vector(m[0*3+i], m[1 * 3 + i], m[2 * 3 + i]);// rotate_dir(v, get_rotation(time));
-			trans_matrix[0 * 4 + i] = v2[0] * scale;
-			trans_matrix[1 * 4 + i] = v2[1] * scale;
-			trans_matrix[2 * 4 + i] = v2[2] * scale;
+			trans_matrix[0 * 4 + i] = v2[0] * s;
+			trans_matrix[1 * 4 + i] = v2[1] * s;
+			trans_matrix[2 * 4 + i] = v2[2] * s;
 
 			rot_matrix[0 * 3 + i] = v2[0];
 			rot_matrix[1 * 3 + i] = v2[1];
@@ -390,22 +447,22 @@ public:
 						
 			//v2 = inverse_rotate_dir(v2, get_rotation(time));
 			v2 = Vector(mt[0 * 3 + i], mt[1 * 3 + i], mt[2 * 3 + i]);
-			inv_trans_matrix[0 * 4 + i] = v2[0] / scale;
-			inv_trans_matrix[1 * 4 + i] = v2[1] / scale;
-			inv_trans_matrix[2 * 4 + i] = v2[2] / scale;
+			inv_trans_matrix[0 * 4 + i] = v2[0] / s;
+			inv_trans_matrix[1 * 4 + i] = v2[1] / s;
+			inv_trans_matrix[2 * 4 + i] = v2[2] / s;
 		}
 
 		//v2 = rotate_dir(-rotation_center, get_rotation(time));
 		v2 = m*(-rotation_center);
-		trans_matrix[0 * 4 + 3] = v2[0]*scale + rotation_center[0] + get_translation(time)[0];
-		trans_matrix[1 * 4 + 3] = v2[1] * scale + rotation_center[1] + get_translation(time)[1];
-		trans_matrix[2 * 4 + 3] = v2[2] * scale + rotation_center[2] + get_translation(time)[2];
+		trans_matrix[0 * 4 + 3] = v2[0] * s + rotation_center[0] + tr[0];
+		trans_matrix[1 * 4 + 3] = v2[1] * s + rotation_center[1] + tr[1];
+		trans_matrix[2 * 4 + 3] = v2[2] * s + rotation_center[2] + tr[2];
 
 		//v2 = inverse_rotate_dir(-rotation_center-get_translation(time), get_rotation(time));
-		v2 = mt*(-rotation_center - get_translation(time));
-		inv_trans_matrix[0 * 4 + 3] = v2[0] /scale + rotation_center[0] ;
-		inv_trans_matrix[1 * 4 + 3] = v2[1] / scale + rotation_center[1];
-		inv_trans_matrix[2 * 4 + 3] = v2[2] / scale + rotation_center[2];		
+		v2 = mt*(-rotation_center - tr);
+		inv_trans_matrix[0 * 4 + 3] = v2[0] / s + rotation_center[0] ;
+		inv_trans_matrix[1 * 4 + 3] = v2[1] / s + rotation_center[1];
+		inv_trans_matrix[2 * 4 + 3] = v2[2] / s + rotation_center[2];		
 
 	}
 
@@ -487,10 +544,20 @@ public:
 		fprintf(f, "translation: (%lf, %lf, %lf)\n", max_translation[0], max_translation[1], max_translation[2]);
 		fprintf(f, "rotation: (%lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf)\n", mat_rotation[0], mat_rotation[1], mat_rotation[2], mat_rotation[3], mat_rotation[4], mat_rotation[5], mat_rotation[6], mat_rotation[7], mat_rotation[8]);
 		fprintf(f, "center: (%lf, %lf, %lf)\n", rotation_center[0], rotation_center[1], rotation_center[2]);
-		fprintf(f, "scale: %lf\n", scale);
+		fprintf(f, "scale: %lf\n", scale); // TODO SAVE ANIMATIONS
 		fprintf(f, "display_edges: %u\n", display_edges ? 1 : 0);
 		fprintf(f, "interp_normals: %u\n", interp_normals ? 1 : 0);
 		fprintf(f, "flip_normals: %u\n", flip_normals ? 1 : 0);
+		fprintf(f, "nb_transforms: %u\n", static_cast<unsigned int>(translation_keyframes.size()));
+		for (std::map<double, double>::iterator it = scale_keyframes.begin(); it != scale_keyframes.end(); ++it) {
+			fprintf(f, "%lf %lf\n", it->first, it->second);
+		}
+		for (std::map<double, Vector>::iterator it = translation_keyframes.begin(); it != translation_keyframes.end(); ++it) {
+			fprintf(f, "%lf %lf, %lf, %lf\n", it->first, it->second[0], it->second[1], it->second[2]);
+		}
+		for (std::map<double, Matrix<3, 3> >::iterator it = rotation_keyframes.begin(); it != rotation_keyframes.end(); ++it) {
+			fprintf(f, "%lf %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf\n", it->first, it->second[0], it->second[1], it->second[2], it->second[3], it->second[4], it->second[5], it->second[6], it->second[7], it->second[8]);
+		}
 		fprintf(f, "nb_textures: %u\n", static_cast<unsigned int>(textures.size()));
 		for (int i = 0; i < textures.size(); i++) {
 			fprintf(f, "texture: %s\n", textures[i].filename.c_str());
@@ -546,10 +613,37 @@ public:
 		fscanf(f, "scale: %lf\n", &scale);
 		fscanf(f, "display_edges: %u\n", &mybool); display_edges = mybool;
 		fscanf(f, "interp_normals: %u\n", &mybool); interp_normals = mybool;
-			fscanf(f, "flip_normals: %u\n", &mybool); flip_normals = mybool;
+		fscanf(f, "flip_normals: %u\n", &mybool); flip_normals = mybool;
 
-		int n; 
-		fscanf(f, "nb_textures: %u\n", &n);
+		fscanf(f, " %[^\n]\n", line);
+		scale_keyframes.clear();
+		translation_keyframes.clear();
+		rotation_keyframes.clear();
+		int n;
+		if (line[4] == 'r') {
+			sscanf(line, "nb_transforms: %u\n", &n);
+			for (int i = 0; i < n; i++) {
+				double s;
+				double frame;
+				fscanf(f, "%lf %lf\n", &frame, &s);
+				scale_keyframes[frame] = s;
+			}
+			for (int i = 0; i < n; i++) {
+				double frame;
+				Vector t;
+				fscanf(f, "%lf %lf, %lf, %lf\n", &frame, &t[0], &t[1], &t[2]);
+				translation_keyframes[frame] = t;
+			}
+			for (int i = 0; i < n; i++) {
+				double frame;
+				Matrix<3,3> m;
+				fscanf(f, "%lf %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf\n", &frame, &m[0], &m[1], &m[2], &m[3], &m[4], &m[5], &m[6], &m[7], &m[8]);
+				rotation_keyframes[frame] = m;
+			}
+			fscanf(f, "nb_textures: %u\n", &n);
+		} else {
+			sscanf(line, "nb_textures: %u\n", &n);
+		}
 		for (int i = 0; i < n; i++) {
 			fscanf(f, "texture: %[^\n]\n", line);
 			if (line[0] == 'C' && line[1] == 'o') {  //Color
@@ -670,7 +764,7 @@ public:
 	std::string name;
 	bool miroir;	
 	Vector max_translation;
-	Matrix<3, 3> mat_rotation; // Euler angles
+	Matrix<3, 3> mat_rotation; 
 	Vector rotation_center;
 	double scale;
 	bool display_edges, interp_normals, flip_normals, ghost;
@@ -917,7 +1011,9 @@ public:
 
 class Scene {
 public:
-	Scene() { backgroundW = 0; backgroundH = 0; };
+	Scene() {
+		backgroundW = 0; backgroundH = 0; current_time = 0; current_frame = 0; duration = 1;
+	};
 
 	void addObject(Object* o) { objects.push_back(o); }
 
@@ -936,12 +1032,13 @@ public:
 	}
 
 
-	bool intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id) const {
+	bool intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id, bool avoid_ghosts = false) const {
 
 		bool has_inter = false;
 		min_t = 1E99;
 
 		for (int i = 0; i < objects.size(); i++) {
+			if (avoid_ghosts && objects[i]->ghost) continue;
 			Vector localP;
 			MaterialValues localmat;
 			double t;
@@ -969,11 +1066,12 @@ public:
 	}
 
 
-	bool intersection_shadow(const Ray& d, double &min_t, double dist_light) const {
+	bool intersection_shadow(const Ray& d, double &min_t, double dist_light, bool avoid_ghosts = false) const {
 
 		min_t = 1E99;
 
 		for (int i = 0; i < objects.size(); i++) {
+			if (avoid_ghosts && objects[i]->ghost) continue;
 			Vector transformed_dir = objects[i]->apply_inverse_rotation_scaling(d.direction);
 			Vector new_origin = objects[i]->apply_inverse_transformation(d.origin); 
 			Ray transformed_ray(new_origin, transformed_dir, d.time);
@@ -998,13 +1096,13 @@ public:
 		backgroundfilename = std::string("");
 	}
 
-	void load_background(const char* filename) {
+	void load_background(const char* filename, double gamma) {
 		std::vector<unsigned char> bg;
 		backgroundfilename = std::string(filename);
 		load_bmp(filename, bg, backgroundW, backgroundH);
 		background.resize(bg.size());
 		for (int i = 0; i < backgroundW*backgroundH * 3; i++)
-			background[i] = std::pow(bg[i], 2.2); // will be gamma corrected during rendering ; beware: values are kept between [0,255^2.2] for consistency with the renderer
+			background[i] = std::pow(bg[i]/255., gamma)* 196964.699; // will be gamma corrected during rendering ; beware: values are kept between [0,255^2.2] for consistency with the renderer
 	}
 
 	std::vector<Object*> objects;
@@ -1015,5 +1113,7 @@ public:
 	double intensite_lumiere;
 	double envmap_intensity;
 	double fog_density;
+	int nbframes, current_frame;
+	double duration, current_time;
 	int fog_type; // 0 : uniform, 1: exponential
 };

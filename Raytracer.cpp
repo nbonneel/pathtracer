@@ -9,51 +9,12 @@
 #include <string>
 #include "chrono.h"
 #include "Raytracer.h"
+
 #undef max
 #undef min
 
 
-
 inline double sqr(double x) { return x*x; }
-
-void save_img(const char* filename, const unsigned char* pixels, int W, int H) // stored as RGB
-{
-	unsigned char bmpfileheader[14] = { 'B','M', 0,0,0,0, 0,0, 0,0, 54,0,0,0 };
-	unsigned char bmpinfoheader[40] = { 40,0,0,0, 0,0,0,0, 0,0,0,0, 1,0, 24,0 };
-	unsigned char bmppad[3] = { 0,0,0 };
-
-	int filesize = 54 + 3 * W*H;  //w is your image width, h is image height, both int
-	bmpfileheader[2] = (unsigned char)(filesize);
-	bmpfileheader[3] = (unsigned char)(filesize >> 8);
-	bmpfileheader[4] = (unsigned char)(filesize >> 16);
-	bmpfileheader[5] = (unsigned char)(filesize >> 24);
-
-	bmpinfoheader[4] = (unsigned char)(W);
-	bmpinfoheader[5] = (unsigned char)(W >> 8);
-	bmpinfoheader[6] = (unsigned char)(W >> 16);
-	bmpinfoheader[7] = (unsigned char)(W >> 24);
-	bmpinfoheader[8] = (unsigned char)(H);
-	bmpinfoheader[9] = (unsigned char)(H >> 8);
-	bmpinfoheader[10] = (unsigned char)(H >> 16);
-	bmpinfoheader[11] = (unsigned char)(H >> 24);
-
-	FILE* f;
-	f = fopen(filename, "wb");
-	fwrite(bmpfileheader, 1, 14, f);
-	fwrite(bmpinfoheader, 1, 40, f);
-	std::vector<unsigned char> bgr_pixels(W*H * 3);
-	for (int i = 0; i < W*H; i++) {
-		bgr_pixels[i * 3] = pixels[i * 3 + 2];
-		bgr_pixels[i * 3+1] = pixels[i * 3 + 1];
-		bgr_pixels[i * 3+2] = pixels[i * 3];
-	}
-	for (int i = 0; i < H; i++)
-	{
-		fwrite(&bgr_pixels[0] + (W*(H - i - 1) * 3), 3, W, f);
-		fwrite(bmppad, 1, (4 - (W * 3) % 4) % 4, f);
-	}
-	fclose(f);
-}
 
 
 Vector Phong_BRDF(const Vector& wi, const Vector& wo, const Vector& N, const Vector& phong_exponent) {
@@ -71,11 +32,11 @@ double int_exponential(double y0, double ysol, double beta, double s, double uy)
 	return result;
 }
 
-Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int screenI, int screenJ, bool show_lights) {
+Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int screenI, int screenJ, bool show_lights, bool no_envmap) {
 
 	if (nbrebonds == 0) return Vector(0, 0, 0);
 
-	Vector centerLight = s.lumiere->O + s.lumiere->get_translation(r.time);
+	Vector centerLight = s.lumiere->O + s.lumiere->get_translation(r.time, is_recording);
 
 	Vector P;
 	MaterialValues mat;
@@ -99,11 +60,15 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 		double b = s.background[i*s.backgroundW * 3 + j * 3 + 2];
 		return Vector(r, g, b);
 	}
+	double lum_scale = s.lumiere->get_scale(r.time, is_recording);
 
 	Vector intensite_pixel(0, 0, 0);
 	if (has_inter) {
+		if (no_envmap && sphere_id == 1) {
+			return Vector(0, 0, 0);
+		}
 		if (sphere_id == 0) {
-			intensite_pixel = show_lights ? (/*s.lumiere->albedo **/Vector(1.,1.,1.)* (s.intensite_lumiere / sqr(s.lumiere->scale))) : Vector(0., 0., 0.);
+			intensite_pixel = show_lights ? (/*s.lumiere->albedo **/Vector(1.,1.,1.)* (s.intensite_lumiere / sqr(lum_scale))) : Vector(0., 0., 0.);
 		} else {
 
 			intensite_pixel += mat.Ke*s.envmap_intensity;
@@ -113,7 +78,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 				Ray rayon_miroir(P + 0.001*N, direction_miroir, r.time);
 
 				//if (uniform(engine) < 0.9)
-				intensite_pixel += getColor(rayon_miroir, s, nbrebonds - 1, screenI, screenJ);// / 0.9;
+				intensite_pixel += getColor(rayon_miroir, s, nbrebonds - 1, screenI, screenJ, show_lights, no_envmap);// / 0.9;
 
 			} else
 				if (mat.transp) {
@@ -150,7 +115,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 						new_ray = Ray(P + 0.001*normale_pour_transparence, r.direction.reflect(N), r.time);
 						//return Vector(0, 0, 0);
 					}
-					intensite_pixel += getColor(new_ray, s, nbrebonds - 1, screenI, screenJ);
+					intensite_pixel += getColor(new_ray, s, nbrebonds - 1, screenI, screenJ, show_lights, no_envmap);
 				} else {
 
 					//if (dot(N, r.direction) > 0) N = -N;
@@ -172,33 +137,39 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 	
 					Vector axeOP = (P - centerLight).getNormalized();
 					Vector dir_aleatoire = random_cos(axeOP);
-					Vector point_aleatoire = dir_aleatoire * s.lumiere->R*s.lumiere->scale + centerLight;
+					Vector point_aleatoire = dir_aleatoire * s.lumiere->R*lum_scale + centerLight;
 					Vector wi = (point_aleatoire - P).getNormalized();
 					double d_light2 = (point_aleatoire - P).getNorm2();
 					Vector Np = dir_aleatoire;
 					Vector kd =  mat.Kd;
 					Vector tr;
-					if (s.objects[sphere_id]->ghost)
-						tr = getColor(Ray(P + r.direction*0.001, r.direction, r.time), s, nbrebonds, screenI, screenJ, show_lights);
-
+					if (s.objects[sphere_id]->ghost) {
+						Vector offset;   // try to be robust here since we don't do nbrebonds-1
+						if (dot(N, r.direction) > 0)
+							offset = N;
+						else
+							offset = -N;
+						tr = getColor(Ray(P + r.direction*0.001 + offset*0.001, r.direction, r.time), s, nbrebonds, screenI, screenJ, show_lights, no_envmap);
+					}
 					Ray ray_light(P + 0.01*wi, wi, r.time);
 					double t_light;
-					bool has_inter_light = s.intersection_shadow(ray_light, t_light, sqrt(d_light2));
-
+					bool has_inter_light = s.intersection_shadow(ray_light, t_light, sqrt(d_light2), true);
+					bool direct_visible = true;
 					if ((has_inter_light) || (dot(N, wi) < 0)) {
 						intensite_pixel += Vector(0, 0, 0);
+						direct_visible = false;
 					} else {
 						//intensite_pixel = (s.intensite_lumiere / (4.*M_PI*d_light2) * std::max(0., dot(N, wi)) * dot(Np, -wi) / dot(axeOP, dir_aleatoire))*(M_PI) * ((1. - s.objects[sphere_id]->ks)*albedo/ (M_PI) + Phong_BRDF(wi, r.direction, N, s.objects[sphere_id]->phong_exponent)*s.objects[sphere_id]->ks * albedo);
 
 						//Vector BRDF = albedo / M_PI   * (1. - s.objects[sphere_id]->ks)   + s.objects[sphere_id]->ks*Phong_BRDF(wi, r.direction, N, s.objects[sphere_id]->phong_exponent)*albedo;
 						Vector BRDF = kd / M_PI + Phong_BRDF(wi, r.direction, N, mat.Ne)*mat.Ks;
 						double J = 1.*dot(Np, -wi) / d_light2;
-						double proba = dot(axeOP, dir_aleatoire) / (M_PI * s.lumiere->R*s.lumiere->R*s.lumiere->scale*s.lumiere->scale);
-						if (proba > 0) {
-							if (s.objects[sphere_id]->ghost) {
-								intensite_pixel += tr;
-							} else {
-								intensite_pixel += (s.intensite_lumiere / sqr(s.lumiere->scale) * std::max(0., dot(N, wi)) * J / proba)  * BRDF ;
+						double proba = dot(axeOP, dir_aleatoire) / (M_PI * s.lumiere->R*s.lumiere->R*lum_scale*lum_scale);
+						if (s.objects[sphere_id]->ghost) {
+							intensite_pixel += tr;
+						} else {
+							if (proba > 0) {
+								intensite_pixel += (s.intensite_lumiere / sqr(lum_scale) * std::max(0., dot(N, wi)) * J / proba)  * BRDF;
 							}
 						}
 						
@@ -209,6 +180,9 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 					double avgNe = (mat.Ne[0] + mat.Ne[1] + mat.Ne[2]) / 3.;
 					Vector direction_aleatoire;
 					double p = 1 - (mat.Ks[0] + mat.Ks[1] + mat.Ks[2]) / 3.;
+					if (s.objects[sphere_id]->ghost) {
+						p = std::max(0.2, p);
+					}
 					bool sample_diffuse;
 					Vector R = r.direction.reflect(N);
 					if (uniform(engine) < p) {
@@ -232,14 +206,14 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 						/*if (nbrebonds != nb_bounces)
 							return intensite_pixel;*/
 						if (sample_diffuse)
-							intensite_pixel += tr/ 196964.7/ M_PI *getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false)  / proba_globale;
+							intensite_pixel += tr / 196964.699 / M_PI *getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false, direct_visible)  / proba_globale;
 						else
-							intensite_pixel += tr / 196964.7 / M_PI*getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false)  * Phong_BRDF(direction_aleatoire, r.direction, N, mat.Ne) / proba_globale *mat.Ks;
+							intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false, true)  * Phong_BRDF(direction_aleatoire, r.direction, N, mat.Ne) / proba_globale *mat.Ks;
 					} else {
 						if (sample_diffuse)
-							intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false) * ((dot(N, direction_aleatoire) / (M_PI) / proba_globale)) * kd;
+							intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false, no_envmap) * ((dot(N, direction_aleatoire) / (M_PI) / proba_globale)) * kd;
 						else
-							intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false)  * ((dot(N, direction_aleatoire) / proba_globale)) *mat.Ks * Phong_BRDF(direction_aleatoire, r.direction, N, mat.Ne);
+							intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false, no_envmap)  * ((dot(N, direction_aleatoire) / proba_globale)) *mat.Ks * Phong_BRDF(direction_aleatoire, r.direction, N, mat.Ne);
 					}
 					//intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, false)  * dot(N, direction_aleatoire) * Phong_BRDF(direction_aleatoire, r.direction, N, s.objects[sphere_id]->phong_exponent)*s.objects[sphere_id]->ks * albedo / proba_globale;
 				}
@@ -260,7 +234,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 	if (is_uniform_fog) {
 		int_ext = beta * t;
 	} else {
-		int_ext = int_exponential(r.origin[1], s.objects[2]->get_translation(1)[1], beta, t, r.direction[1]);
+		int_ext = int_exponential(r.origin[1], s.objects[2]->get_translation(r.time, is_recording)[1], beta, t, r.direction[1]);
 	}
 	double T = exp(-int_ext);
 
@@ -285,7 +259,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 	if (is_uniform_fog) {
 		int_ext_partielle = beta * random_t;
 	} else {
-		int_ext_partielle = int_exponential(r.origin[1], s.objects[2]->get_translation(1)[1], beta, random_t, r.direction[1]);
+		int_ext_partielle = int_exponential(r.origin[1], s.objects[2]->get_translation(r.time, is_recording)[1], beta, random_t, r.direction[1]);
 	}
 		
 
@@ -302,7 +276,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 		is_uniform = true;
 	} else {		
 		Vector dir_aleatoire = random_cos(axeOP);
-		point_aleatoire = dir_aleatoire * s.lumiere->R*s.lumiere->scale + centerLight;
+		point_aleatoire = dir_aleatoire * s.lumiere->R*lum_scale + centerLight;
 		random_dir = (point_aleatoire - random_P).getNormalized();
 		is_uniform = false;
 	}
@@ -347,7 +321,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 	} else {
 		double pdf_uniform = 1. / (4.*M_PI);
 		double J = dot(interN, -random_dir) / (interP - random_P).getNorm2();
-		double pdf_light = (interinter && interid==0) ? (dot((interP - centerLight).getNormalized(), axeOP) / (M_PI * sqr(s.lumiere->R*s.lumiere->scale)) / J) : 0.;
+		double pdf_light = (interinter && interid==0) ? (dot((interP - centerLight).getNormalized(), axeOP) / (M_PI * sqr(s.lumiere->R*lum_scale)) / J) : 0.;
 		proba_dir = p_uniform * pdf_uniform + (1 - p_uniform)*pdf_light;
 
 		Vector L = getColor(L_ray, s, nbrebonds - 1, screenI, screenJ);
@@ -356,7 +330,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 		if (is_uniform_fog) {
 			ext = beta;
 		} else {
-			ext = 0.1 * exp(-beta*(random_P[1] - s.objects[2]->get_translation(1)[1]));
+			ext = 0.1 * exp(-beta*(random_P[1] - s.objects[2]->get_translation(r.time, is_recording)[1]));
 		}
 		Lv = L * phase_func * ext * exp(-int_ext_partielle) / (proba_t * proba_dir);
 	}
@@ -369,11 +343,13 @@ void Raytracer::save_scene(const char* filename) {
 	FILE* f = fopen(filename, "w+");
 	fprintf(f, "W,H: %u, %u\n", W, H);
 	fprintf(f, "nrays: %u\n", nrays);
+	fprintf(f, "nbframes: %u\n", s.nbframes);
 	fprintf(f, "Cam: (%lf, %lf, %lf), (%lf, %lf, %lf), (%lf, %lf, %lf)\n", cam.position[0], cam.position[1], cam.position[2], cam.direction[0], cam.direction[1], cam.direction[2], cam.up[0], cam.up[1], cam.up[2]);
 	fprintf(f, "fov: %lf\n", cam.fov);
 	fprintf(f, "focus: %lf\n", cam.focus_distance);
 	fprintf(f, "aperture: %lf\n", cam.aperture);
 	fprintf(f, "sigma_filter: %lf\n", sigma_filter);
+	fprintf(f, "gamma: %lf\n", gamma);
 	fprintf(f, "bounces: %u\n", nb_bounces);
 	fprintf(f, "intensite_lum: %le\n", s.intensite_lumiere);
 	fprintf(f, "intensite_envmap: %lf\n", s.envmap_intensity);
@@ -395,20 +371,34 @@ void Raytracer::save_scene(const char* filename) {
 void Raytracer::load_scene(const char* filename) {
 
 	s.clear();
+	char line[255], bg[255];
 
 	FILE* f = fopen(filename, "r");
 	fscanf(f, "W,H: %u, %u\n", &W, &H);
 	fscanf(f, "nrays: %u\n", &nrays);
-	fscanf(f, "Cam: (%lf, %lf, %lf), (%lf, %lf, %lf), (%lf, %lf, %lf)\n", &cam.position[0], &cam.position[1], &cam.position[2], &cam.direction[0], &cam.direction[1], &cam.direction[2], &cam.up[0], &cam.up[1], &cam.up[2]);
+	fscanf(f, "%[^\n]\n", line);
+	if (line[0] == 'n') {
+		sscanf(line, "nbframes: %u\n", &s.nbframes);
+		fscanf(f, "Cam: (%lf, %lf, %lf), (%lf, %lf, %lf), (%lf, %lf, %lf)\n", &cam.position[0], &cam.position[1], &cam.position[2], &cam.direction[0], &cam.direction[1], &cam.direction[2], &cam.up[0], &cam.up[1], &cam.up[2]);
+	} else {
+		sscanf(line, "Cam: (%lf, %lf, %lf), (%lf, %lf, %lf), (%lf, %lf, %lf)\n", &cam.position[0], &cam.position[1], &cam.position[2], &cam.direction[0], &cam.direction[1], &cam.direction[2], &cam.up[0], &cam.up[1], &cam.up[2]);
+	}
 	fscanf(f, "fov: %lf\n", &cam.fov);
 	fscanf(f, "focus: %lf\n", &cam.focus_distance);
 	fscanf(f, "aperture: %lf\n", &cam.aperture);
 	fscanf(f, "sigma_filter: %lf\n", &sigma_filter);
-	fscanf(f, "bounces: %u\n", &nb_bounces);
+	
+	int nbo;
+	fscanf(f, "%[^\n]\n", line);
+	if (line[0] == 'g') {
+		sscanf(line, "gamma: %lf\n", &gamma);
+		fscanf(f, "bounces: %u\n", &nb_bounces);
+	} else {
+		sscanf(line, "bounces: %u\n", &nb_bounces);
+	}
 	fscanf(f, "intensite_lum: %le\n", &s.intensite_lumiere);
 	fscanf(f, "intensite_envmap: %lf\n", &s.envmap_intensity);
-	char line[255], bg[255];
-	int nbo;
+
 
 	fscanf(f, "%[^\n]\n", line);
 	if (line[0] == 'n') {
@@ -416,7 +406,7 @@ void Raytracer::load_scene(const char* filename) {
 		s.clear_background();
 	} else {
 		sscanf(line, "background: %[^\n]\n", bg);
-		s.load_background(bg);
+		s.load_background(bg, gamma);
 		fscanf(f, "nbobjects: %u\n", &nbo);
 	}
 
@@ -436,8 +426,13 @@ void Raytracer::loadScene() {
 
 	//W = 1000;
 	//H = 1200;
-	W = 600;
-	H = 720;
+#ifdef _DEBUG
+	W = 100;
+	H = 80;
+#else
+	W = 1000;
+	H = 800;
+#endif
 	nrays = 1000;   //10 pour debugguer, 1000 pour les rendus finaux	
 	cam = Camera(Vector(0., 0., 50.), Vector(0, 0, -1), Vector(0, 1, 0));
 	cam.fov = 35 * M_PI / 180;   // field of view
@@ -511,10 +506,6 @@ void Raytracer::render_image()
 		imagedouble_lowres[i * 3 + 2] = 0;
 	}
 
-	for (int i = 0; i < s.objects.size(); i++) {
-		s.objects[i]->build_matrix(0); // time = 0 here
-	}
-
 	
 	//static int nbcalls = 0;
 	std::vector<std::pair<int, int> > permut(64);
@@ -554,6 +545,11 @@ void Raytracer::render_image()
 
 
 	for (int time_step = fstart; time_step < fend; time_step++) {
+
+		for (int i = 0; i < s.objects.size(); i++) {
+			s.objects[i]->build_matrix(s.current_frame, is_recording); // time = 0 here
+		}
+
 		for (int k = 0; k < nrays; k++) {
 			current_nb_rays = k;
 			chrono.Start();
@@ -643,16 +639,16 @@ void Raytracer::render_image()
 #pragma omp parallel for 
 		for (int i = 0; i < H; i++) {
 			for (int j = 0; j < W; j++) {
-				image[((H - i - 1)*W + j) * 3 + 0] = std::min(255., std::max(0., std::pow(imagedouble[((H - i - 1)*W + j) * 3 + 0] / (nrays + 1), 1 / 2.2)));   // rouge
-				image[((H - i - 1)*W + j) * 3 + 1] = std::min(255., std::max(0., std::pow(imagedouble[((H - i - 1)*W + j) * 3 + 1] / (nrays + 1), 1 / 2.2))); // vert
-				image[((H - i - 1)*W + j) * 3 + 2] = std::min(255., std::max(0., std::pow(imagedouble[((H - i - 1)*W + j) * 3 + 2] / (nrays + 1), 1 / 2.2))); // bleu
+				image[((H - i - 1)*W + j) * 3 + 0] = std::min(255., std::max(0., 255.*std::pow(imagedouble[((H - i - 1)*W + j) * 3 + 0] / 196964.7 / (nrays + 1), 1 / gamma)));   // rouge
+				image[((H - i - 1)*W + j) * 3 + 1] = std::min(255., std::max(0., 255.*std::pow(imagedouble[((H - i - 1)*W + j) * 3 + 1] / 196964.7 / (nrays + 1), 1 / gamma))); // vert
+				image[((H - i - 1)*W + j) * 3 + 2] = std::min(255., std::max(0., 255.*std::pow(imagedouble[((H - i - 1)*W + j) * 3 + 2] / 196964.7 / (nrays + 1), 1 / gamma))); // bleu
 			}
 		}
 
 		std::ostringstream os;
 		//os << "testFog_" << time_step << ".bmp";
 		os << "export" << time_step << ".bmp";
-		save_img(os.str().c_str(), &image[0], W, H);
+		save_image(os.str().c_str(), &image[0], W, H);
 	}
 
 	//std::cout << chrono.GetDiffMs() / (double)1000. << std::endl;
