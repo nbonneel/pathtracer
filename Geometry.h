@@ -538,6 +538,9 @@ public:
 		return mat;
 	}
 
+	virtual void colorAnisotropy() {
+	}
+
 	virtual void save_to_file(FILE* f) {
 		fprintf(f, "name: %s\n", name.c_str());		
 		fprintf(f, "miroir: %u\n", miroir?1:0);		

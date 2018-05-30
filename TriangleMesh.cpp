@@ -103,6 +103,32 @@ void Geometry::readVRML(const char* obj) {
 	delete[] line;
 }
 
+
+void Geometry::readOFF(const char* filename) {
+	FILE* f = fopen(filename, "r+");
+
+	const char* s[4];
+	fscanf(f, "%s\n", s); // OFF
+	int nbvtx, nbfaces, nbxx;
+	fscanf(f, "%u %u %u\n", &nbvtx, &nbfaces, &nbxx);
+
+	vertices.resize(nbvtx);
+	indices.resize(nbfaces);
+	for (int i = 0; i<nbvtx; i++) {
+		float x, y, z;
+		fscanf(f, "%f %f %f\n", &x, &y, &z);
+		vertices[i] = Vector(x,y,z);
+	}
+	for (int i = 0; i<nbfaces; i++) {
+		int a, b, c;
+		int nbv;
+		fscanf(f, "%u %u %u %u\n", &nbv, &a, &b, &c);
+		indices[i] = TriangleIndices(a, b, c);
+	}
+
+	fclose(f);
+}
+
 void Geometry::load_edge_colors(const char* csvfilename) {
 	if (!csvfilename) return;
 
@@ -194,8 +220,8 @@ Vector TransformH(
 	float H
 )
 {
-	float U = cos(H*M_PI / 180);
-	float W = sin(H*M_PI / 180);
+	float U = cos(-H*M_PI / 180);
+	float W = sin(-H*M_PI / 180);
 
 	Vector ret;
 	ret[0] = (.299 + .701*U + .168*W)*in[0]
@@ -687,6 +713,9 @@ void Geometry::init(const char* obj, double scaling, const Vector& offset, bool 
 	std::string lowerFilename = filename;
 	std::transform(filename.begin(), filename.end(), lowerFilename.begin(), ::tolower);
 
+	if (lowerFilename.find(".off") != std::string::npos) {
+		readOFF(obj);
+	} else
 	if (lowerFilename.find(".wrl") != std::string::npos) {
 		readVRML(obj);
 	} else {
@@ -731,6 +760,10 @@ void Geometry::init(const char* obj, double scaling, const Vector& offset, bool 
 		csv_file = std::string("");
 	load_edge_colors(colors_csv_filename);
 
+	permuted_triangle_index.resize(indices.size());
+	for (int i = 0; i < permuted_triangle_index.size(); i++) {
+		permuted_triangle_index[i] = i;
+	}
 	max_bvh_triangles = 0;
 	if (!preserve_input) {
 		build_bvh(&bvh, 0, indices.size());
@@ -908,6 +941,7 @@ void Geometry::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
 			if ((facecolors.size() != 0) && (i < facecolors.size()) && (pivot < facecolors.size())) {
 				std::swap(facecolors[i], facecolors[pivot]);
 			}
+			std::swap(permuted_triangle_index[i], permuted_triangle_index[pivot]);
 		}
 	}
 

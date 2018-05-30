@@ -182,6 +182,9 @@ bool RaytracerApp::OnInit()
 	ks_sizer->Add(ks_text, 0, wxEXPAND);
 	ks_sizer->Add(ks_slider, 1, wxEXPAND);*/
 
+	colorAnisotropy = new wxButton(panelObject, COLOR_ANISOTROPY, "Color Anisotropy", wxDefaultPosition, wxDefaultSize);
+	Connect(COLOR_ANISOTROPY, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::colorAnisotropy), NULL, renderPanel);
+
 	deleteObject = new wxButton(panelObject, DELETE_OBJECT, "Delete", wxDefaultPosition, wxDefaultSize);
 	Connect(DELETE_OBJECT, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::delete_object), NULL, renderPanel);
 
@@ -200,6 +203,7 @@ bool RaytracerApp::OnInit()
 	panelObject_sizer->Add(m_TranspFile, 0, wxEXPAND);
 	panelObject_sizer->Add(m_RefrFile, 0, wxEXPAND);
 	//panelObject_sizer->Add(ks_sizer, 0, wxEXPAND);
+	panelObject_sizer->Add(colorAnisotropy, 0, wxEXPAND);
 	panelObject_sizer->Add(deleteObject, 0, wxEXPAND);
 	
 	panelObject->SetSizer(panelObject_sizer);
@@ -1742,7 +1746,36 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 	size_t nFiles = filenames.GetCount();
 	if (m_pOwner != NULL) {
 		m_pOwner->render_panel->stop_render();
-		for (size_t n = 0; n < nFiles; n++) {		
+		for (size_t n = 0; n < nFiles; n++) {
+
+			if (filenames[n].find(".seg") != std::string::npos) {
+				if (m_pOwner->render_panel->selected_object < 0 || m_pOwner->render_panel->selected_object>= m_pOwner->render_panel->raytracer.s.objects.size()) {
+					wxMessageBox("No triangle mesh was selected to apply the segments to", "Error", wxOK) ;
+					return true;
+				}
+				Geometry* g = dynamic_cast<Geometry*>(m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]);
+				if (!g) {
+					wxMessageBox("Selected object is not a triangle mesh", "Error", wxOK);
+					return true;
+				}
+
+				std::vector<int> unpermuted_index(g->indices.size());
+				for (int i = 0; i < g->indices.size(); i++) {
+					unpermuted_index[g->permuted_triangle_index[i]] = i;
+				}
+				FILE* f = fopen(filenames[n].c_str(), "r+");
+				int u;
+				int faceid = 0;
+				g->facecolors.resize(g->indices.size());
+				while (fscanf(f, "%u", &u)!= EOF) {
+					Vector col(((u*u*(u + 2) * 123 + 51) % 1000) / 1000., ((u*(u+7)*456 + 266) % 1000) / 1000., ((u*u*u*5+u*33 + 687) % 1000) / 1000.);
+					if (faceid<g->indices.size())
+						g->facecolors[unpermuted_index[faceid]] = col;
+					faceid++;
+				}
+				fclose(f);
+				continue;
+			}
 
 			if (filenames[n].find(".xyz") != std::string::npos) {
 
@@ -1764,13 +1797,17 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 				double s = std::max(g->bvh.bbox.bounds[1][0] - g->bvh.bbox.bounds[0][0], std::max(g->bvh.bbox.bounds[1][1] - g->bvh.bbox.bounds[0][1], g->bvh.bbox.bounds[1][2] - g->bvh.bbox.bounds[0][2]));
 				g->max_translation = Vector(0, m_pOwner->render_panel->raytracer.s.objects[2]->get_translation(m_pOwner->render_panel->raytracer.s.current_time, m_pOwner->render_panel->raytracer.is_recording)[1] - (g->bvh.bbox.bounds[0][1])*g->scale, 0);
 				m_pOwner->render_panel->raytracer.s.addObject(g);
-			} else {
+				continue;
+			} 
+
+			if ((filenames[n].find(".obj") != std::string::npos)  || (filenames[n].find(".wrl") != std::string::npos) || (filenames[n].find(".off") != std::string::npos)) {
 				bool center = (wxMessageBox("Should the model be normalized / centered ?", "Normalization ?", wxYES_NO | wxCENTRE) == wxYES);
 				Geometry* g = new Geometry(filenames[n], 1, Vector(0, 0, 0), false, NULL, false, center);
 				g->scale = 30;
 				g->display_edges = false;
 				g->max_translation = Vector(0, m_pOwner->render_panel->raytracer.s.objects[2]->get_translation(m_pOwner->render_panel->raytracer.s.current_time, m_pOwner->render_panel->raytracer.is_recording)[1] - (g->bvh.bbox.bounds[0][1])*g->scale, 0);
 				m_pOwner->render_panel->raytracer.s.addObject(g);
+				continue;
 			}
 		}		
 		m_pOwner->render_panel->start_render();

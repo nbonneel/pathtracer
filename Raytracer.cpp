@@ -496,15 +496,9 @@ void Raytracer::render_image()
 	imagedouble_lowres.resize(Wlr*Hlr * 3, 0);
 	sample_count.resize(W*H, 0);
 	
-	for (int i = 0; i < W*H; i++) {
-		computed[i] = false;
-		sample_count[i] = 0;
-	}
-	for (int i = 0; i < Wlr*Hlr; i++) {
-		imagedouble_lowres[i * 3] = 0;
-		imagedouble_lowres[i * 3 + 1] = 0;
-		imagedouble_lowres[i * 3 + 2] = 0;
-	}
+	std::fill(computed.begin(), computed.end(), false);
+	std::fill(sample_count.begin(), sample_count.end(), 0);
+	std::fill(imagedouble_lowres.begin(), imagedouble_lowres.end(), 0);
 
 	
 	//static int nbcalls = 0;
