@@ -38,15 +38,16 @@ struct PointCloud
 class PointSet : public Object {
 public:
 	PointSet() {};
-	PointSet(const char* filename, int nbcols, int *cols, bool mirror = false, bool normal_swapped = false) {
-		init(filename, nbcols, cols, mirror, normal_swapped);
+	PointSet(const char* filename, int nbcols, int *cols, bool mirror = false, bool normal_swapped = false, bool centered = true) {
+		init(filename, nbcols, cols, mirror, normal_swapped, centered);
 	};
 
-	void init(const char* filename, int nbcols, int *cols, bool mirror = false, bool normal_swapped = false) {
+	void init(const char* filename, int nbcols, int *cols, bool mirror = false, bool normal_swapped = false, bool centered = true) {
 		miroir = mirror;
 		flip_normals = normal_swapped;
 		this->nbcols = nbcols;
 		memcpy(this->cols, cols, nbcols * sizeof(int));
+		is_centered = centered;
 
 		// cols[i] : -1: ignore, 0:x 1:y, 2:z, 3:nx,4:ny,5:nz, 6:colr, 7:colg, 8:colb
 		FILE* f = fopen(filename, "r");
@@ -96,17 +97,23 @@ public:
 		}
 		fclose(f);
 
-		if (normals[0][0]==0. && normals[0][1]==0. && normals[0][2]==0.)
+
+
+		BBox bb = build_centers_bbox(0, vertices.size());
+		Vector center(0., 0., 0.);
+		double s = std::max(bb.bounds[1][0] - bb.bounds[0][0], std::max(bb.bounds[1][1] - bb.bounds[0][1], bb.bounds[1][2] - bb.bounds[0][2]));
+		Vector c = (bb.bounds[0] + bb.bounds[1])*0.5;
+		if (is_centered) {
+			for (int i = 0; i < vertices.size(); i++) {
+				vertices[i] = (vertices[i] - c) / s * 1;
+				center += vertices[i];
+			}
+			center = center / vertices.size();
+		}
+
+		if (normals[0][0] == 0. && normals[0][1] == 0. && normals[0][2] == 0.)
 			estimate_normals();
 
-		BBox b = build_centers_bbox(0, vertices.size());
-		Vector center(0., 0., 0.);
-		double s = sqrt((b.bounds[1] - b.bounds[0]).getNorm2());
-		for (int i = 0; i < vertices.size(); i++) {
-			vertices[i] = (vertices[i] - b.bounds[0]) / s * 50;
-			center += vertices[i];
-		}
-		center = center / vertices.size();
 		build_bvh(0, vertices.size());
 
 
@@ -161,7 +168,7 @@ public:
 			cimg_library::CImg<double> mat(cov, 3, 3), val(3), vec(3, 3);
 			mat.symmetric_eigen(val, vec);
 			normals[i] = Vector(vec(2, 0), vec(2, 1), vec(2, 2));
-			radius[i] = 2*std::max(1E-8, sqrt(out_dist_sqr[5]));
+			radius[i] = 0.15*2*std::max(1E-8, sqrt(out_dist_sqr[5]));
 		}
 
 		//std::sort(allNNDist.begin(), allNNDist.end());
@@ -176,7 +183,7 @@ public:
 
 		Object::save_to_file(f);
 
-
+		fprintf(f, "is_centered: %d\n", is_centered?1:0);
 		fprintf(f, "radius: %d\n", 1);
 		fprintf(f, "nbcols: %u\ncolumns: ", nbcols);
 		for (int i = 0; i < nbcols; i++) {
@@ -190,12 +197,23 @@ public:
 		PointSet* result = new PointSet();
 		result->Object::load_from_file(f);
 		double unused;
-		fscanf(f, "radius: %lf\n", &unused);
+		bool is_centered = true;
+		char line[512];
+		fscanf(f, "%[^\n]\n", line);
+		if (line[0] == 'i' && line[1] == 's') { //for backward compatibility
+			int c;
+			sscanf(line, "is_centered: %u\n", &c);
+			is_centered = (c == 1);
+			fscanf(f, "radius: %lf\n", &unused);
+		} else {
+			sscanf(line, "radius: %lf\n", &unused);
+		}
+		
 		fscanf(f, "nbcols: %u\ncolumns: ", &result->nbcols);
 		for (int i = 0; i <result->nbcols; i++) {
 			fscanf(f, "%d", &result->cols[i]);
 		}
-		result->init(result->name.c_str(), result->nbcols, result->cols, result->miroir, result->flip_normals);
+		result->init(result->name.c_str(), result->nbcols, result->cols, result->miroir, result->flip_normals, is_centered);
 		return result;
 	}
 
@@ -215,4 +233,5 @@ public:
 	BVH bvh;
 	int nbcols;
 	int cols[100];
+	bool is_centered;
 };

@@ -11,7 +11,9 @@
 class Raytracer {
 public:
 
-	Raytracer() { stopped = false; current_nb_rays = 0; curTimePerFrame = 0; };
+	Raytracer() {
+		stopped = false; current_nb_rays = 0; curTimePerFrame = 0; is_recording = false;  gamma = 2.2;
+	};
 	void loadScene();
 	void render_image();
 	void clear_image() { 
@@ -30,7 +32,7 @@ public:
 	void save_scene(const char* filename);
 	void load_scene(const char* filename);
 
-	Vector getColor(const Ray &r, const Scene &s, int nbrebonds, bool show_lights = true);
+	Vector getColor(const Ray &r, const Scene &s, int nbrebonds, int screenI, int screenJ, bool show_lights = true, bool no_envmap = false);
 
 	int W, H, Wlr, Hlr;
 	int nrays;  
@@ -38,6 +40,8 @@ public:
 	
 	double sigma_filter;  // antialiasing
 	int nb_bounces;
+	double gamma;
+	bool is_recording;
 	
 	Scene s;
 
@@ -59,4 +63,3 @@ public:
 	std::vector<double> sample_count;
 };
 
-void save_img(const char* filename, const unsigned char* pixels, int W, int H);

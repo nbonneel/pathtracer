@@ -112,7 +112,7 @@
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
-      <OpenMPSupport>false</OpenMPSupport>
+      <OpenMPSupport>true</OpenMPSupport>
       <AdditionalIncludeDirectories>C:\SharedLibs\wxWidgets-3.1.0\include;C:\SharedLibs\wxWidgets-3.1.0\include\msvc</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>

@@ -11,6 +11,7 @@ Minimalist Quick'n Dirty Path Tracer. (almost) No keyboard needed, just drag'n d
 * Filtering, DoF, one spherical light source, Fresnel reflection on transparent objects.
 * Rendering for lenticular images (can buy sheets at vuethru.com or dplenticular.com)
 * Limited and buggy support of fog.
+* Some support for integrating photos (background photo, "ghost" objects that receive shadows and indirect light but are not displayed)
 
 ## Compilation:
 * Dependency: Only wxWidget 3.1.0 (to download), CImg (included) and Nanoflann (included)
@@ -81,5 +82,16 @@ Minimalist Quick'n Dirty Path Tracer. (almost) No keyboard needed, just drag'n d
   <td> 4.5 millions points Point Cloud</td>
   <td> Lenticular images</td>
   </tr>
+  
+  <tr>  
+  <td> <img src="https://github.com/nbonneel/pathtracer/raw/master/img/lionPhoto.jpg" width="300"> </td>
+  <td> </td>
+  <td> </td>  
+  </tr>
+  <tr> 
+  <td>Lion on a ghost plane + Background photo</td>
+  <td> </td>
+  <td> </td>
+  </tr>  
   
   </table>

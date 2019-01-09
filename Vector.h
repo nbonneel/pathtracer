@@ -31,6 +31,34 @@ Vector operator-(const Vector& a);
 double dot(const Vector&a, const Vector& b);
 Vector cross(const Vector&a, const Vector& b);
 
+template<typename T>
+class Quaternion
+{
+public:
+	Quaternion() { }
+	Quaternion(double wVal, double xVal, double yVal, double zVal)
+	{
+		w = wVal; x = xVal; y = yVal; z = zVal;
+	}
+
+	T w, x, y, z;
+};
+template<typename T>
+Quaternion<T> operator*(const Quaternion<T>& q1, const Quaternion<T>& q2) {
+	T w1, x1, y1, z1, w2, x2, y2, z2, w3, x3, y3, z3;
+
+	w1 = q1.w; x1 = q1.x; y1 = q1.y; z1 = q1.z;
+	w2 = q2.w; x2 = q2.x; y2 = q2.y; z2 = q2.z;
+
+	w3 = w1*w2 - x1*x2 - y1*y2 - z1*z2;
+	x3 = w1*x2 + x1*w2 + y1*z2 - z1*y2;
+	y3 = w1*y2 + y1*w2 + z1*x2 - x1*z2;
+	z3 = w1*z2 + z1*w2 + x1*y2 - y1*x2;
+
+	return Quaternion<T>(w3, x3, y3, z3);
+}
+
+
 template<int M, int N>
 class Matrix {
 public:
@@ -40,7 +68,7 @@ public:
 			values[i*N + i] = 1;
 		}
 	}
-	Matrix<N, M> getTransposed() {
+	Matrix<N, M> getTransposed() const {
 		Matrix<N, M> res;
 		for (int i=0; i<M; i++)
 			for (int j = 0; j < N; j++) {
@@ -48,11 +76,172 @@ public:
 			}
 		return res;
 	}
+	void fromQuaternion(Quaternion<double> q) {
+		double w, x, y, z;
+		w = q.w; x = q.x; y = q.y; z = q.z;
+
+		values[0] = w*w + x*x - y*y - z*z;
+		values[1] = 2.0*x*y + 2.0*w*z;
+		values[2] = 2.0*x*z - 2.0*y*w;
+		values[3] = 2.0*x*y - 2.0*w*z;
+		values[4] = w*w - x*x + y*y - z*z;
+		values[5] = 2.0*y*z + 2.0*w*x;
+		values[6] = 2.0*x*z + 2.0*w*y;
+		values[7] = 2.0*y*z - 2.0*w*x;
+		values[8] = w*w - x*x - y*y + z*z;
+	}
+
+	Quaternion<double> toQuaternion() const {
+		double m00 = (*this)(0, 0);
+		double m01 = (*this)(1, 0);
+		double m02 = (*this)(2, 0);
+		double m10 = (*this)(0, 1);
+		double m11 = (*this)(1, 1);
+		double m12 = (*this)(2, 1);
+		double m20 = (*this)(0, 2);
+		double m21 = (*this)(1, 2);
+		double m22 = (*this)(2, 2);
+
+		double tr = m00 + m11 + m22;
+		double qw, qx, qy, qz;
+		if (tr > 0) {
+			double S = sqrt(tr + 1.0) * 2; // S=4*qw 
+			qw = 0.25 * S;
+			qx = (m21 - m12) / S;
+			qy = (m02 - m20) / S;
+			qz = (m10 - m01) / S;
+		} else if ((m00 > m11)&(m00 > m22)) {
+			double S = sqrt(1.0 + m00 - m11 - m22) * 2; // S=4*qx 
+			qw = (m21 - m12) / S;
+			qx = 0.25 * S;
+			qy = (m01 + m10) / S;
+			qz = (m02 + m20) / S;
+		} else if (m11 > m22) {
+			double S = sqrt(1.0 + m11 - m00 - m22) * 2; // S=4*qy
+			qw = (m02 - m20) / S;
+			qx = (m01 + m10) / S;
+			qy = 0.25 * S;
+			qz = (m12 + m21) / S;
+		} else {
+			double S = sqrt(1.0 + m22 - m00 - m11) * 2; // S=4*qz
+			qw = (m10 - m01) / S;
+			qx = (m02 + m20) / S;
+			qy = (m12 + m21) / S;
+			qz = 0.25 * S;
+		}
+		return Quaternion<double>(qw, qx, qy, qz);
+	}
+	double det() const {
+		return (*this)(0, 0) * ((*this)(1, 1) * (*this)(2, 2) - (*this)(2, 1) * (*this)(1, 2)) -
+			(*this)(0, 1) * ((*this)(1, 0) * (*this)(2, 2) - (*this)(1, 2) * (*this)(2, 0)) +
+			(*this)(0, 2) * ((*this)(1, 0) * (*this)(2, 1) - (*this)(1, 1) * (*this)(2, 0));
+	}
+	double &operator()(int i, int j) {
+		return values[i*N + j];
+	}
+	double operator()(int i, int j) const {
+		return values[i*N + j];
+	}
+	Matrix<3,3> inverse() const {  // ONLY FOR 3x3
+
+		double determinant = det();
+
+		double invdet = 1 / determinant;
+
+		Matrix<3,3> minv; // inverse of matrix m
+		minv(0, 0) = ((*this)(1, 1) * (*this)(2, 2) - (*this)(2, 1) * (*this)(1, 2)) * invdet;
+		minv(0, 1) = ((*this)(0, 2) * (*this)(2, 1) - (*this)(0, 1) * (*this)(2, 2)) * invdet;
+		minv(0, 2) = ((*this)(0, 1) * (*this)(1, 2) - (*this)(0, 2) * (*this)(1, 1)) * invdet;
+		minv(1, 0) = ((*this)(1, 2) * (*this)(2, 0) - (*this)(1, 0) * (*this)(2, 2)) * invdet;
+		minv(1, 1) = ((*this)(0, 0) * (*this)(2, 2) - (*this)(0, 2) * (*this)(2, 0)) * invdet;
+		minv(1, 2) = ((*this)(1, 0) * (*this)(0, 2) - (*this)(0, 0) * (*this)(1, 2)) * invdet;
+		minv(2, 0) = ((*this)(1, 0) * (*this)(2, 1) - (*this)(2, 0) * (*this)(1, 1)) * invdet;
+		minv(2, 1) = ((*this)(2, 0) * (*this)(0, 1) - (*this)(0, 0) * (*this)(2, 1)) * invdet;
+		minv(2, 2) = ((*this)(0, 0) * (*this)(1, 1) - (*this)(1, 0) * (*this)(0, 1)) * invdet;
+		return minv;
+	}	
 	double operator[](int i) const { return values[i]; }
 	double& operator[](int i)  { return values[i]; }
 	double values[M*N];
 };
 
+template<int M, int N> Matrix<M, N> operator+(const Matrix<M, N>& a, const Matrix<M, N>& b) {
+	Matrix<M, N> result;
+	for (int i = 0; i < M*N; i++) {
+		result[i] = a[i] + b[i];
+	}
+	return result;
+}
+
+template<int M, int N, int O> Matrix<M, O> operator*(const Matrix<M, N>& a, const Matrix<N, O>& b) {
+	Matrix<M, O> result;	
+	for (int i = 0; i < M; i++) {
+		for (int j = 0; j < O; j++) {
+			double s = 0;
+			for (int k = 0; k < N; k++) {
+				s += a[i*N+k]*b[k*O+j];
+			}
+			result.values[i*O + j] = s;
+		}
+	}
+	return result;
+}
+template<int M, int N> Matrix<M, N> operator*(double a, const Matrix<M, N>& b) {
+	Matrix<M, N> result;
+	for (int i = 0; i < M*N; i++) {
+		result[i] = a*b[i];
+	}
+	return result;
+}
+
+template<typename T>
+Quaternion<T> Slerp(Quaternion<T> q1, Quaternion<T> q2, double t) {
+	T w1, x1, y1, z1, w2, x2, y2, z2, w3, x3, y3, z3;
+	Quaternion<T> q2New;
+	double theta, mult1, mult2;
+
+	w1 = q1.w; x1 = q1.x; y1 = q1.y; z1 = q1.z;
+	w2 = q2.w; x2 = q2.x; y2 = q2.y; z2 = q2.z;
+
+	// Reverse the sign of q2 if q1.q2 < 0.
+	if (w1*w2 + x1*x2 + y1*y2 + z1*z2 < 0)
+	{
+		w2 = -w2; x2 = -x2; y2 = -y2; z2 = -z2;
+	}
+
+	theta = acos(w1*w2 + x1*x2 + y1*y2 + z1*z2);
+
+	if (theta > 0.000001)
+	{
+		mult1 = sin((1 - t)*theta) / sin(theta);
+		mult2 = sin(t*theta) / sin(theta);
+	}
+
+	// To avoid division by 0 and by very small numbers the approximation of sin(angle)
+	// by angle is used when theta is small (0.000001 is chosen arbitrarily).
+	else
+	{
+		mult1 = 1 - t;
+		mult2 = t;
+	}
+
+	w3 = mult1*w1 + mult2*w2;
+	x3 = mult1*x1 + mult2*x2;
+	y3 = mult1*y1 + mult2*y2;
+	z3 = mult1*z1 + mult2*z2;
+	return Quaternion<T>(w3, x3, y3, z3);
+}
+
+template<int M, int N> Matrix<M, N> Slerp(const Matrix<M, N>& a, const Matrix<M, N>& b, double t) {
+
+	Quaternion<double> qa = a.toQuaternion();
+	Quaternion<double> qb = b.toQuaternion();
+	Quaternion<double> qm = Slerp(qa, qb, t);
+
+	Matrix<M, N> result;
+	result.fromQuaternion(qm);
+	return result;
+}
 static inline Matrix<3, 3> createRotationMatrixX(double angleX) {
 	Matrix<3, 3> R;
 	R[0] = cos(angleX);
@@ -168,20 +357,7 @@ static inline Vector operator*(const Matrix<3, 4> &mat, const Vector &b) {
 	return res;
 }
 
-template<int M, int N, int O>
-Matrix<M, O> operator*(const Matrix<M, N> &matA, const Matrix<N, O> &matB) {
 
-	Matrix<M, O> result;
-	for (int i = 0; i < M; i++)
-		for (int j = 0; j < O; j++) {
-			double v = 0;
-			for (int k = 0; k < N; k++) {
-				v += matA[i*N + k] * matB[k*O + j];
-			}
-			result[i*O + j] = v;
-		}
-	return result;
-}
 
 
 Vector min(const Vector& a, const Vector& b);

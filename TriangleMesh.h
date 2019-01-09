@@ -67,6 +67,9 @@ public:
 		m12 = dot(u, v);
 		invdetm = 1. / (m11*m22 - m12*m12);
 	};
+	double area() {
+		return sqrt(N.getNorm2())*0.5;
+	}
 	bool intersection(const Ray& d, Vector& P, double &t, double &alpha, double &beta, double &gamma) const {
 		t = dot(A - d.origin, N) / dot(d.direction, N);
 		if (t < 0 || t != t) return false;  //isnan
@@ -86,7 +89,7 @@ public:
 		alpha = 1 - beta - gamma;
 		if (alpha < 0) return false;
 
-		//N.normalize();
+		//N.normalize(); // only normalized at the last moment, for the actual nearest triangle being intersected (not all intersected triangles)
 		return true;
 
 	}
@@ -95,17 +98,19 @@ public:
 	double m11, m12, m22, invdetm;
 };
 
-
+Vector TransformH(const Vector &in, float H); // transform hue of a color
 
 class Geometry : public Object {
 public:
+  ~Geometry() {}
 	Geometry() {};
-	Geometry(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool preserve_input = false);
+	Geometry(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
 
-	void init(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool load_textures = true, bool preserve_input = false);
+	void init(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool load_textures = true, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
 
-	void readOBJ(const char* obj, bool load_textures);
-	void readVRML(const char* obj);
+	void readOBJ(const char* filename, bool load_textures);
+	void readVRML(const char* filename);
+	void readOFF(const char* filename);
 	void exportMTL(const char* mtlfile);
 	void saveOBJ(const char* obj);
 
@@ -118,6 +123,7 @@ public:
 
 		Object::save_to_file(f);
 
+		fprintf(f, "is_centered: %u\n", is_centered ? 1 : 0);
 		fprintf(f, "has_csv: %u\n", (csv_file.size() != 0) ? 1 : 0);
 		fprintf(f, "csv_file: %s\n", csv_file.c_str());
 	}
@@ -127,16 +133,46 @@ public:
 		result->Object::load_from_file(f);
 		int hascsv;
 		char line[512];
-		fscanf(f, "has_csv: %u\n", &hascsv);
+		fscanf(f, "%[^\n]\n", line);
+		bool is_centered = true;
+		if (line[0] == 'i' && line[1] == 's') { //for backward compatibility
+			int c;
+			sscanf(line, "is_centered: %u\n", &c);
+			is_centered = (c == 1);
+			fscanf(f, "has_csv: %u\n", &hascsv);
+		} else {
+			sscanf(line, "has_csv: %u\n", &hascsv);
+		}
+		
 		if (hascsv)
 			fscanf(f, "csv_file: %[^\n]\n", line);
 		else
 			fscanf(f, "csv_file: \n");
 
-		result->init(result->name.c_str(), 1., Vector(0, 0, 0), result->miroir, hascsv ? line : NULL, false);
+		result->init(result->name.c_str(), 1., Vector(0, 0, 0), result->miroir, hascsv ? line : NULL, false, false, is_centered, result->rotation_center);
 		return result;
 	}
 
+	virtual void colorAnisotropy() {
+
+		facecolors.resize(indices.size());
+		for (int i = 0; i < indices.size(); i++) {
+			double angle1 = std::abs(dot(vertices[indices[i].vtxj] - vertices[indices[i].vtxi], vertices[indices[i].vtxk] - vertices[indices[i].vtxi]))/sqrt((vertices[indices[i].vtxj] - vertices[indices[i].vtxi]).getNorm2()*(vertices[indices[i].vtxk] - vertices[indices[i].vtxi]).getNorm2());
+			double angle2 = std::abs(dot(vertices[indices[i].vtxi] - vertices[indices[i].vtxj], vertices[indices[i].vtxk] - vertices[indices[i].vtxj])) / sqrt((vertices[indices[i].vtxi] - vertices[indices[i].vtxj]).getNorm2()*(vertices[indices[i].vtxk] - vertices[indices[i].vtxj]).getNorm2());
+			double angle3 = std::abs(dot(vertices[indices[i].vtxi] - vertices[indices[i].vtxk], vertices[indices[i].vtxj] - vertices[indices[i].vtxk])) / sqrt((vertices[indices[i].vtxi] - vertices[indices[i].vtxk]).getNorm2()*(vertices[indices[i].vtxj] - vertices[indices[i].vtxk]).getNorm2());
+			double aniso = std::acos(std::max(angle1, std::max(angle2, angle3)))*180/M_PI;
+			facecolors[i] = TransformH(Vector(1,0,0), std::min(240., std::max(0., aniso/60*240)));
+		}
+		std::vector<unsigned char> img(240*30 * 3, 0);
+		for (int i=0; i<240; i++)
+			for (int j = 0; j < 30; j++) {
+				Vector col = TransformH(Vector(1, 0, 0), i);
+				img[i * 3 * 30 + j * 3 + 0] = std::pow(col[0], 1./2.2) * 255;  //beware albedo values were gamma corrected. Same on the legend
+				img[i * 3 * 30 + j * 3 + 1] = std::pow(col[1], 1. / 2.2) * 255;
+				img[i * 3 * 30 + j * 3 + 2] = std::pow(col[2], 1. / 2.2) * 255;
+			}
+		save_image("legend.png", &img[0], 30, 240);
+	}
 
 	std::map<std::string, int> groupNames;
 
@@ -148,6 +184,7 @@ public:
 	std::vector<Vector> facecolors;
 	std::vector<std::map<int, Vector> > edgecolor; // [id_vertex1][idvertex2]
 	std::vector<Vector> vertexcolors;
+	std::vector<int> permuted_triangle_index;
 
 	std::vector<Vector> tangents;
 	std::vector<Vector> bitangents;
@@ -161,6 +198,8 @@ public:
 
 	void build_bvh(BVH* node, int i0, int i1);
 	void build_bvh_recur(BVH* b, int node, int i0, int i1, int depth);
+
+	bool is_centered;
 
 	BVH bvh;
 	int max_bvh_triangles;

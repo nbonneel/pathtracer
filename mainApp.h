@@ -9,6 +9,7 @@
 #include <wx/colordlg.h>
 #include <wx/spinctrl.h>
 #include <wx/button.h>
+#include <wx/tglbtn.h>
 #include <ostream>
 #include <sstream>
 #include "chrono.h"
@@ -39,6 +40,7 @@
 #define BOUNCES_SPIN 1013
 #define TRANSPARENT_CHECKBOX 1014
 #define FLIPNORMALS_CHECKBOX 1015
+#define GHOST_CHECKBOX 10151
 #define REFRACTION_INDEX 1016
 #define DELETE_OBJECT 1017
 #define RENDER_WIDTH 1018
@@ -50,6 +52,13 @@
 #define MAXANGLE_SLIDER 1024
 #define NBVIEWS 1025
 #define NBPIXPERSLICE 1026
+#define NBFRAMES 1027
+#define ADD_KEYFRAME 1028
+#define TIME_SLIDER 1029
+#define DURATION 1030
+#define RECORD_KEYFRAME 1031
+#define RENDER_VIDEO 1032
+#define COLOR_ANISOTROPY 1033
 
 #define ID_ALBEDO_DELETE 10
 #define ID_MOVEUP 11
@@ -268,6 +277,22 @@ private:
 	RaytracerFrame *m_rtFrame;
 };
 
+class DnDBackgroundFile : public wxFileDropTarget
+{
+public:
+	DnDBackgroundFile(wxTextCtrl* pOwner = NULL, RaytracerFrame *rtFrame = NULL) {
+		m_pOwner = pOwner; m_rtFrame = rtFrame;
+	}
+
+	virtual bool OnDropFiles(wxCoord x, wxCoord y,
+		const wxArrayString& filenames);
+
+private:
+	wxTextCtrl *m_pOwner;
+	RaytracerFrame *m_rtFrame;
+};
+
+
 class DnDNormalFile : public wxFileDropTarget
 {
 public:
@@ -428,6 +453,22 @@ public:
 		start_render();
 	}
 
+	void colorAnisotropy(wxCommandEvent& event) {
+		if (selected_object < 0) return;
+		if (selected_object >= raytracer.s.objects.size()) return;
+
+		stop_render();
+		raytracer.s.objects[selected_object]->colorAnisotropy();
+		start_render();
+	}
+
+	void add_keyframe(wxCommandEvent& event) {
+		if (selected_object < 0) return;
+		if (selected_object >= raytracer.s.objects.size()) return;
+
+		raytracer.s.objects[selected_object]->add_keyframe(raytracer.s.current_frame);
+	}
+
 	void launch_render(wxCommandEvent& event) {
 		stop_render();
 		PerfChrono perf;
@@ -439,6 +480,21 @@ public:
 		FILE* f = fopen("time.txt", "a+");
 		fprintf(f, "%e\n", t);
 		fclose(f);
+		start_render();
+	}
+
+	void render_video(wxCommandEvent& event) {
+		stop_render();
+		PerfChrono perf;
+		perf.Start();
+		raytracer.stopped = false;
+		for (int i = 0; i < raytracer.s.nbframes; i++) {
+			raytracer.clear_image();
+			raytracer.s.current_frame = i;
+			raytracer.s.current_time = i*raytracer.s.duration / (double)raytracer.s.nbframes;
+			raytracer.render_image();
+		}
+		raytracer.stopped = true;
 		start_render();
 	}
 
@@ -641,17 +697,19 @@ public:
 	RenderPanel* renderPanel;
 	wxGauge *progressBar;
 	wxBookCtrlBase *m_bookCtrl;
-	wxCheckBox *show_edges, *interp_normals, *transparent, *flipnormals, *isLenticularCheck;
-	wxTextCtrl *objectName, *envmapName;
-	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider, *maxangle_slider;
+	wxCheckBox *show_edges, *interp_normals, *transparent, *flipnormals, *isLenticularCheck, *ghost;
+	wxTextCtrl *objectName, *envmapName, *backgroundName;
+	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider, *maxangle_slider, *time_slider;
 	wxListCtrl *m_AlbedoFile, *m_SpecularFile, *m_NormalFile, *m_AlphaFile, *m_RoughnessFile, *m_TranspFile, *m_RefrFile;
 	//wxColourPickerCtrl *albedoColorPicker;
 	wxRadioButton *uniformFogRadio, *expFogRadio;
 	wxColourDialog* colPicker;
 	wxFileDialog* texOpenDlg;
-	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays, *nbviews, *nbpixslice;
+	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays, *nbviews, *nbpixslice, *nbframesctrl;
+	wxSpinCtrlDouble *duration;
 	wxSpinCtrlDouble* refractionIndex;
-	wxButton *deleteObject, *launchRender;
+	wxButton *deleteObject, *launchRender, *addKeyframe, *renderVideo, *colorAnisotropy;
+	wxToggleButton*recordKeyframes;
 	wxStaticText* infoModel;
 	wxStaticText* infoPerf;
 	bool render_loop_on;
