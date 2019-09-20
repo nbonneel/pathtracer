@@ -14,6 +14,7 @@ include(${wxWidgets_USE_FILE})
 
 SET(SRCS
   Geometry.cpp
+  MERLBRDFRead.cpp
   PointSet.cpp
   Raytracer.cpp
   TriangleMesh.cpp
