@@ -8,7 +8,7 @@
 #include <list>
 
 void Geometry::readVRML(const char* obj) {
-	bool shuffle_colors = true;
+	bool shuffle_colors = false;
 
 	FILE* f;
 	f = fopen(obj, "r");
@@ -224,15 +224,15 @@ Vector TransformH(
 	float W = sin(-H*M_PI / 180);
 
 	Vector ret;
-	ret[0] = (.299 + .701*U + .168*W)*in[0]
+	ret[0] = std::min(1., std::max(0., (.299 + .701*U + .168*W)*in[0]
 		+ (.587 - .587*U + .330*W)*in[1]
-		+ (.114 - .114*U - .497*W)*in[2];
-	ret[1] = (.299 - .299*U - .328*W)*in[0]
+		+ (.114 - .114*U - .497*W)*in[2]));
+	ret[1] = std::min(1., std::max(0., (.299 - .299*U - .328*W)*in[0]
 		+ (.587 + .413*U + .035*W)*in[1]
-		+ (.114 - .114*U + .292*W)*in[2];
-	ret[2] = (.299 - .3*U + 1.25*W)*in[0]
+		+ (.114 - .114*U + .292*W)*in[2]));
+	ret[2] = std::min(1., std::max(0., (.299 - .3*U + 1.25*W)*in[0]
 		+ (.587 - .588*U - 1.05*W)*in[1]
-		+ (.114 + .886*U - .203*W)*in[2];
+		+ (.114 + .886*U - .203*W)*in[2]));
 	return ret;
 }
 
@@ -1027,7 +1027,7 @@ bool Geometry::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 				if (triangleSoup[i].intersection(d, localP, localt, alpha, beta, gamma)) {
 					if (localt < t) {
 						int textureId = indices[i].group;
-						if (uvs.size()>0 && alphamap.size() > textureId && indices[i].uvi >= 0 && indices[i].uvj >= 0 && indices[i].uvk >= 0) {
+						if (uvs.size() > 0 && alphamap.size() > textureId && indices[i].uvi >= 0 && indices[i].uvj >= 0 && indices[i].uvk >= 0) {
 							double u = uvs[indices[i].uvi][0] * alpha + uvs[indices[i].uvj][0] * beta + uvs[indices[i].uvk][0] * gamma;
 							double v = uvs[indices[i].uvi][1] * alpha + uvs[indices[i].uvj][1] * beta + uvs[indices[i].uvk][1] * gamma;
 							u = Texture::wrap(u);
@@ -1048,6 +1048,14 @@ bool Geometry::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 		int i = best_index;
 		triangle_id = best_index;
 		triangleSoup[i].intersection(d, localP, localt, alpha, beta, gamma);
+		if (isnan(alpha) && isnan(beta) && isnan(gamma)) { alpha = 1; beta = 0; gamma = 0; };
+		if (isnan(alpha)) alpha = 0;
+		if (isnan(beta)) beta = 0;
+		if (isnan(gamma)) gamma = 0;
+		if (isinf(alpha)) alpha = 1;
+		if (isinf(beta)) beta = 1;
+		if (isinf(gamma)) gamma = 1;
+
 		localN.normalize();
 		P = localP;
 

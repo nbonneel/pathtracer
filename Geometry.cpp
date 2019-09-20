@@ -8,12 +8,12 @@
 #include "TriangleMesh.h"
 #include "PointSet.h"
 
-Object* Object::create_from_file(FILE* f) {
+Object* Object::create_from_file(FILE* f, const char* replacedNames) {
 
 	char line[255];
 	fscanf(f, "%[^\n]\n", line);
 	if (line[4] == 'M') { // mesh
-		return Geometry::create_from_file(f);
+		return Geometry::create_from_file(f, replacedNames);
 	}
 	if (line[4] == 'S') { // sphere
 		return Sphere::create_from_file(f);
@@ -22,7 +22,7 @@ Object* Object::create_from_file(FILE* f) {
 		return Plane::create_from_file(f);
 	}
 	if (line[4] == 'P' && line[5] == 'O') { // PointSet
-		return PointSet::create_from_file(f);
+		return PointSet::create_from_file(f, replacedNames);
 	}
   return nullptr;
 }

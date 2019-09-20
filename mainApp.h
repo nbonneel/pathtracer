@@ -59,6 +59,7 @@
 #define RECORD_KEYFRAME 1031
 #define RENDER_VIDEO 1032
 #define COLOR_ANISOTROPY 1033
+#define RANDOM_COLOR 1034
 
 #define ID_ALBEDO_DELETE 10
 #define ID_MOVEUP 11
@@ -462,6 +463,15 @@ public:
 		start_render();
 	}
 
+	void randomColors(wxCommandEvent& event) {
+		if (selected_object < 0) return;
+		if (selected_object >= raytracer.s.objects.size()) return;
+
+		stop_render();
+		raytracer.s.objects[selected_object]->randomColors();
+		start_render();
+	}
+
 	void add_keyframe(wxCommandEvent& event) {
 		if (selected_object < 0) return;
 		if (selected_object >= raytracer.s.objects.size()) return;
@@ -708,7 +718,7 @@ public:
 	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays, *nbviews, *nbpixslice, *nbframesctrl;
 	wxSpinCtrlDouble *duration;
 	wxSpinCtrlDouble* refractionIndex;
-	wxButton *deleteObject, *launchRender, *addKeyframe, *renderVideo, *colorAnisotropy;
+	wxButton *deleteObject, *launchRender, *addKeyframe, *renderVideo, *colorAnisotropy, *randomColors;
 	wxToggleButton*recordKeyframes;
 	wxStaticText* infoModel;
 	wxStaticText* infoPerf;

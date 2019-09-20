@@ -128,9 +128,9 @@ public:
 		fprintf(f, "csv_file: %s\n", csv_file.c_str());
 	}
 
-	static Geometry* create_from_file(FILE* f) {
+	static Geometry* create_from_file(FILE* f, const char* replacedNames = NULL) {
 		Geometry* result = new Geometry();
-		result->Object::load_from_file(f);
+		result->Object::load_from_file(f, replacedNames);
 		int hascsv;
 		char line[512];
 		fscanf(f, "%[^\n]\n", line);
@@ -162,7 +162,10 @@ public:
 			double angle3 = std::abs(dot(vertices[indices[i].vtxi] - vertices[indices[i].vtxk], vertices[indices[i].vtxj] - vertices[indices[i].vtxk])) / sqrt((vertices[indices[i].vtxi] - vertices[indices[i].vtxk]).getNorm2()*(vertices[indices[i].vtxj] - vertices[indices[i].vtxk]).getNorm2());
 			double aniso = std::acos(std::max(angle1, std::max(angle2, angle3)))*180/M_PI;
 			facecolors[i] = TransformH(Vector(1,0,0), std::min(240., std::max(0., aniso/60*240)));
+			//facecolors[i] = Vector(std::pow(facecolors[i][0], 2.2), std::pow(facecolors[i][1], 2.2), std::pow(facecolors[i][2], 2.2)); // just here, assumes a 2.2 gamma
 		}
+
+		// save color map to file
 		std::vector<unsigned char> img(240*30 * 3, 0);
 		for (int i=0; i<240; i++)
 			for (int j = 0; j < 30; j++) {
@@ -172,6 +175,20 @@ public:
 				img[i * 3 * 30 + j * 3 + 2] = std::pow(col[2], 1. / 2.2) * 255;
 			}
 		save_image("legend.png", &img[0], 30, 240);
+	}
+
+	virtual void randomColors() {
+
+		int r1 = rand() % 10000+1;
+		int r2 = rand() % 10000 + 1;
+		int r3 = rand() % 10000 + 1;
+		for (int i = 0; i < facecolors.size(); i++) {
+			Vector c = facecolors[i];
+			long long ir = (long long)(c[0] * 1024); ir = (ir*r1 + ir*ir*(r1 + 1) + ir*15 +r1+ 3)%1024;
+			long long ig = (long long)(c[1] * 1024); ig = (ig*r2 + ig*ig*(r2 + 9) + ig * 7 +r2+ 3) % 1024;
+			long long ib = (long long)(c[2] * 1024); ib = (ib*r3 + ib*ib*(r3 + 3) + ib * 18 +r3+ 3) % 1024;
+			facecolors[i] = Vector(ir / 1024., ig / 1024., ib / 1024.);
+		}
 	}
 
 	std::map<std::string, int> groupNames;

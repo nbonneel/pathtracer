@@ -274,6 +274,14 @@ public:
 		coord[1] = y;
 		coord[2] = z;
 	}
+	explicit Vector(const double* x) {
+		memcpy(coord, x, 3 * sizeof(double));
+	}
+	explicit Vector(const float* x) {
+		coord[0] = (double)x[0];
+		coord[1] = (double)x[1];
+		coord[2] = (double)x[2];
+	}
 	const double& operator[](int i) const { return coord[i]; }
 	double& operator[](int i) { return coord[i]; }
 
@@ -364,7 +372,6 @@ Vector min(const Vector& a, const Vector& b);
 Vector max(const Vector& a, const Vector& b);
 Vector pow(const Vector& a, const Vector& b);
 Vector random_cos(const Vector &N);
-Vector random_Phong(const Vector &R, double phong_exponent);
 Vector random_uniform();
 
 Vector rotate_dir(const Vector&v, const Vector &angles);

@@ -168,7 +168,7 @@ public:
 			cimg_library::CImg<double> mat(cov, 3, 3), val(3), vec(3, 3);
 			mat.symmetric_eigen(val, vec);
 			normals[i] = Vector(vec(2, 0), vec(2, 1), vec(2, 2));
-			radius[i] = 0.15*2*std::max(1E-8, sqrt(out_dist_sqr[5]));
+			radius[i] = 0.21*2*std::max(1E-8, sqrt(out_dist_sqr[5]));
 		}
 
 		//std::sort(allNNDist.begin(), allNNDist.end());
@@ -193,9 +193,9 @@ public:
 
 	}
 
-	static PointSet* create_from_file(FILE* f) {
+	static PointSet* create_from_file(FILE* f, const char* replacedNames = NULL) {
 		PointSet* result = new PointSet();
-		result->Object::load_from_file(f);
+		result->Object::load_from_file(f, replacedNames);
 		double unused;
 		bool is_centered = true;
 		char line[512];

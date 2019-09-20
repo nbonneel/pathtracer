@@ -15,7 +15,10 @@ bool RaytracerApp::OnInit()
 	if (argc > 1) {
 		Raytracer raytracer;
 		raytracer.loadScene();
-		raytracer.load_scene(wxApp::argv[1]);
+		if (argc>3)
+			raytracer.load_scene(wxApp::argv[1], wxApp::argv[3]);
+		else
+			raytracer.load_scene(wxApp::argv[1]);
 		raytracer.render_image();
 		if (arc>2)
 			save_image(wxApp::argv[2], &raytracer.image[0], raytracer.W, raytracer.H);
@@ -185,6 +188,9 @@ bool RaytracerApp::OnInit()
 	colorAnisotropy = new wxButton(panelObject, COLOR_ANISOTROPY, "Color Anisotropy", wxDefaultPosition, wxDefaultSize);
 	Connect(COLOR_ANISOTROPY, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::colorAnisotropy), NULL, renderPanel);
 
+	randomColors = new wxButton(panelObject, RANDOM_COLOR, "Randomize Face Color Map", wxDefaultPosition, wxDefaultSize);
+	Connect(RANDOM_COLOR, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::randomColors), NULL, renderPanel);
+
 	deleteObject = new wxButton(panelObject, DELETE_OBJECT, "Delete", wxDefaultPosition, wxDefaultSize);
 	Connect(DELETE_OBJECT, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::delete_object), NULL, renderPanel);
 
@@ -204,6 +210,7 @@ bool RaytracerApp::OnInit()
 	panelObject_sizer->Add(m_RefrFile, 0, wxEXPAND);
 	//panelObject_sizer->Add(ks_sizer, 0, wxEXPAND);
 	panelObject_sizer->Add(colorAnisotropy, 0, wxEXPAND);
+	panelObject_sizer->Add(randomColors, 0, wxEXPAND);
 	panelObject_sizer->Add(deleteObject, 0, wxEXPAND);
 	
 	panelObject->SetSizer(panelObject_sizer);
@@ -798,6 +805,7 @@ void RenderPanel::render(wxDC& dc)
 	computed2 = computed;
 	}*/
 
+	raytracer.sample_count.resize(raytracer.W*raytracer.H); // just in case.
 	for (int i = 0; i < raytracer.H; i++) {
 		for (int j = 0; j < raytracer.W; j++) {
 			//if (!raytracer.computed[i*raytracer.W + j]) {
@@ -1746,9 +1754,9 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 	size_t nFiles = filenames.GetCount();
 	if (m_pOwner != NULL) {
 		m_pOwner->render_panel->stop_render();
-		for (size_t n = 0; n < nFiles; n++) {
+		for (size_t n = 0; n < nFiles; n++) {			
 
-			if (filenames[n].find(".seg") != std::string::npos) {
+			if (filenames[n].Lower().find(".seg") != std::string::npos) {
 				if (m_pOwner->render_panel->selected_object < 0 || m_pOwner->render_panel->selected_object>= m_pOwner->render_panel->raytracer.s.objects.size()) {
 					wxMessageBox("No triangle mesh was selected to apply the segments to", "Error", wxOK) ;
 					return true;
@@ -1777,7 +1785,46 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 				continue;
 			}
 
-			if (filenames[n].find(".xyz") != std::string::npos) {
+			if (filenames[n].Lower().find(".lab") != std::string::npos) {
+				if (m_pOwner->render_panel->selected_object < 0 || m_pOwner->render_panel->selected_object >= m_pOwner->render_panel->raytracer.s.objects.size()) {
+					wxMessageBox("No triangle mesh was selected to apply the segments to", "Error", wxOK);
+					return true;
+				}
+				Geometry* g = dynamic_cast<Geometry*>(m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]);
+				if (!g) {
+					wxMessageBox("Selected object is not a triangle mesh", "Error", wxOK);
+					return true;
+				}
+
+				std::vector<int> unpermuted_index(g->indices.size());
+				for (int i = 0; i < g->indices.size(); i++) {
+					unpermuted_index[g->permuted_triangle_index[i]] = i;
+				}
+				FILE* f = fopen(filenames[n].c_str(), "r+");
+				int u;
+				int faceid = 0;
+				g->facecolors.resize(g->indices.size());
+				char lineName[512];
+				char lineFaces[512*1000];
+				char* line;
+				int segId = 0;
+				while (fscanf(f, "%[^\n]\n%[^\n]\n", lineName, lineFaces) != EOF) {
+					int faceid, offset;
+					line = lineFaces;
+					while (sscanf(line, "%u%n", &faceid,&offset) == 1) {						
+						faceid--;
+						line = line + offset;
+						Vector col(((segId*segId*(segId + 2) * 123 + 51) % 1000) / 1000., ((segId*(segId + 7) * 456 + 266) % 1000) / 1000., ((segId*segId*segId * 5 + segId * 33 + 687) % 1000) / 1000.);
+						if (faceid < g->indices.size())
+							g->facecolors[unpermuted_index[faceid]] = col;
+					}
+					segId++;
+				}
+				fclose(f);
+				continue;
+			}
+
+			if (filenames[n].Lower().find(".xyz") != std::string::npos) {
 
 				std::string values = wxGetTextFromUser("Space separated, -1: ignore, 0:x 1:y, 2:z, 3:nx,4:ny,5:nz, 6:colr, 7:colg, 8:colb",
 					"Enter XYZ file format", "-1 -1 0 1 2 6 7 8").ToStdString();
@@ -1800,13 +1847,34 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 				continue;
 			} 
 
-			if ((filenames[n].find(".obj") != std::string::npos)  || (filenames[n].find(".wrl") != std::string::npos) || (filenames[n].find(".off") != std::string::npos)) {
+			if ((filenames[n].Lower().find(".obj") != std::string::npos)  || (filenames[n].Lower().find(".wrl") != std::string::npos) || (filenames[n].Lower().find(".off") != std::string::npos)) {
 				bool center = (wxMessageBox("Should the model be normalized / centered ?", "Normalization ?", wxYES_NO | wxCENTRE) == wxYES);
 				Geometry* g = new Geometry(filenames[n], 1, Vector(0, 0, 0), false, NULL, false, center);
 				g->scale = 30;
 				g->display_edges = false;
 				g->max_translation = Vector(0, m_pOwner->render_panel->raytracer.s.objects[2]->get_translation(m_pOwner->render_panel->raytracer.s.current_time, m_pOwner->render_panel->raytracer.is_recording)[1] - (g->bvh.bbox.bounds[0][1])*g->scale, 0);
 				m_pOwner->render_panel->raytracer.s.addObject(g);
+				continue;
+			}
+
+			if (filenames[n].Lower().find(".titopo") != std::string::npos) {
+				if (m_pOwner->render_panel->selected_object < 0 || m_pOwner->render_panel->selected_object >= m_pOwner->render_panel->raytracer.s.objects.size()) {
+					wxMessageBox("No object was selected to apply the BRDF to", "Error", wxOK);
+					return true;
+				}
+				if (filenames[n].Lower().find(".titopoh") != std::string::npos) {
+					m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf = new TitopoBRDF(filenames[n].ToStdString(),45,45,180);
+				} else {
+					m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf = new TitopoBRDF(filenames[n].ToStdString(),90,90,360);
+				}
+				continue;
+			}
+			if (filenames[n].Lower().find(".binary") != std::string::npos) {
+				if (m_pOwner->render_panel->selected_object < 0 || m_pOwner->render_panel->selected_object >= m_pOwner->render_panel->raytracer.s.objects.size()) {
+					wxMessageBox("No object was selected to apply the BRDF to", "Error", wxOK);
+					return true;
+				}
+				m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf = new IsoMERLBRDF(filenames[n].ToStdString());
 				continue;
 			}
 		}		

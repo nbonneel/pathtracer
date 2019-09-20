@@ -206,6 +206,8 @@ bool PointSet::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 			mat.Kd = colors[i];
 		else
 			mat.Kd = Vector(0.5, 0.5, 0.5);
+		//mat.Kd = Vector(localN[0]*0.5+0.5, localN[1] * 0.5 + 0.5, localN[2] * 0.5 + 0.5);
+		//mat.Kd = Vector(std::abs(localN[0]), std::abs(localN[1]), std::abs(localN[2]));
 		if (display_edges) {
 			double r2 = (localP - vertices[i]).getNorm2();
 			if (r2 > (radius[i]*radius[i] *0.95*0.95))
