@@ -112,6 +112,24 @@ public:
 	Vector Kd, Ks, Ne;
 };
 
+class LambertBRDF : public BRDF {
+public:
+	LambertBRDF(const Vector &Kd) :Kd(Kd) {};
+	void setParameters(const MaterialValues &m) {
+		Kd = m.Kd;
+	}
+	Vector sample(const Vector& wo, const Vector& N, double &pdf) const {  // performs MIS Kd-Ks		
+		Vector direction_aleatoire = random_cos(N);		
+		pdf = dot(N, direction_aleatoire) / (M_PI);
+		return direction_aleatoire;
+	}
+	Vector eval(const Vector& wi, const Vector& wo, const Vector& N) const {				
+		return Kd / M_PI;
+	}
+	Vector Kd;
+};
+
+
 class TitopoBRDF : public BRDF { //our internal thetai,thetao, phio format
 public:
 	TitopoBRDF(std::string filename, int Nthetai, int Nthetao, int Nphid):Nthetai(Nthetai), Nthetao(Nthetao), Nphid(Nphid){

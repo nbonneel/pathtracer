@@ -545,7 +545,7 @@ void Raytracer::render_image()
 							double dx_aperture = (uniform(engine) - 0.5) * cam.aperture;
 							double dy_aperture = (uniform(engine) - 0.5) * cam.aperture;
 
-							double time = time_step / 60. + uniform(engine) / 60.;
+							double time = s.current_time + time_step / 60. + uniform(engine) / 60.;
 
 
 

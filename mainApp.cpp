@@ -5,12 +5,16 @@
 
 wxIMPLEMENT_APP(RaytracerApp);
 
-
+#include "fluid.h"
 
 bool RaytracerApp::OnInit()
 {
 	int arc = wxApp::argc;
 	//wxCmdLineArgsArray argv(wxApp::argv);
+
+	/*Fluid fl(BBox(Vector(-10, -10, -10), Vector(10, 10, 10)), 64, 64, 64, 200000, 1000.);
+	fl.run();
+	exit(0);*/
 
 	if (argc > 1) {
 		Raytracer raytracer;
@@ -308,7 +312,7 @@ bool RaytracerApp::OnInit()
 
 	wxBoxSizer * bounces_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* bounces_text = new wxStaticText(panelRenderer, 9999 - 1, "light bounces: ");
-	bounces = new wxSpinCtrl(panelRenderer, BOUNCES_SPIN, wxString("3"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 10, 3);
+	bounces = new wxSpinCtrl(panelRenderer, BOUNCES_SPIN, wxString("3"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 100, 3);
 	Connect(BOUNCES_SPIN, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	bounces_sizer->Add(bounces_text, 0, wxEXPAND);
 	bounces_sizer->Add(bounces, 1, wxEXPAND);
@@ -431,7 +435,59 @@ bool RaytracerApp::OnInit()
 
 	m_bookCtrl->AddPage(panelAnimation, wxT("Animation"), false);
 
+	// ------------------
+	wxPanel *panelFluids = new wxPanel(m_bookCtrl);
+	wxBoxSizer * panelFluids_sizer = new wxBoxSizer(wxVERTICAL);
+	panelFluids->SetSizer(panelFluids_sizer);
 
+	wxBoxSizer * fluidres_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* fluidres_text = new wxStaticText(panelFluids, 9999 - 1, "Resolution: ");
+	fluidresX = new wxSpinCtrl(panelFluids, FLUIDRESX, wxString("32"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 4, 512, 32);
+	fluidresY = new wxSpinCtrl(panelFluids, FLUIDRESY, wxString("32"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 4, 512, 32);
+	fluidresZ = new wxSpinCtrl(panelFluids, FLUIDRESZ, wxString("32"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 4, 512, 32);
+	Connect(FLUIDRESX, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	Connect(FLUIDRESY, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	Connect(FLUIDRESZ, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	fluidres_sizer->Add(fluidres_text, 0, wxEXPAND);
+	fluidres_sizer->Add(fluidresX, 1, wxEXPAND);
+	fluidres_sizer->Add(fluidresY, 1, wxEXPAND);
+	fluidres_sizer->Add(fluidresZ, 1, wxEXPAND);
+	panelFluids_sizer->Add(fluidres_sizer, 0, wxEXPAND);
+
+	wxBoxSizer * fluidnparticles_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* fluidnparticles_text = new wxStaticText(panelFluids, 9999 - 1, "Nb particles: ");
+	fluidnparticles = new wxSpinCtrl(panelFluids, FLUIDNPARTICLES, wxString("4000000"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 4000000, 8000000);
+	Connect(FLUIDNPARTICLES, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	fluidnparticles_sizer->Add(fluidnparticles_text, 0, wxEXPAND);
+	fluidnparticles_sizer->Add(fluidnparticles, 1, wxEXPAND);
+	panelFluids_sizer->Add(fluidnparticles_sizer, 0, wxEXPAND);
+
+	wxBoxSizer * fluidparticlesize_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* fluidparticlesize_text = new wxStaticText(panelFluids, 9999 - 1, "Particle size: ");
+	fluidparticlesize = new wxSpinCtrlDouble(panelFluids, FLUIDPARTICLESIZE, wxString("0.05"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.01, 1, 0.05, 0.01);
+	Connect(FLUIDPARTICLESIZE, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	fluidparticlesize_sizer->Add(fluidparticlesize_text, 0, wxEXPAND);
+	fluidparticlesize_sizer->Add(fluidparticlesize, 1, wxEXPAND);
+	panelFluids_sizer->Add(fluidparticlesize_sizer, 0, wxEXPAND);
+
+	wxBoxSizer * fluidtimestep_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* fluidtimestep_text = new wxStaticText(panelFluids, 9999 - 1, "Time step: ");
+	fluidtimestep = new wxSpinCtrlDouble(panelFluids, FLUIDTIMESTEP, wxString("0.033"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.001, 2, 1./30., 0.01);
+	Connect(FLUIDTIMESTEP, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	fluidtimestep_sizer->Add(fluidtimestep_text, 0, wxEXPAND);
+	fluidtimestep_sizer->Add(fluidtimestep, 1, wxEXPAND);
+	panelFluids_sizer->Add(fluidtimestep_sizer, 0, wxEXPAND);
+
+	addFluid = new wxButton(panelFluids, ADD_FLUID, "Add fluid", wxDefaultPosition, wxDefaultSize);
+	Connect(ADD_FLUID, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::add_fluid), NULL, renderPanel);
+	panelFluids_sizer->Add(addFluid, 0, wxEXPAND);
+
+
+
+	
+	m_bookCtrl->AddPage(panelFluids, wxT("Fluids"), false);
+
+	// ----------------
 
 	m_bookCtrl->SetSelection(0);
 
@@ -441,7 +497,7 @@ bool RaytracerApp::OnInit()
 	wxBoxSizer * time_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* time_text = new wxStaticText(frame, 9999, "timeline ");
 	time_slider = new wxSlider(frame, FOV_SLIDER, 0, 0, 1, wxDefaultPosition, wxSize(600,32), wxSL_HORIZONTAL | wxSL_LABELS);
-	Connect(TIME_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	Connect(TIME_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);	
 	time_sizer->Add(time_text, 0, wxEXPAND);
 	time_sizer->Add(time_slider, 1, wxEXPAND);
 
@@ -575,6 +631,11 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 		raytracer.s.objects[i]->mat_rotation = raytracer.s.objects[i]->get_rotation(raytracer.s.current_frame, false);
 		raytracer.s.objects[i]->scale = raytracer.s.objects[i]->get_scale(raytracer.s.current_frame, false);
 	}
+	for (int i = 0; i < raytracer.s.objects.size(); i++) {
+		Fluid* f = dynamic_cast<Fluid*>(raytracer.s.objects[i]);
+		if (!f) continue;
+		f->build_bvh(raytracer_app->time_slider->GetValue(), 0, f->Nparticles);
+	}
 
 
 	start_render();
@@ -588,6 +649,40 @@ void RenderPanel::update_textures_and_render(wxCommandEvent& event) {
 
 	raytracer.s.objects[selected_object]->display_edges = raytracer_app->show_edges->IsChecked();
 
+	start_render();
+}
+
+
+void RenderPanel::add_fluid(wxCommandEvent& event) {
+	raytracer_app->renderPanel->stop_render();
+
+	Fluid* fl = new Fluid(BBox(Vector(-10, -27.3, -10), Vector(10, -27.3+20, 10)), raytracer_app->fluidresX->GetValue(), raytracer_app->fluidresY->GetValue(), raytracer_app->fluidresZ->GetValue(), raytracer_app->fluidnparticles->GetValue(), 1000., raytracer_app->fluidparticlesize->GetValue(), raytracer_app->nbframesctrl->GetValue(), raytracer_app->fluidtimestep->GetValue());
+	fl->run();
+	
+	raytracer.s.addObject(fl);
+	raytracer_app->renderPanel->update_gui();
+	raytracer_app->renderPanel->start_render();	
+}
+
+void RenderPanel::render_video(wxCommandEvent& event) {
+	stop_render();
+	PerfChrono perf;
+	perf.Start();
+	raytracer.stopped = false;
+	for (int i = 0; i < raytracer.s.nbframes; i++) {
+		raytracer.clear_image();
+		raytracer.s.current_frame = i;
+		raytracer.s.current_time = i * raytracer.s.duration / (double)raytracer.s.nbframes;
+
+		for (int j = 0; j < raytracer.s.objects.size(); j++) {
+			Fluid* f = dynamic_cast<Fluid*>(raytracer.s.objects[j]);
+			if (!f) continue;
+			f->build_bvh(i, 0, f->Nparticles);
+		}
+
+		raytracer.render_image();
+	}
+	raytracer.stopped = true;
 	start_render();
 }
 
@@ -710,7 +805,7 @@ void RenderPanel::update_gui() {
 		std::string filename = raytracer.s.objects[selected_object]->transparent_map[i].filename;
 		long index = raytracer_app->m_TranspFile->InsertItem(i, item);
 		raytracer_app->m_TranspFile->SetItem(index, 0, txt, -1);
-		raytracer_app->m_TranspFile->SetItem(index, 1, (raytracer.s.objects[selected_object]->transparent_map[i].multiplier[0]>0.5) ? "Refractive" : "Not Refractive", -1);
+		raytracer_app->m_TranspFile->SetItem(index, 1, (raytracer.s.objects[selected_object]->transparent_map[i].multiplier[0]>0.5) ? "Not Refractive" : "Refractive", -1);
 		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
 			raytracer_app->m_TranspFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
 	}

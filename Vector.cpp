@@ -17,6 +17,9 @@ Vector operator*(const Vector &b, double a) {
 Vector operator/(const Vector& a, double b) {
 	return Vector(a[0]/b, a[1]/b, a[2]/b);
 }
+Vector operator/(const Vector& a, const Vector &b) {
+	return Vector(a[0] / b[0], a[1] / b[1], a[2] / b[2]);
+}
 Vector operator-(const Vector& a) {
 	return Vector(-a[0], -a[1], -a[2]);
 }
