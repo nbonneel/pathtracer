@@ -1056,7 +1056,7 @@ bool Geometry::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 		if (isinf(beta)) beta = 1;
 		if (isinf(gamma)) gamma = 1;
 
-		localN.normalize();
+		//localN.normalize();
 		P = localP;
 
 		double u = 0, v = 0;
@@ -1080,7 +1080,7 @@ bool Geometry::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 			mat.shadingN = normals[indices[i].ni] * alpha + normals[indices[i].nj] * beta + normals[indices[i].nk] * gamma;
 			mat.shadingN.normalize();
 		}
-		if (dot(mat.shadingN, d.direction) > 0 && mat.transp) mat.shadingN = -mat.shadingN;
+		//if (dot(mat.shadingN, d.direction) > 0 && mat.transp) mat.shadingN = -mat.shadingN;  // why did I wrote that ?
 		if (flip_normals) mat.shadingN = -mat.shadingN;
 
 
@@ -1096,7 +1096,7 @@ bool Geometry::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 			Ns.normalize();
 			if (!(isnan(Ns[0]) || isnan(Ns[1]) || isnan(Ns[2])))
 				mat.shadingN = Ns;
-			if (dot(mat.shadingN, d.direction) > 0) mat.shadingN = -mat.shadingN;
+			//if (dot(mat.shadingN, d.direction) > 0) mat.shadingN = -mat.shadingN; // why did I wrote that ?
 		}
 
 

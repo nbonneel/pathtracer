@@ -1031,6 +1031,7 @@ public:
 		envmapfilename = "";
 		if (has_envmap) {
 			load_envmap(envmap_file);
+			flip_normals = true;
 		}
 		this->rotation_center = origin;
 		name = "Sphere";

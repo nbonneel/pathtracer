@@ -1,5 +1,5 @@
 #include "fluid.h"
-
+#include <omp.h>
 
 BBox Fluid::build_bbox(int frame, int i0, int i1) {
 
@@ -63,7 +63,7 @@ void Fluid::build_bvh_recur(int frame, BVH* b, int node, int i0, int i1) {
 #ifdef _DEBUG
 	int max_tests = 1;
 #else
-	int max_tests = 16;
+	int max_tests = 3;
 #endif
 
 	for (int test_split = 0; test_split < max_tests; test_split++) {
@@ -108,7 +108,7 @@ void Fluid::build_bvh_recur(int frame, BVH* b, int node, int i0, int i1) {
 	}
 
 
-	if (pivot < i0 || pivot >= i1 - 1 || i1 <= i0 + 4) { // 4 triangles per leaf
+	if (pivot < i0 || pivot >= i1 - 1 || i1 <= i0 + 1 /**/) { // 1 spheres per leaf
 		return;
 	}
 
@@ -141,8 +141,9 @@ bool Fluid::intersection_opaque(const Ray& d, Vector& P, double &t, MaterialValu
 	if (!bvh.bbox.intersection_invd(invd, signs, t_box_left)) return false;
 	if (t_box_left > cur_best_t) return false;
 
-	int l[150];
-	double tnear[150];
+	int tid = omp_get_thread_num();
+	int* l = nodelist[tid];
+	double* tnear = tnearlist[tid];
 	int idx_back = -1;
 
 	l[++idx_back] = 0;
@@ -199,7 +200,7 @@ bool Fluid::intersection_opaque(const Ray& d, Vector& P, double &t, MaterialValu
 		mat = queryMaterial(0, 0, 0);
 		mat.shadingN = localN;
 
-		if (dot(mat.shadingN, d.direction) > 0 && !mat.transp) mat.shadingN = -mat.shadingN;
+		//if (dot(mat.shadingN, d.direction) > 0 && !mat.transp) mat.shadingN = -mat.shadingN;
 		if (flip_normals) mat.shadingN = -mat.shadingN;
 
 		mat.Kd = Vector(0.5, 0.5, 0.5);
@@ -232,15 +233,16 @@ bool Fluid::intersection_transparent(const Ray& d, Vector& P, double &t, Materia
 	if (t_box_left > cur_best_t) return false;
 	if (t_box_left > 0) return intersection_opaque(d, P, t, mat, cur_best_t, triangle_id); // ray coming from outside the global bbox : same thing as opaque intersections.
 
-	int l[150];
-	double tnear[150];
+	int threadid = omp_get_thread_num();
+	int* l = nodelist[threadid];
+	double* tnear = tnearlist[threadid];
 	int idx_back = -1;
 
 	l[++idx_back] = 0;
 	tnear[idx_back] = t_box_left;
-	std::vector<std::pair<double, std::pair<double, int> > > allts;
-	allts.reserve(50);
 
+
+	int interid = 0;
 	while (idx_back >= 0) {
 
 		const int current = l[idx_back--];
@@ -249,8 +251,13 @@ bool Fluid::intersection_transparent(const Ray& d, Vector& P, double &t, Materia
 		const int fd = bvh.nodes[current].fd;
 
 		if (!bvh.nodes[current].isleaf) {
-			goleft = bvh.nodes[fg].bbox.intersection_invd(invd, signs, t_box_left) ;
-			goright = bvh.nodes[fd].bbox.intersection_invd(invd, signs, t_box_right) ;
+			if (signs[0] == 1) {
+				goleft = bvh.nodes[fg].bbox.intersection_invd_positive_x(invd, signs, t_box_left);
+				goright = bvh.nodes[fd].bbox.intersection_invd_positive_x(invd, signs, t_box_right);
+			} else {
+				goleft = bvh.nodes[fg].bbox.intersection_invd_negative_x(invd, signs, t_box_left);
+				goright = bvh.nodes[fd].bbox.intersection_invd_negative_x(invd, signs, t_box_right);
+			}
 
 			if (goleft&&goright) {				
 				l[++idx_back] = fd;  tnear[idx_back] = t_box_right;
@@ -264,8 +271,9 @@ bool Fluid::intersection_transparent(const Ray& d, Vector& P, double &t, Materia
 			for (int i = fg; i < fd; i++) {
 				double t1, t2;
 				if (SimplerSphere(particles[frame][i], radius).both_intersections(d, t1, t2)) {					
-					has_inter = true;
-					allts.push_back(std::make_pair(t1, std::make_pair(t2, i)));
+					has_inter = true;					
+					allts[threadid][interid] = std::make_pair(t1, std::make_pair(t2, i));
+					interid++;
 				}
 			}
 		}
@@ -273,28 +281,30 @@ bool Fluid::intersection_transparent(const Ray& d, Vector& P, double &t, Materia
 	}
 
 	if (has_inter) {
-		std::sort(allts.begin(), allts.end());
-		if (allts[0].first > 0) {
-			best_index = allts[0].second.second;
-			t = allts[0].first;
+		std::sort(allts[threadid], allts[threadid]+ interid+1);
+		if (allts[threadid][0].first > 0) {
+			best_index = allts[threadid][0].second.second;
+			t = allts[threadid][0].first;
 		} else {
 			int k = 0;
-			while ((k < allts.size()) && (allts[k].second.first < 0)) {				
+			while ((k < interid) && (allts[threadid][k].second.first < 0)) {
 				k++;
 			}
-			t = allts[k].second.first;
+			t = allts[threadid][k].second.first;
 			best_index = k;		
 			k++;
-			while ((k < allts.size()) && (allts[k].first < t)) {
-				t = std::max(t, allts[k].second.first);
+			while ((k < interid) && (allts[threadid][k].first <= t)) {
+				t = std::max(t, allts[threadid][k].second.first);
 				best_index = k;
 				k++;
 			}
 		}
 		triangle_id = best_index;
-		SimplerSphere(particles[frame][best_index], radius).intersection(d, P, mat.shadingN, t);		
+		
+		P = d.origin + t * d.direction;
+		mat.shadingN = P - particles[frame][best_index]; mat.shadingN.normalize();
 
-		if (dot(mat.shadingN, d.direction) > 0 && !mat.transp) mat.shadingN = -mat.shadingN;
+		//if (dot(mat.shadingN, d.direction) > 0 && !mat.transp) mat.shadingN = -mat.shadingN;
 		if (flip_normals) mat.shadingN = -mat.shadingN;
 
 		//mat.Kd = Vector(0.5, 0.5, 0.5);
@@ -317,7 +327,7 @@ bool Fluid::intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat
 }
 
 
-bool Fluid::intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const {
+bool Fluid::intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const { // not correct, but no big deal
 	t = cur_best_t;
 	bool has_inter = false;
 	double t_box_left, t_box_right;
@@ -336,8 +346,9 @@ bool Fluid::intersection_shadow(const Ray& d, double &t, double cur_best_t, doub
 	if (!bvh.bbox.intersection_invd(invd, signs, t_box_left)) return false;
 	if (t_box_left > cur_best_t || t_box_left > dist_light) return false;
 
-	int l[50];
-	double tnear[50];
+	int tid = omp_get_thread_num();
+	int* l = nodelist[tid];
+	double* tnear = tnearlist[tid];
 	int idx_back = -1;
 
 	l[++idx_back] = 0;

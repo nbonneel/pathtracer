@@ -413,8 +413,8 @@ bool RaytracerApp::OnInit()
 
 	wxBoxSizer * duration_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* duration_text = new wxStaticText(panelAnimation, 9999 - 1, "duration (s): ");
-	duration = new wxSpinCtrlDouble(panelAnimation, DURATION, "1", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.001, 1000, 1, 0.1);
-	Connect(DURATION, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	duration = new wxSpinCtrlDouble(panelAnimation, DURATION, wxString("1"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.001, 1000, 1, 0.1);
+	Connect(DURATION, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	duration_sizer->Add(duration_text, 0, wxEXPAND);
 	duration_sizer->Add(duration, 1, wxEXPAND);
 
@@ -456,7 +456,7 @@ bool RaytracerApp::OnInit()
 
 	wxBoxSizer * fluidnparticles_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* fluidnparticles_text = new wxStaticText(panelFluids, 9999 - 1, "Nb particles: ");
-	fluidnparticles = new wxSpinCtrl(panelFluids, FLUIDNPARTICLES, wxString("4000000"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 4000000, 8000000);
+	fluidnparticles = new wxSpinCtrl(panelFluids, FLUIDNPARTICLES, wxString("4000000"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 10000000, 4000000);
 	Connect(FLUIDNPARTICLES, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	fluidnparticles_sizer->Add(fluidnparticles_text, 0, wxEXPAND);
 	fluidnparticles_sizer->Add(fluidnparticles, 1, wxEXPAND);
@@ -465,7 +465,7 @@ bool RaytracerApp::OnInit()
 	wxBoxSizer * fluidparticlesize_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* fluidparticlesize_text = new wxStaticText(panelFluids, 9999 - 1, "Particle size: ");
 	fluidparticlesize = new wxSpinCtrlDouble(panelFluids, FLUIDPARTICLESIZE, wxString("0.05"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.01, 1, 0.05, 0.01);
-	Connect(FLUIDPARTICLESIZE, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	Connect(FLUIDPARTICLESIZE, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	fluidparticlesize_sizer->Add(fluidparticlesize_text, 0, wxEXPAND);
 	fluidparticlesize_sizer->Add(fluidparticlesize, 1, wxEXPAND);
 	panelFluids_sizer->Add(fluidparticlesize_sizer, 0, wxEXPAND);
@@ -473,7 +473,7 @@ bool RaytracerApp::OnInit()
 	wxBoxSizer * fluidtimestep_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* fluidtimestep_text = new wxStaticText(panelFluids, 9999 - 1, "Time step: ");
 	fluidtimestep = new wxSpinCtrlDouble(panelFluids, FLUIDTIMESTEP, wxString("0.033"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.001, 2, 1./30., 0.01);
-	Connect(FLUIDTIMESTEP, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	Connect(FLUIDTIMESTEP, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	fluidtimestep_sizer->Add(fluidtimestep_text, 0, wxEXPAND);
 	fluidtimestep_sizer->Add(fluidtimestep, 1, wxEXPAND);
 	panelFluids_sizer->Add(fluidtimestep_sizer, 0, wxEXPAND);
@@ -656,7 +656,7 @@ void RenderPanel::update_textures_and_render(wxCommandEvent& event) {
 void RenderPanel::add_fluid(wxCommandEvent& event) {
 	raytracer_app->renderPanel->stop_render();
 
-	Fluid* fl = new Fluid(BBox(Vector(-10, -27.3, -10), Vector(10, -27.3+20, 10)), raytracer_app->fluidresX->GetValue(), raytracer_app->fluidresY->GetValue(), raytracer_app->fluidresZ->GetValue(), raytracer_app->fluidnparticles->GetValue(), 1000., raytracer_app->fluidparticlesize->GetValue(), raytracer_app->nbframesctrl->GetValue(), raytracer_app->fluidtimestep->GetValue());
+	Fluid* fl = new Fluid(raytracer.s, BBox(Vector(-18, -27.3, -18), Vector(18, -27.3+36, 18)), raytracer_app->fluidresX->GetValue(), raytracer_app->fluidresY->GetValue(), raytracer_app->fluidresZ->GetValue(), raytracer_app->fluidnparticles->GetValue(), 1000., raytracer_app->fluidparticlesize->GetValue(), raytracer_app->nbframesctrl->GetValue(), raytracer_app->fluidtimestep->GetValue());
 	fl->run();
 	
 	raytracer.s.addObject(fl);
@@ -726,6 +726,17 @@ void RenderPanel::update_gui() {
 	raytracer_app->nbframesctrl->SetValue(raytracer.s.nbframes);
 	raytracer_app->time_slider->SetMax(raytracer.s.nbframes);
 
+	raytracer_app->fogdensity_slider->SetValue(raytracer.s.fog_density*100.);
+	raytracer_app->uniformFogRadio->SetValue(raytracer.s.fog_type == 0);
+
+	double factor = 1. / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
+	raytracer_app->lightintensity_slider->SetValue(raytracer.s.intensite_lumiere / factor);
+	raytracer_app->envmapintensity_slider->SetValue(raytracer.s.envmap_intensity * 100);
+
+	raytracer_app->duration->SetValue(raytracer.s.duration);
+	raytracer_app->time_slider->SetValue(raytracer.s.current_frame);
+	raytracer_app->recordKeyframes->SetValue(raytracer.is_recording);
+
 	//Vector alb = raytracer.s.objects[selected_object]->albedo;
 	//raytracer_app->albedoColorPicker->SetColour(wxColour(alb[0] * 255., alb[1] * 255., alb[2] * 255.));
 
@@ -753,7 +764,8 @@ void RenderPanel::update_gui() {
 		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
 			raytracer_app->m_NormalFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
 	}
-	raytracer_app->envmapName->SetLabelText(((Sphere*)raytracer.s.objects[1])->envmapfilename);
+	if (raytracer.s.objects.size()>1 && dynamic_cast<Sphere*>(raytracer.s.objects[1]))
+		raytracer_app->envmapName->SetLabelText(((Sphere*)raytracer.s.objects[1])->envmapfilename);
 	raytracer_app->backgroundName->SetLabelText(raytracer.s.backgroundfilename);
 
 	raytracer_app->m_AlphaFile->DeleteAllItems();
@@ -843,16 +855,7 @@ void RenderPanel::update_gui() {
 		raytracer_app->m_TranspFile->EnsureVisible(id);
 	}
 
-	raytracer_app->fogdensity_slider->SetValue(raytracer.s.fog_density*100.);
-	raytracer_app->uniformFogRadio->SetValue(raytracer.s.fog_type == 0);
 
-	double factor = 1. / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
-	raytracer_app->lightintensity_slider->SetValue(raytracer.s.intensite_lumiere / factor);
-	raytracer_app->envmapintensity_slider->SetValue(raytracer.s.envmap_intensity * 100);
-
-	raytracer_app->duration->SetValue(raytracer.s.duration);
-	raytracer_app->time_slider->SetValue(raytracer.s.current_frame );
-	raytracer_app->recordKeyframes->SetValue(raytracer.is_recording);
 }
 
 void RenderPanel::render(wxDC& dc)

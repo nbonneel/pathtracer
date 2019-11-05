@@ -620,7 +620,7 @@ public:
 		
 
 		/*if (!wasDragging)*/ {
-			Ray r = raytracer.cam.generateDirection((displayH - (mouse_init_y - 1.))*(double)raytracer.H / displayH, mouse_init_x*(double)raytracer.W / displayW, 0, 0, 0, 0, 0, raytracer.W, raytracer.H);
+			Ray r = raytracer.cam.generateDirection((displayH - (mouse_init_y - 1.))*(double)raytracer.H / displayH, mouse_init_x*(double)raytracer.W / displayW, raytracer.s.current_time, 0, 0, 0, 0, raytracer.W, raytracer.H);
 
 			Vector P;
 			int new_selected, new_tri;

@@ -421,7 +421,7 @@ void Raytracer::loadScene() {
 	nb_bounces = 3;
 
 	Sphere* slum = new Sphere(Vector(10, 23, 15), 10);   //sphere light: position, rayon, albedo (qui sert à rien)
-	Sphere* s2 = new Sphere(Vector(0, 0, 0), 1000000); // envmap  
+	Sphere* s2 = new Sphere(Vector(0, 0, 0), 1000000); s2->flip_normals = true; // envmap  
 
 	Plane* plane = new Plane(Vector(0, 0, 0), Vector(0., 1., 0.));
 	plane->max_translation = Vector(0.,-27.3,0.);
@@ -620,7 +620,7 @@ void Raytracer::render_image()
 
 		std::ostringstream os;
 		//os << "testFog_" << time_step << ".bmp";
-		os << "export" << s.current_frame << ".bmp";
+		os << "exportC" << s.current_frame << ".bmp";
 		save_image(os.str().c_str(), &image[0], W, H);
 	}
 
