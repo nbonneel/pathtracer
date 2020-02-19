@@ -26,10 +26,313 @@ BBox Fluid::build_centers_bbox(int frame, int i0, int i1) {
 }
 
 void Fluid::build_bvh(int frame, int i0, int i1) {
+	return;
 	bvh.nodes.clear();
 	bvh.bbox = build_bbox(frame, i0, i1);
 	bvh.nodes.reserve(Nparticles * 2);
-	build_bvh_recur(frame, &bvh, 0, i0, i1);
+	build_bvh_recur(frame, &bvh, 0, i0, i1);	
+}
+
+void Fluid::build_grid(int frame) {
+	accelgrid.clear();
+	accelgridindices.clear();
+	accelgrid.resize(Nx*Ny*Nz, 0);
+	accelgridindices.resize(Nx*Ny*Nz);
+	int ni = std::ceil(radius / dx[0]);
+	int nj = std::ceil(radius / dx[1]);
+	int nk = std::ceil(radius / dx[2]);
+
+	for (int id = 0; id < particles[frame].size(); id++) {
+		int minx = std::max(0, (int)((particles[frame][id][0] - radius - extent.bounds[0][0]) / dx[0]));
+		int miny = std::max(0, (int)((particles[frame][id][1] - radius - extent.bounds[0][1]) / dx[1]));
+		int minz = std::max(0, (int)((particles[frame][id][2] - radius - extent.bounds[0][2]) / dx[2]));
+		int maxx = std::min(Nx - 1, (int)((particles[frame][id][0] + radius - extent.bounds[0][0]) / dx[0]));
+		int maxy = std::min(Ny - 1, (int)((particles[frame][id][1] + radius - extent.bounds[0][1]) / dx[1]));
+		int maxz = std::min(Nz - 1, (int)((particles[frame][id][2] + radius - extent.bounds[0][2]) / dx[2]));
+
+		for (int i = minz; i <= maxz; i++) {
+			for (int j = miny; j <= maxy; j++) {
+				for (int k = minx; k <= maxx; k++) {
+					accelgrid[i*Nx*Ny + j * Nx + k] = 1;
+					accelgridindices[i*Nx*Ny + j * Nx + k].push_back(id);
+				}
+			}
+		}
+	}
+}
+
+
+bool Fluid::intersection_transparent2(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const {
+	t = cur_best_t;
+	bool has_inter = false;
+	double t_box_left, t_box_right;
+	int best_index = -1;
+	bool goleft, goright;
+	Vector localP, localN;
+	double localt;
+	int frame = d.time;
+
+	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
+	char signs[3];
+	signs[0] = (invd.direction[0] >= 0) ? 1 : 0;
+	signs[1] = (invd.direction[1] >= 0) ? 1 : 0;
+	signs[2] = (invd.direction[2] >= 0) ? 1 : 0;
+
+	if (!extent.intersection_invd(invd, signs, t_box_left)) return false;
+	
+	int threadid = omp_get_thread_num();
+	int interid = 0;
+	Vector startingP = d.origin + (t_box_left+1E-9) * d.direction;
+	int boxid[3] = { (startingP[0] - extent.bounds[0][0]) / dx[0], (startingP[1] - extent.bounds[0][1]) / dx[1] , (startingP[2] - extent.bounds[0][2]) / dx[2] };
+	if (boxid[0] < 0 || boxid[1] < 0 || boxid[2] < 0 || boxid[0] >= Nx || boxid[1] >= Ny || boxid[2] >= Nz) return false;
+
+	char stepX = signs[0] * 2 - 1;
+	char stepY = signs[1] * 2 - 1;
+	char stepZ = signs[2] * 2 - 1;
+	Vector step(stepX, stepY, stepZ);
+
+	Vector tMax = (((Vector(boxid[0], boxid[1], boxid[2])+Vector(signs[0], signs[1], signs[2]))*dx+extent.bounds[0])-startingP) / d.direction; // next ray-plane intersection
+	Vector tDelta = (step * dx) / d.direction;
+	
+	while (true) {		
+		int voxid = boxid[2] * Nx*Ny + boxid[1] * Nx + boxid[0];
+		if (accelgrid[voxid]) {
+			int nids = accelgridindices[voxid].size();
+			const int* ids = &accelgridindices[voxid][0];
+			bool curhasinter = false;
+			for (int i = 0; i < nids; i++) {
+				double t1, t2;
+				if (SimplerSphere(particles[frame][ids[i]], radius).both_intersections(d, t1, t2)) {
+					has_inter = true;
+					curhasinter = true;
+					allts[threadid][interid] = std::make_pair(t1, std::make_pair(t2, ids[i]));
+					interid++;
+				}
+			}
+			if (!curhasinter && has_inter) break;
+		}
+		if (tMax[0] < tMax[1]){
+			if (tMax[0] < tMax[2]) {
+				boxid[0] += step[0];
+				if (boxid[0] >= Nx || boxid[0]<0) break;
+				tMax[0] += tDelta[0];
+			} else {
+				boxid[2] += step[2];
+				if (boxid[2] >= Nz || boxid[2] < 0) break;
+				tMax[2] += tDelta[2];
+			}
+		} else {
+			if (tMax[1] < tMax[2]) {
+				boxid[1] += step[1];
+				if (boxid[1] >= Ny || boxid[1] < 0) break;
+				tMax[1] += tDelta[1];
+			} else {
+				boxid[2] += step[2];
+				if (boxid[2] >= Nz || boxid[2] < 0) break;
+				tMax[2] += tDelta[2];
+			}
+		}
+	}
+
+	if (has_inter) {
+		std::sort(allts[threadid], allts[threadid] + interid + 1);
+		if (allts[threadid][0].first > 0) {
+			best_index = allts[threadid][0].second.second;
+			t = allts[threadid][0].first;
+		} else {
+			int k = 0;
+			while ((k < interid) && (allts[threadid][k].second.first < 0)) {
+				k++;
+			}
+			t = allts[threadid][k].second.first;
+			best_index = k;
+			k++;
+			while ((k < interid) && (allts[threadid][k].first <= t)) {
+				t = std::max(t, allts[threadid][k].second.first);
+				best_index = k;
+				k++;
+			}
+		}
+		triangle_id = best_index;
+
+		P = d.origin + t * d.direction;
+		mat.shadingN = P - particles[frame][best_index]; mat.shadingN.normalize();
+
+		//if (dot(mat.shadingN, d.direction) > 0 && !mat.transp) mat.shadingN = -mat.shadingN;
+		if (flip_normals) mat.shadingN = -mat.shadingN;
+
+		//mat.Kd = Vector(0.5, 0.5, 0.5);
+		//mat.Kd = Vector(localN[0]*0.5+0.5, localN[1] * 0.5 + 0.5, localN[2] * 0.5 + 0.5);
+		//mat.Kd = Vector(std::abs(localN[0]), std::abs(localN[1]), std::abs(localN[2]));
+	}
+
+
+	return has_inter;
+}
+
+
+
+bool Fluid::intersection_opaque2(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const {
+	t = cur_best_t;
+	bool has_inter = false;
+	double t_box_left, t_box_right;
+	int best_index = -1;
+	bool goleft, goright;
+	Vector localP, localN;
+	double localt;
+	int frame = d.time;
+
+	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
+	char signs[3];
+	signs[0] = (invd.direction[0] >= 0) ? 1 : 0;
+	signs[1] = (invd.direction[1] >= 0) ? 1 : 0;
+	signs[2] = (invd.direction[2] >= 0) ? 1 : 0;
+
+	if (!extent.intersection_invd(invd, signs, t_box_left)) return false;
+
+	int threadid = omp_get_thread_num();
+	int interid = 0;
+	Vector startingP = d.origin + (t_box_left + 1E-9) * d.direction;
+	int boxid[3] = { (startingP[0] - extent.bounds[0][0]) / dx[0], (startingP[1] - extent.bounds[0][1]) / dx[1] , (startingP[2] - extent.bounds[0][2]) / dx[2] };
+	if (boxid[0] < 0 || boxid[1] < 0 || boxid[2] < 0 || boxid[0] >= Nx || boxid[1] >= Ny || boxid[2] >= Nz) return false;
+
+	char stepX = signs[0] * 2 - 1;
+	char stepY = signs[1] * 2 - 1;
+	char stepZ = signs[2] * 2 - 1;
+	Vector step(stepX, stepY, stepZ);
+
+	Vector tMax = (((Vector(boxid[0], boxid[1], boxid[2]) + Vector(signs[0], signs[1], signs[2]))*dx + extent.bounds[0]) - startingP) / d.direction; // next ray-plane intersection
+	Vector tDelta = (step * dx) / d.direction;
+
+	t = 1E30;	
+	while (true) {
+		int voxid = boxid[2] * Nx*Ny + boxid[1] * Nx + boxid[0];
+		if (accelgrid[voxid]) {
+			int nids = accelgridindices[voxid].size();
+			const int* ids = &accelgridindices[voxid][0];
+			for (int i = 0; i < nids; i++) {
+				double t1;
+				Vector curP, curN;
+				if (SimplerSphere(particles[frame][ids[i]], radius).intersection(d, curP, curN, t1)) {					
+					if (t1 < t) {
+						has_inter = true;
+						t = t1;
+						P = curP;
+						mat.shadingN = curN;
+						triangle_id = ids[i];
+					}					
+				}
+			}
+			if (has_inter) break;
+		}
+		if (tMax[0] < tMax[1]) {
+			if (tMax[0] < tMax[2]) {
+				boxid[0] += step[0];
+				if (boxid[0] >= Nx || boxid[0] < 0) break;
+				tMax[0] += tDelta[0];
+			} else {
+				boxid[2] += step[2];
+				if (boxid[2] >= Nz || boxid[2] < 0) break;
+				tMax[2] += tDelta[2];
+			}
+		} else {
+			if (tMax[1] < tMax[2]) {
+				boxid[1] += step[1];
+				if (boxid[1] >= Ny || boxid[1] < 0) break;
+				tMax[1] += tDelta[1];
+			} else {
+				boxid[2] += step[2];
+				if (boxid[2] >= Nz || boxid[2] < 0) break;
+				tMax[2] += tDelta[2];
+			}
+		}
+	}
+
+	if (has_inter) {	
+		//if (dot(mat.shadingN, d.direction) > 0 && !mat.transp) mat.shadingN = -mat.shadingN;
+		if (flip_normals) mat.shadingN = -mat.shadingN;
+		//mat.Kd = Vector(0.5, 0.5, 0.5);
+		//mat.Kd = Vector(localN[0]*0.5+0.5, localN[1] * 0.5 + 0.5, localN[2] * 0.5 + 0.5);
+		//mat.Kd = Vector(std::abs(localN[0]), std::abs(localN[1]), std::abs(localN[2]));
+		mat.Kd = visualparticlescolor[triangle_id];
+	}
+
+
+	return has_inter;
+}
+
+bool Fluid::intersection_shadow2(const Ray& d, double &t, double cur_best_t, double dist_light) const {
+	t = cur_best_t;
+	double t_box_left, t_box_right;
+	int best_index = -1;
+	bool goleft, goright;
+	Vector localP, localN;
+	double localt;
+	int frame = d.time;
+
+	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
+	char signs[3];
+	signs[0] = (invd.direction[0] >= 0) ? 1 : 0;
+	signs[1] = (invd.direction[1] >= 0) ? 1 : 0;
+	signs[2] = (invd.direction[2] >= 0) ? 1 : 0;
+
+	if (!extent.intersection_invd(invd, signs, t_box_left)) return false;
+
+	int threadid = omp_get_thread_num();
+	int interid = 0;
+	Vector startingP = d.origin + (t_box_left + 1E-9) * d.direction;
+	int boxid[3] = { (startingP[0] - extent.bounds[0][0]) / dx[0], (startingP[1] - extent.bounds[0][1]) / dx[1] , (startingP[2] - extent.bounds[0][2]) / dx[2] };
+	if (boxid[0] < 0 || boxid[1] < 0 || boxid[2] < 0 || boxid[0] >= Nx || boxid[1] >= Ny || boxid[2] >= Nz) return false;
+	char stepX = signs[0] * 2 - 1;
+	char stepY = signs[1] * 2 - 1;
+	char stepZ = signs[2] * 2 - 1;
+	Vector step(stepX, stepY, stepZ);
+
+	Vector tMax = (((Vector(boxid[0], boxid[1], boxid[2]) + Vector(signs[0], signs[1], signs[2]))*dx + extent.bounds[0]) - startingP) / d.direction; // next ray-plane intersection
+	Vector tDelta = (step * dx) / d.direction;
+
+	t = 1E30;
+	while (true) {
+		int voxid = boxid[2] * Nx*Ny + boxid[1] * Nx + boxid[0];
+		if (accelgrid[voxid]) {
+			int nids = accelgridindices[voxid].size();
+			const int* ids = &accelgridindices[voxid][0];
+			for (int i = 0; i < nids; i++) {
+				double t1;
+				Vector curP, curN;
+				if (SimplerSphere(particles[frame][ids[i]], radius).intersection_shadow(d, t1)) {
+					if (t1 < dist_light) {
+						t = t1;
+						return true;
+					}
+				}
+			}
+		}
+		if (tMax[0] < tMax[1]) {
+			if (tMax[0] < tMax[2]) {
+				boxid[0] += step[0];
+				if (boxid[0] >= Nx || boxid[0] < 0) break;
+				tMax[0] += tDelta[0];
+			} else {
+				boxid[2] += step[2];
+				if (boxid[2] >= Nz || boxid[2] < 0) break;
+				tMax[2] += tDelta[2];
+			}
+		} else {
+			if (tMax[1] < tMax[2]) {
+				boxid[1] += step[1];
+				if (boxid[1] >= Ny || boxid[1] < 0) break;
+				tMax[1] += tDelta[1];
+			} else {
+				boxid[2] += step[2];
+				if (boxid[2] >= Nz || boxid[2] < 0) break;
+				tMax[2] += tDelta[2];
+			}
+		}
+	}
+
+
+	return false;
 }
 
 void Fluid::build_bvh_recur(int frame, BVH* b, int node, int i0, int i1) {
@@ -245,6 +548,11 @@ bool Fluid::intersection_transparent(const Ray& d, Vector& P, double &t, Materia
 	int interid = 0;
 	while (idx_back >= 0) {
 
+		if (tnear[idx_back] > cur_best_t) {
+			idx_back--;
+			continue;
+		}
+
 		const int current = l[idx_back--];
 
 		const int fg = bvh.nodes[current].fg;
@@ -320,14 +628,17 @@ bool Fluid::intersection_transparent(const Ray& d, Vector& P, double &t, Materia
 bool Fluid::intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const {
 	mat = queryMaterial(0, 0, 0);
 	if (mat.transp) {
-		return intersection_transparent(d, P, t, mat, cur_best_t, triangle_id);
+		return intersection_transparent2(d, P, t, mat, cur_best_t, triangle_id);
 	} else {
-		return intersection_opaque(d, P, t, mat, cur_best_t, triangle_id);
+		return intersection_opaque2(d, P, t, mat, cur_best_t, triangle_id);
 	}
 }
 
 
 bool Fluid::intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const { // not correct, but no big deal
+
+	return intersection_shadow2(d, t, cur_best_t, dist_light);
+
 	t = cur_best_t;
 	bool has_inter = false;
 	double t_box_left, t_box_right;

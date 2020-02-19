@@ -16,7 +16,7 @@
 /*static __declspec(thread) std::default_random_engine engine;
 static __declspec(thread) std::uniform_real_distribution<double> uniform(0, 1);*/
 
-static thread_local std::default_random_engine engine;
+static thread_local std::default_random_engine engine[64];
 static thread_local std::uniform_real_distribution<double> uniform(0, 1);
 
 class Vector;

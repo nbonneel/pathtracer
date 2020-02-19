@@ -68,6 +68,8 @@
 #define FLUIDNPARTICLES 1039
 #define FLUIDPARTICLESIZE 1040
 #define FLUIDTIMESTEP 1041
+#define IS_FLUID_INIT_CHECKBOX 1042
+#define FLUIDNSUBSTEPS 1043
 
 #define ID_ALBEDO_DELETE 10
 #define ID_MOVEUP 11
@@ -703,7 +705,7 @@ public:
 	RenderPanel* renderPanel;
 	wxGauge *progressBar;
 	wxBookCtrlBase *m_bookCtrl;
-	wxCheckBox *show_edges, *interp_normals, *transparent, *flipnormals, *isLenticularCheck, *ghost;
+	wxCheckBox *show_edges, *interp_normals, *transparent, *flipnormals, *isLenticularCheck, *ghost, *initfluid;
 	wxTextCtrl *objectName, *envmapName, *backgroundName;
 	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider, *maxangle_slider, *time_slider;
 	wxListCtrl *m_AlbedoFile, *m_SpecularFile, *m_NormalFile, *m_AlphaFile, *m_RoughnessFile, *m_TranspFile, *m_RefrFile;
@@ -711,7 +713,7 @@ public:
 	wxRadioButton *uniformFogRadio, *expFogRadio;
 	wxColourDialog* colPicker;
 	wxFileDialog* texOpenDlg;
-	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays, *nbviews, *nbpixslice, *nbframesctrl, *fluidresX, *fluidresY, *fluidresZ, *fluidnparticles;
+	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays, *nbviews, *nbpixslice, *nbframesctrl, *fluidresX, *fluidresY, *fluidresZ, *fluidnparticles, *fluidsubsteps;
 	wxSpinCtrlDouble *duration, *fluidparticlesize, *fluidtimestep;
 	wxSpinCtrlDouble* refractionIndex;
 	wxButton *deleteObject, *launchRender, *addKeyframe, *renderVideo, *colorAnisotropy, *randomColors, *addFluid;

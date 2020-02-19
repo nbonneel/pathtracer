@@ -12,6 +12,8 @@
 #include "CImg.h"
 #include "utils.h"
 
+#include <omp.h>
+
 #ifdef min
 #undef min
 #endif
@@ -41,6 +43,7 @@ public:
 class BRDF {
 public:
 	BRDF() {};
+	virtual BRDF* clone() = 0;
 	virtual void setParameters(const MaterialValues &m) = 0;
 	virtual Vector sample(const Vector& wi, const Vector& N, double &pdf) const = 0;
 	virtual Vector eval(const Vector& wi, const Vector& wo, const Vector& N) const = 0;
@@ -56,9 +59,13 @@ public:
 		Ks = m.Ks;
 		Ne = m.Ne;
 	}
+	virtual PhongBRDF* clone() {
+		return new PhongBRDF(*this);
+	}
 	static Vector random_Phong(const Vector &R, double phong_exponent) {
-		double r1 = uniform(engine);
-		double r2 = uniform(engine);
+		int threadid = omp_get_thread_num();
+		double r1 = uniform(engine[threadid]);
+		double r2 = uniform(engine[threadid]);
 		double facteur = sqrt(1 - std::pow(r2, 2. / (phong_exponent + 1)));
 		Vector direction_aleatoire_repere_local(cos(2 * M_PI*r1)*facteur, sin(2 * M_PI*r1)*facteur, std::pow(r2, 1. / (phong_exponent + 1)));
 		//Vector aleatoire(uniform(engine) - 0.5, uniform(engine) - 0.5, uniform(engine) - 0.5);
@@ -79,6 +86,7 @@ public:
 			return direction_aleatoire_repere_local[2] * R + direction_aleatoire_repere_local[0] * tangent1 + direction_aleatoire_repere_local[1] * tangent2;
 	}
 	Vector sample(const Vector& wo, const Vector& N, double &pdf) const {  // performs MIS Kd-Ks
+		int threadid = omp_get_thread_num();
 		double avgNe = (Ne[0] + Ne[1] + Ne[2]) / 3.;
 		Vector direction_aleatoire;
 		double p = 1 - (Ks[0] + Ks[1] + Ks[2]) / 3.;
@@ -87,7 +95,7 @@ public:
 		}*/
 		bool sample_diffuse;
 		Vector R = (-wo).reflect(N); // reflect takes a ray going towards a surface and reflects it outwards of it
-		if (uniform(engine) < p) {
+		if (uniform(engine[threadid]) < p) {
 			sample_diffuse = true;
 			direction_aleatoire = random_cos(N);
 		} else {
@@ -118,6 +126,9 @@ public:
 	void setParameters(const MaterialValues &m) {
 		Kd = m.Kd;
 	}
+	virtual LambertBRDF* clone() {
+		return new LambertBRDF(*this);
+	}
 	Vector sample(const Vector& wo, const Vector& N, double &pdf) const {  // performs MIS Kd-Ks		
 		Vector direction_aleatoire = random_cos(N);		
 		pdf = dot(N, direction_aleatoire) / (M_PI);
@@ -141,6 +152,9 @@ public:
 	}
 
 	void setParameters(const MaterialValues &m) {};
+	virtual TitopoBRDF* clone() {
+		return new TitopoBRDF(*this);
+	}
 	Vector sample(const Vector& wi, const Vector& N, double &pdf) const {
 		Vector d = random_cos(N);
 		pdf = dot(N, d) / (M_PI);
@@ -211,7 +225,9 @@ public:
 	IsoMERLBRDF(std::string filename) {		
 		read_brdf(filename.c_str(), data);
 	}
-
+	virtual IsoMERLBRDF* clone() {
+		return new IsoMERLBRDF(*this);
+	}
 	void setParameters(const MaterialValues &m) {};
 	Vector sample(const Vector& wi, const Vector& N, double &pdf) const {
 		Vector d = random_cos(N);
@@ -359,6 +375,7 @@ public:
 			if (load_image(file, values, W, H)) {
 				for (int i = 0; i < values.size(); i++) {
 					values[i] /= 255.;
+					values[i] = std::pow(values[i], 2.2); // values are then gamma corrected. 
 				}
 			} 
 		} 

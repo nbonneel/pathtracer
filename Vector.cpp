@@ -1,6 +1,7 @@
 #include "Vector.h"
 #include <cmath>
 #include <algorithm>
+#include <omp.h>
 
 Vector operator+(const Vector& a, const Vector &b) {
 	return Vector(a[0] + b[0], a[1] + b[1], a[2] + b[2]);
@@ -44,8 +45,9 @@ Vector cross(const Vector&a, const Vector& b) {
 }
 
 Vector random_cos(const Vector &N) {
-	double r1 = uniform(engine);
-	double r2 = uniform(engine);
+	int threadid = omp_get_thread_num();
+	double r1 = uniform(engine[threadid]);
+	double r2 = uniform(engine[threadid]);
 	double sr2 = sqrt(1. - r2);
 	Vector direction_aleatoire_repere_local(cos(2 * M_PI*r1)*sr2, sin(2 * M_PI*r1)*sr2, sqrt(r2));
 	/*Vector aleatoire(uniform(engine) - 0.5, uniform(engine) - 0.5, uniform(engine) - 0.5);	
@@ -68,8 +70,9 @@ Vector random_cos(const Vector &N) {
 
 
 Vector random_uniform() {
-	double r1 = uniform(engine);
-	double r2 = uniform(engine);
+	int threadid = omp_get_thread_num();
+	double r1 = uniform(engine[threadid]);
+	double r2 = uniform(engine[threadid]);
 	Vector result;
 	result[0] = 2.*cos(2.*M_PI*r1)*sqrt(r2*(1 - r2));
 	result[1] = 2.*sin(2.*M_PI*r1)*sqrt(r2*(1 - r2));
