@@ -174,12 +174,13 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 					double proba_globale;
 					Vector direction_aleatoire = brdf->sample(-r.direction, N, proba_globale);
 
-					if (dot(direction_aleatoire, N) < 0) return intensite_pixel;
-					if (dot(direction_aleatoire, r.direction.reflect(N)) < 0) return intensite_pixel;
+					if (dot(direction_aleatoire, N) < 0 || dot(direction_aleatoire, r.direction.reflect(N)) < 0 || proba_globale <= 0) {
+						delete brdf;
+						return intensite_pixel;
+					}
+
 
 					Ray	rayon_aleatoire(P + 0.01*direction_aleatoire, direction_aleatoire, r.time);
-
-					if (proba_globale <= 0) return intensite_pixel;
 
 					intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false, no_envmap)  * ((dot(N, direction_aleatoire) / proba_globale)) *brdf->eval(direction_aleatoire, -r.direction, N);
 
