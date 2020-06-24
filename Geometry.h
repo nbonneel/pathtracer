@@ -1030,6 +1030,50 @@ public:
 };
 
 
+class Cylinder : public Object {
+public:
+	Cylinder() {};
+	Cylinder(const Vector& A, const Vector&B, double R):A(A),B(B), R(R) {
+		d = (B - A).getNormalized();
+		len = sqrt((B - A).getNorm2());
+	}
+
+	bool intersection(const Ray& r, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const {
+
+		// norm2(X*t+Y) = R^2
+		Vector X = r.direction - dot(r.direction, d)*d;
+		Vector Y = r.origin - A - dot(r.origin - A, d)*d;
+		double a = X.getNorm2();
+		double b = 2 * dot(X, Y);
+		double c = Y.getNorm2() - R*R;
+		double delta = b*b - 4 * a*c;
+		if (delta < 0) return false;
+		double sdelta = sqrt(delta);
+		double t2 = (-b + sdelta) / (2 * a);
+		if (t2 < 0) return false;
+		double t1 = (-b - sdelta) / (2 * a);
+		if (t1 > 0) t = t1; else t = t2;
+		P = r.origin + t*r.direction;
+		double dP = dot(P - A, d);
+		if (dP < 0 || dP > len) return false;
+		
+		Vector proj = A + dP*d;
+		mat = queryMaterial(0, dP/len, 0.5);
+		mat.shadingN = (P - proj).getNormalized();
+		if (flip_normals) mat.shadingN = -mat.shadingN;
+		triangle_id = -1;
+		return true;
+	}
+	bool intersection_shadow(const Ray& r, double &t, double cur_best_t, double dist_light) const {
+		Vector P;
+		MaterialValues mat;
+		int tri;
+		return intersection(r, P, t, mat, cur_best_t, tri);
+	}
+
+	Vector A, B, d;
+	double R, len;
+};
 
 
 class Sphere : public Object {

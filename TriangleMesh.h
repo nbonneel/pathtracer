@@ -228,3 +228,50 @@ private:
 	void load_edge_colors(const char* csvfilename); // beware, has to be called before the build bvh
 	void setup_tangents();   // has to be called after the bvh construction
 };
+
+
+
+
+class Yarns : public Object {
+public:
+	Yarns() {};
+	Yarns(const char* filename) {
+		FILE* f = fopen(filename, "r+");
+		int nbyarns;
+		fscanf(f, "%u\n", &nbyarns);
+		for (int i = 0; i < nbyarns; i++) {
+			int nbsegments;
+			fscanf(f, "%u\n", &nbsegments);
+			float x, y, z;
+			fscanf(f, "%f %f %f\n", &x, &y, &z);
+			for (int j = 0; j < nbsegments - 1; j++) {
+				float x2, y2, z2;
+				fscanf(f, "%f %f %f\n", &x2, &y2, &z2);
+				Cylinder* c = new Cylinder(Vector(x, y, z)*50., Vector(x2, y2, z2)*50., 0.1);
+				cyls.push_back(c);
+				x = x2;
+				y = y2;
+				z = z2;
+			}
+		}
+		fclose(f);
+		build_bvh(&bvh, 0, cyls.size());
+	}
+
+	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const;
+	bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const {
+		MaterialValues mat;
+		int tid;
+		Vector P;
+		return intersection(d, P, t, mat, cur_best_t, tid);
+	}
+
+	BBox build_bbox(int i0, int i1);
+	BBox build_centers_bbox(int i0, int i1);
+
+	void build_bvh(BVH* node, int i0, int i1);
+	void build_bvh_recur(BVH* b, int node, int i0, int i1, int depth);
+
+	std::vector<Cylinder*> cyls;
+	BVH bvh;
+};

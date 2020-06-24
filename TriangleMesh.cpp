@@ -1322,3 +1322,233 @@ int Geometry::getNbConnected(int &alsoReturnsNbEdges, int &nonManifoldFaces, int
 	return nbcomp;
 }
 
+
+
+
+
+BBox Yarns::build_bbox(int i0, int i1) {
+
+	BBox result;
+	result.bounds[1] = -Vector(1,1,1)*std::numeric_limits<double>::max();
+	result.bounds[0] = Vector(1, 1, 1)*std::numeric_limits<double>::max();
+	for (int i = i0; i < i1; i++) { // indice de cylindre
+		for (int k = 0; k < 3; k++) { // indice de dimension
+			result.bounds[0][k] = std::min(result.bounds[0][k], cyls[i]->A[k] - cyls[i]->R);
+			result.bounds[1][k] = std::max(result.bounds[1][k], cyls[i]->A[k] + cyls[i]->R);
+			result.bounds[0][k] = std::min(result.bounds[0][k], cyls[i]->B[k] - cyls[i]->R);
+			result.bounds[1][k] = std::max(result.bounds[1][k], cyls[i]->B[k] + cyls[i]->R);
+		}
+	}
+	return result;
+}
+
+BBox Yarns::build_centers_bbox(int i0, int i1) {
+
+	BBox result;
+	result.bounds[1] = (cyls[i0]->A + cyls[i0]->B) / 2.;
+	result.bounds[0] = (cyls[i0]->A + cyls[i0]->B) / 2.;
+	for (int i = i0; i < i1; i++) { // indice de triangle
+		Vector center = (cyls[i]->A + cyls[i]->B) / 2.;
+		for (int k = 0; k < 3; k++) { // indice de dimension	
+			result.bounds[0][k] = std::min(result.bounds[0][k], center[k]);
+			result.bounds[1][k] = std::max(result.bounds[1][k], center[k]);
+		}
+	}
+	return result;
+}
+
+void Yarns::build_bvh(BVH* b, int i0, int i1) {
+	bvh.bbox = build_bbox(i0, i1);
+	bvh.nodes.reserve(cyls.size() * 2);
+	build_bvh_recur(b, 0, i0, i1, 0);
+}
+
+void Yarns::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
+
+	BVHNodes n;
+	//n.i0 = i0;
+	//n.i1 = i1;
+	n.bbox = build_bbox(i0, i1);
+	n.fg = i0;
+	n.fd = i1;
+	n.isleaf = true;
+	b->nodes.push_back(n);
+
+	BBox centerBB = build_centers_bbox(i0, i1);
+
+	Vector diag = centerBB.bounds[1] - centerBB.bounds[0];
+	int split_dim;
+	if ((diag[0] >= diag[1]) && (diag[0] >= diag[2])) {
+		split_dim = 0;
+	}
+	else {
+		if ((diag[1] >= diag[0]) && (diag[1] >= diag[2])) {
+			split_dim = 1;
+		}
+		else {
+			split_dim = 2;
+		}
+	}
+
+
+	double best_split_factor = 0.5;
+	double best_area_bb = 1E50;
+#ifdef _DEBUG
+	int max_tests = 1;
+#else
+	int max_tests = 16;
+#endif
+
+	for (int test_split = 0; test_split < max_tests; test_split++) {
+
+		double cur_split_factor = (test_split + 1) / (double)(max_tests + 1);
+		double split_val = centerBB.bounds[0][split_dim] + diag[split_dim] * cur_split_factor;
+		BBox bb_left(Vector(1E10, 1E10, 1E10), Vector(-1E10, -1E10, -1E10)), bb_right(Vector(1E10, 1E10, 1E10), Vector(-1E10, -1E10, -1E10));
+		int nl = 0, nr = 0;
+
+		for (int i = i0; i < i1; i++) {
+			double center_split_dim = (cyls[i]->A[split_dim] + cyls[i]->B[split_dim]) / 2.;
+
+			if (center_split_dim <= split_val) {
+				bb_left.bounds[0] = min(bb_left.bounds[0], cyls[i]->A - Vector(cyls[i]->R, cyls[i]->R, cyls[i]->R));
+				bb_left.bounds[0] = min(bb_left.bounds[0], cyls[i]->B - Vector(cyls[i]->R, cyls[i]->R, cyls[i]->R));
+
+				bb_left.bounds[1] = max(bb_left.bounds[1], cyls[i]->A + Vector(cyls[i]->R, cyls[i]->R, cyls[i]->R));
+				bb_left.bounds[1] = max(bb_left.bounds[1], cyls[i]->B + Vector(cyls[i]->R, cyls[i]->R, cyls[i]->R));
+
+				nl++;
+			}
+			else {
+				bb_right.bounds[0] = min(bb_right.bounds[0], cyls[i]->A - Vector(cyls[i]->R, cyls[i]->R, cyls[i]->R));
+				bb_right.bounds[0] = min(bb_right.bounds[0], cyls[i]->B - Vector(cyls[i]->R, cyls[i]->R, cyls[i]->R));
+				bb_right.bounds[1] = max(bb_right.bounds[1], cyls[i]->A + Vector(cyls[i]->R, cyls[i]->R, cyls[i]->R));
+				bb_right.bounds[1] = max(bb_right.bounds[1], cyls[i]->B + Vector(cyls[i]->R, cyls[i]->R, cyls[i]->R));
+				nr++;
+			}
+		}
+		double sum_area_bb = bb_left.area()*nl + bb_right.area()*nr;
+		if (sum_area_bb < best_area_bb) {
+			best_split_factor = cur_split_factor;
+			best_area_bb = sum_area_bb;
+		}
+	}
+
+	double split_val = centerBB.bounds[0][split_dim] + diag[split_dim] * best_split_factor;
+	int pivot = i0 - 1;
+	for (int i = i0; i < i1; i++) {
+		double center_split_dim = (cyls[i]->A[split_dim] + cyls[i]->B[split_dim]) / 2.;
+
+		if (center_split_dim <= split_val) {
+			pivot++;
+			std::swap(cyls[i], cyls[pivot]);
+		}
+	}
+
+
+	if (pivot < i0 || pivot >= i1 - 1 || i1 <= i0 + 4) { // 1 triangles per leaf
+		return;
+	}
+
+	b->nodes[node].isleaf = false;
+	b->nodes[node].fg = b->nodes.size();
+	build_bvh_recur(b, b->nodes[node].fg, i0, pivot + 1, depth + 1);
+
+	b->nodes[node].fd = b->nodes.size();
+	build_bvh_recur(b, b->nodes[node].fd, pivot + 1, i1, depth + 1);
+
+}
+
+
+bool Yarns::intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const
+{
+	t = cur_best_t;
+	bool has_inter = false;
+	double t_box_left, t_box_right;
+	int best_index = -1;
+	bool goleft, goright;
+	Vector localP, localN;
+	double localt;
+	double alpha, beta, gamma;
+
+	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
+	char signs[3];
+	signs[0] = (invd.direction[0] >= 0) ? 1 : 0;
+	signs[1] = (invd.direction[1] >= 0) ? 1 : 0;
+	signs[2] = (invd.direction[2] >= 0) ? 1 : 0;
+
+	if (!bvh.bbox.intersection_invd(invd, signs, t_box_left)) return false;
+	if (t_box_left > cur_best_t) return false;
+
+	int l[50];
+	double tnear[50];
+	int idx_back = -1;
+
+	l[++idx_back] = 0;
+	tnear[idx_back] = t_box_left;
+
+	while (idx_back >= 0) {
+
+		if (tnear[idx_back] > t) {
+			idx_back--;
+			continue;
+		}
+		const int current = l[idx_back--];
+
+		const int fg = bvh.nodes[current].fg;
+		const int fd = bvh.nodes[current].fd;
+
+		if (!bvh.nodes[current].isleaf) {
+			if (signs[0] == 1) {
+				goleft = (bvh.nodes[fg].bbox.intersection_invd_positive_x(invd, signs, t_box_left) && t_box_left < t);
+				goright = (bvh.nodes[fd].bbox.intersection_invd_positive_x(invd, signs, t_box_right) && t_box_right < t);
+			}
+			else {
+				goleft = (bvh.nodes[fg].bbox.intersection_invd_negative_x(invd, signs, t_box_left) && t_box_left < t);
+				goright = (bvh.nodes[fd].bbox.intersection_invd_negative_x(invd, signs, t_box_right) && t_box_right < t);
+			}
+
+			if (goleft&&goright) {
+				if (t_box_left < t_box_right) {
+					l[++idx_back] = fd;  tnear[idx_back] = t_box_right;
+					l[++idx_back] = fg;  tnear[idx_back] = t_box_left;
+				}
+				else {
+					l[++idx_back] = fg;  tnear[idx_back] = t_box_left;
+					l[++idx_back] = fd;  tnear[idx_back] = t_box_right;
+				}
+			}
+			else {
+				if (goleft) { l[++idx_back] = fg; tnear[idx_back] = t_box_left; }
+				if (goright) { l[++idx_back] = fd; tnear[idx_back] = t_box_right; }
+			}
+		}
+		else {  // feuille
+				//bool go_in = (bvh.nodes[current].bbox.intersection_invd(invd, signs, t_box_left) && t_box_left < t);
+				//if (go_in)
+			int tid;
+			for (int i = fg; i < fd; i++) {
+				if (cyls[i]->intersection(d, localP, localt, mat, cur_best_t, tid)) {
+					if (localt < t) {					
+						has_inter = true;
+						best_index = i;
+						t = localt;
+					}
+				}
+			}
+		}
+
+	}
+
+	if (has_inter) {
+		int i = best_index;
+		int tid;
+		triangle_id = best_index;
+		cyls[i]->intersection(d, localP, localt, mat, cur_best_t, tid);
+
+
+		//localN.normalize();
+		P = localP;
+	}
+
+	return has_inter;
+}

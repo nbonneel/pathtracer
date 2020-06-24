@@ -56,8 +56,15 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 	if (has_inter) {
 		int threadid = omp_get_thread_num();
 
-		if (no_envmap && sphere_id == 1) {
-			return Vector(0, 0, 0);
+		if (sphere_id == 1) {
+			if (no_envmap)
+				return Vector(0, 0, 0);
+			else {
+				Sphere* env = dynamic_cast<Sphere*>(s.objects[1]);
+				if (env) {
+					return s.envmap_intensity*mat.Ke;
+				}
+			}				
 		}
 		if (sphere_id == 0) {
 			intensite_pixel = show_lights ? (/*s.lumiere->albedo **/Vector(1.,1.,1.)* (s.intensite_lumiere / sqr(lum_scale))) : Vector(0., 0., 0.);

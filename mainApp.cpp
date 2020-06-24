@@ -1982,6 +1982,11 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 				continue;
 			}
 
+			if (filenames[n].Lower().find(".yarn") != std::string::npos) {
+				Yarns* y = new Yarns(filenames[n]);
+				m_pOwner->render_panel->raytracer.s.addObject(y);
+			}
+
 			if (filenames[n].Lower().find(".titopo") != std::string::npos) {
 				if (m_pOwner->render_panel->selected_object < 0 || m_pOwner->render_panel->selected_object >= m_pOwner->render_panel->raytracer.s.objects.size()) {
 					wxMessageBox("No object was selected to apply the BRDF to", "Error", wxOK);
