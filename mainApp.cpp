@@ -5,17 +5,24 @@
 
 wxIMPLEMENT_APP(RaytracerApp);
 
-
+#include "fluid.h"
 
 bool RaytracerApp::OnInit()
 {
 	int arc = wxApp::argc;
 	//wxCmdLineArgsArray argv(wxApp::argv);
 
+	/*Fluid fl(BBox(Vector(-10, -10, -10), Vector(10, 10, 10)), 64, 64, 64, 200000, 1000.);
+	fl.run();
+	exit(0);*/
+
 	if (argc > 1) {
 		Raytracer raytracer;
 		raytracer.loadScene();
-		raytracer.load_scene(wxApp::argv[1]);
+		if (argc>3)
+			raytracer.load_scene(wxApp::argv[1], wxApp::argv[3]);
+		else
+			raytracer.load_scene(wxApp::argv[1]);
 		raytracer.render_image();
 		if (arc>2)
 			save_image(wxApp::argv[2], &raytracer.image[0], raytracer.W, raytracer.H);
@@ -185,6 +192,9 @@ bool RaytracerApp::OnInit()
 	colorAnisotropy = new wxButton(panelObject, COLOR_ANISOTROPY, "Color Anisotropy", wxDefaultPosition, wxDefaultSize);
 	Connect(COLOR_ANISOTROPY, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::colorAnisotropy), NULL, renderPanel);
 
+	randomColors = new wxButton(panelObject, RANDOM_COLOR, "Randomize Face Color Map", wxDefaultPosition, wxDefaultSize);
+	Connect(RANDOM_COLOR, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::randomColors), NULL, renderPanel);
+
 	deleteObject = new wxButton(panelObject, DELETE_OBJECT, "Delete", wxDefaultPosition, wxDefaultSize);
 	Connect(DELETE_OBJECT, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::delete_object), NULL, renderPanel);
 
@@ -204,6 +214,7 @@ bool RaytracerApp::OnInit()
 	panelObject_sizer->Add(m_RefrFile, 0, wxEXPAND);
 	//panelObject_sizer->Add(ks_sizer, 0, wxEXPAND);
 	panelObject_sizer->Add(colorAnisotropy, 0, wxEXPAND);
+	panelObject_sizer->Add(randomColors, 0, wxEXPAND);
 	panelObject_sizer->Add(deleteObject, 0, wxEXPAND);
 	
 	panelObject->SetSizer(panelObject_sizer);
@@ -301,7 +312,7 @@ bool RaytracerApp::OnInit()
 
 	wxBoxSizer * bounces_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* bounces_text = new wxStaticText(panelRenderer, 9999 - 1, "light bounces: ");
-	bounces = new wxSpinCtrl(panelRenderer, BOUNCES_SPIN, wxString("3"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 10, 3);
+	bounces = new wxSpinCtrl(panelRenderer, BOUNCES_SPIN, wxString("3"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 100, 3);
 	Connect(BOUNCES_SPIN, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	bounces_sizer->Add(bounces_text, 0, wxEXPAND);
 	bounces_sizer->Add(bounces, 1, wxEXPAND);
@@ -402,8 +413,8 @@ bool RaytracerApp::OnInit()
 
 	wxBoxSizer * duration_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* duration_text = new wxStaticText(panelAnimation, 9999 - 1, "duration (s): ");
-	duration = new wxSpinCtrlDouble(panelAnimation, DURATION, "1", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.001, 1000, 1, 0.1);
-	Connect(DURATION, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	duration = new wxSpinCtrlDouble(panelAnimation, DURATION, wxString("1"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.001, 1000, 1, 0.1);
+	Connect(DURATION, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	duration_sizer->Add(duration_text, 0, wxEXPAND);
 	duration_sizer->Add(duration, 1, wxEXPAND);
 
@@ -424,7 +435,59 @@ bool RaytracerApp::OnInit()
 
 	m_bookCtrl->AddPage(panelAnimation, wxT("Animation"), false);
 
+	// ------------------
+	wxPanel *panelFluids = new wxPanel(m_bookCtrl);
+	wxBoxSizer * panelFluids_sizer = new wxBoxSizer(wxVERTICAL);
+	panelFluids->SetSizer(panelFluids_sizer);
 
+	wxBoxSizer * fluidres_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* fluidres_text = new wxStaticText(panelFluids, 9999 - 1, "Resolution: ");
+	fluidresX = new wxSpinCtrl(panelFluids, FLUIDRESX, wxString("32"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 4, 512, 32);
+	fluidresY = new wxSpinCtrl(panelFluids, FLUIDRESY, wxString("32"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 4, 512, 32);
+	fluidresZ = new wxSpinCtrl(panelFluids, FLUIDRESZ, wxString("32"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 4, 512, 32);
+	Connect(FLUIDRESX, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	Connect(FLUIDRESY, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	Connect(FLUIDRESZ, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	fluidres_sizer->Add(fluidres_text, 0, wxEXPAND);
+	fluidres_sizer->Add(fluidresX, 1, wxEXPAND);
+	fluidres_sizer->Add(fluidresY, 1, wxEXPAND);
+	fluidres_sizer->Add(fluidresZ, 1, wxEXPAND);
+	panelFluids_sizer->Add(fluidres_sizer, 0, wxEXPAND);
+
+	wxBoxSizer * fluidnparticles_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* fluidnparticles_text = new wxStaticText(panelFluids, 9999 - 1, "Nb particles: ");
+	fluidnparticles = new wxSpinCtrl(panelFluids, FLUIDNPARTICLES, wxString("4000000"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 10000000, 4000000);
+	Connect(FLUIDNPARTICLES, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	fluidnparticles_sizer->Add(fluidnparticles_text, 0, wxEXPAND);
+	fluidnparticles_sizer->Add(fluidnparticles, 1, wxEXPAND);
+	panelFluids_sizer->Add(fluidnparticles_sizer, 0, wxEXPAND);
+
+	wxBoxSizer * fluidparticlesize_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* fluidparticlesize_text = new wxStaticText(panelFluids, 9999 - 1, "Particle size: ");
+	fluidparticlesize = new wxSpinCtrlDouble(panelFluids, FLUIDPARTICLESIZE, wxString("0.05"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.01, 1, 0.05, 0.01);
+	Connect(FLUIDPARTICLESIZE, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	fluidparticlesize_sizer->Add(fluidparticlesize_text, 0, wxEXPAND);
+	fluidparticlesize_sizer->Add(fluidparticlesize, 1, wxEXPAND);
+	panelFluids_sizer->Add(fluidparticlesize_sizer, 0, wxEXPAND);
+
+	wxBoxSizer * fluidtimestep_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* fluidtimestep_text = new wxStaticText(panelFluids, 9999 - 1, "Time step: ");
+	fluidtimestep = new wxSpinCtrlDouble(panelFluids, FLUIDTIMESTEP, wxString("0.033"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.001, 2, 1./30., 0.01);
+	Connect(FLUIDTIMESTEP, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	fluidtimestep_sizer->Add(fluidtimestep_text, 0, wxEXPAND);
+	fluidtimestep_sizer->Add(fluidtimestep, 1, wxEXPAND);
+	panelFluids_sizer->Add(fluidtimestep_sizer, 0, wxEXPAND);
+
+	addFluid = new wxButton(panelFluids, ADD_FLUID, "Add fluid", wxDefaultPosition, wxDefaultSize);
+	Connect(ADD_FLUID, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::add_fluid), NULL, renderPanel);
+	panelFluids_sizer->Add(addFluid, 0, wxEXPAND);
+
+
+
+	
+	m_bookCtrl->AddPage(panelFluids, wxT("Fluids"), false);
+
+	// ----------------
 
 	m_bookCtrl->SetSelection(0);
 
@@ -434,7 +497,7 @@ bool RaytracerApp::OnInit()
 	wxBoxSizer * time_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* time_text = new wxStaticText(frame, 9999, "timeline ");
 	time_slider = new wxSlider(frame, FOV_SLIDER, 0, 0, 1, wxDefaultPosition, wxSize(600,32), wxSL_HORIZONTAL | wxSL_LABELS);
-	Connect(TIME_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	Connect(TIME_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);	
 	time_sizer->Add(time_text, 0, wxEXPAND);
 	time_sizer->Add(time_slider, 1, wxEXPAND);
 
@@ -568,6 +631,11 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 		raytracer.s.objects[i]->mat_rotation = raytracer.s.objects[i]->get_rotation(raytracer.s.current_frame, false);
 		raytracer.s.objects[i]->scale = raytracer.s.objects[i]->get_scale(raytracer.s.current_frame, false);
 	}
+	for (int i = 0; i < raytracer.s.objects.size(); i++) {
+		Fluid* f = dynamic_cast<Fluid*>(raytracer.s.objects[i]);
+		if (!f) continue;
+		f->build_bvh(raytracer_app->time_slider->GetValue(), 0, f->Nparticles);
+	}
 
 
 	start_render();
@@ -581,6 +649,40 @@ void RenderPanel::update_textures_and_render(wxCommandEvent& event) {
 
 	raytracer.s.objects[selected_object]->display_edges = raytracer_app->show_edges->IsChecked();
 
+	start_render();
+}
+
+
+void RenderPanel::add_fluid(wxCommandEvent& event) {
+	raytracer_app->renderPanel->stop_render();
+
+	Fluid* fl = new Fluid(raytracer.s, BBox(Vector(-18, -27.3, -18), Vector(18, -27.3+36, 18)), raytracer_app->fluidresX->GetValue(), raytracer_app->fluidresY->GetValue(), raytracer_app->fluidresZ->GetValue(), raytracer_app->fluidnparticles->GetValue(), 1000., raytracer_app->fluidparticlesize->GetValue(), raytracer_app->nbframesctrl->GetValue(), raytracer_app->fluidtimestep->GetValue());
+	fl->run();
+	
+	raytracer.s.addObject(fl);
+	raytracer_app->renderPanel->update_gui();
+	raytracer_app->renderPanel->start_render();	
+}
+
+void RenderPanel::render_video(wxCommandEvent& event) {
+	stop_render();
+	PerfChrono perf;
+	perf.Start();
+	raytracer.stopped = false;
+	for (int i = 0; i < raytracer.s.nbframes; i++) {
+		raytracer.clear_image();
+		raytracer.s.current_frame = i;
+		raytracer.s.current_time = i * raytracer.s.duration / (double)raytracer.s.nbframes;
+
+		for (int j = 0; j < raytracer.s.objects.size(); j++) {
+			Fluid* f = dynamic_cast<Fluid*>(raytracer.s.objects[j]);
+			if (!f) continue;
+			f->build_bvh(i, 0, f->Nparticles);
+		}
+
+		raytracer.render_image();
+	}
+	raytracer.stopped = true;
 	start_render();
 }
 
@@ -624,6 +726,17 @@ void RenderPanel::update_gui() {
 	raytracer_app->nbframesctrl->SetValue(raytracer.s.nbframes);
 	raytracer_app->time_slider->SetMax(raytracer.s.nbframes);
 
+	raytracer_app->fogdensity_slider->SetValue(raytracer.s.fog_density*100.);
+	raytracer_app->uniformFogRadio->SetValue(raytracer.s.fog_type == 0);
+
+	double factor = 1. / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
+	raytracer_app->lightintensity_slider->SetValue(raytracer.s.intensite_lumiere / factor);
+	raytracer_app->envmapintensity_slider->SetValue(raytracer.s.envmap_intensity * 100);
+
+	raytracer_app->duration->SetValue(raytracer.s.duration);
+	raytracer_app->time_slider->SetValue(raytracer.s.current_frame);
+	raytracer_app->recordKeyframes->SetValue(raytracer.is_recording);
+
 	//Vector alb = raytracer.s.objects[selected_object]->albedo;
 	//raytracer_app->albedoColorPicker->SetColour(wxColour(alb[0] * 255., alb[1] * 255., alb[2] * 255.));
 
@@ -651,7 +764,8 @@ void RenderPanel::update_gui() {
 		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
 			raytracer_app->m_NormalFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
 	}
-	raytracer_app->envmapName->SetLabelText(((Sphere*)raytracer.s.objects[1])->envmapfilename);
+	if (raytracer.s.objects.size()>1 && dynamic_cast<Sphere*>(raytracer.s.objects[1]))
+		raytracer_app->envmapName->SetLabelText(((Sphere*)raytracer.s.objects[1])->envmapfilename);
 	raytracer_app->backgroundName->SetLabelText(raytracer.s.backgroundfilename);
 
 	raytracer_app->m_AlphaFile->DeleteAllItems();
@@ -703,7 +817,7 @@ void RenderPanel::update_gui() {
 		std::string filename = raytracer.s.objects[selected_object]->transparent_map[i].filename;
 		long index = raytracer_app->m_TranspFile->InsertItem(i, item);
 		raytracer_app->m_TranspFile->SetItem(index, 0, txt, -1);
-		raytracer_app->m_TranspFile->SetItem(index, 1, (raytracer.s.objects[selected_object]->transparent_map[i].multiplier[0]>0.5) ? "Refractive" : "Not Refractive", -1);
+		raytracer_app->m_TranspFile->SetItem(index, 1, (raytracer.s.objects[selected_object]->transparent_map[i].multiplier[0]>0.5) ? "Not Refractive" : "Refractive", -1);
 		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
 			raytracer_app->m_TranspFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
 	}
@@ -741,16 +855,7 @@ void RenderPanel::update_gui() {
 		raytracer_app->m_TranspFile->EnsureVisible(id);
 	}
 
-	raytracer_app->fogdensity_slider->SetValue(raytracer.s.fog_density*100.);
-	raytracer_app->uniformFogRadio->SetValue(raytracer.s.fog_type == 0);
 
-	double factor = 1. / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
-	raytracer_app->lightintensity_slider->SetValue(raytracer.s.intensite_lumiere / factor);
-	raytracer_app->envmapintensity_slider->SetValue(raytracer.s.envmap_intensity * 100);
-
-	raytracer_app->duration->SetValue(raytracer.s.duration);
-	raytracer_app->time_slider->SetValue(raytracer.s.current_frame );
-	raytracer_app->recordKeyframes->SetValue(raytracer.is_recording);
 }
 
 void RenderPanel::render(wxDC& dc)
@@ -798,6 +903,7 @@ void RenderPanel::render(wxDC& dc)
 	computed2 = computed;
 	}*/
 
+	raytracer.sample_count.resize(raytracer.W*raytracer.H); // just in case.
 	for (int i = 0; i < raytracer.H; i++) {
 		for (int j = 0; j < raytracer.W; j++) {
 			//if (!raytracer.computed[i*raytracer.W + j]) {
@@ -1746,9 +1852,9 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 	size_t nFiles = filenames.GetCount();
 	if (m_pOwner != NULL) {
 		m_pOwner->render_panel->stop_render();
-		for (size_t n = 0; n < nFiles; n++) {
+		for (size_t n = 0; n < nFiles; n++) {			
 
-			if (filenames[n].find(".seg") != std::string::npos) {
+			if (filenames[n].Lower().find(".seg") != std::string::npos) {
 				if (m_pOwner->render_panel->selected_object < 0 || m_pOwner->render_panel->selected_object>= m_pOwner->render_panel->raytracer.s.objects.size()) {
 					wxMessageBox("No triangle mesh was selected to apply the segments to", "Error", wxOK) ;
 					return true;
@@ -1777,7 +1883,46 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 				continue;
 			}
 
-			if (filenames[n].find(".xyz") != std::string::npos) {
+			if (filenames[n].Lower().find(".lab") != std::string::npos) {
+				if (m_pOwner->render_panel->selected_object < 0 || m_pOwner->render_panel->selected_object >= m_pOwner->render_panel->raytracer.s.objects.size()) {
+					wxMessageBox("No triangle mesh was selected to apply the segments to", "Error", wxOK);
+					return true;
+				}
+				Geometry* g = dynamic_cast<Geometry*>(m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]);
+				if (!g) {
+					wxMessageBox("Selected object is not a triangle mesh", "Error", wxOK);
+					return true;
+				}
+
+				std::vector<int> unpermuted_index(g->indices.size());
+				for (int i = 0; i < g->indices.size(); i++) {
+					unpermuted_index[g->permuted_triangle_index[i]] = i;
+				}
+				FILE* f = fopen(filenames[n].c_str(), "r+");
+				int u;
+				int faceid = 0;
+				g->facecolors.resize(g->indices.size());
+				char lineName[512];
+				char lineFaces[512*1000];
+				char* line;
+				int segId = 0;
+				while (fscanf(f, "%[^\n]\n%[^\n]\n", lineName, lineFaces) != EOF) {
+					int faceid, offset;
+					line = lineFaces;
+					while (sscanf(line, "%u%n", &faceid,&offset) == 1) {						
+						faceid--;
+						line = line + offset;
+						Vector col(((segId*segId*(segId + 2) * 123 + 51) % 1000) / 1000., ((segId*(segId + 7) * 456 + 266) % 1000) / 1000., ((segId*segId*segId * 5 + segId * 33 + 687) % 1000) / 1000.);
+						if (faceid < g->indices.size())
+							g->facecolors[unpermuted_index[faceid]] = col;
+					}
+					segId++;
+				}
+				fclose(f);
+				continue;
+			}
+
+			if (filenames[n].Lower().find(".xyz") != std::string::npos) {
 
 				std::string values = wxGetTextFromUser("Space separated, -1: ignore, 0:x 1:y, 2:z, 3:nx,4:ny,5:nz, 6:colr, 7:colg, 8:colb",
 					"Enter XYZ file format", "-1 -1 0 1 2 6 7 8").ToStdString();
@@ -1800,13 +1945,39 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 				continue;
 			} 
 
-			if ((filenames[n].find(".obj") != std::string::npos)  || (filenames[n].find(".wrl") != std::string::npos) || (filenames[n].find(".off") != std::string::npos)) {
+			if ((filenames[n].Lower().find(".obj") != std::string::npos)  || (filenames[n].Lower().find(".wrl") != std::string::npos) || (filenames[n].Lower().find(".off") != std::string::npos)) {
 				bool center = (wxMessageBox("Should the model be normalized / centered ?", "Normalization ?", wxYES_NO | wxCENTRE) == wxYES);
 				Geometry* g = new Geometry(filenames[n], 1, Vector(0, 0, 0), false, NULL, false, center);
 				g->scale = 30;
 				g->display_edges = false;
 				g->max_translation = Vector(0, m_pOwner->render_panel->raytracer.s.objects[2]->get_translation(m_pOwner->render_panel->raytracer.s.current_time, m_pOwner->render_panel->raytracer.is_recording)[1] - (g->bvh.bbox.bounds[0][1])*g->scale, 0);
 				m_pOwner->render_panel->raytracer.s.addObject(g);
+				continue;
+			}
+
+			if (filenames[n].Lower().find(".yarn") != std::string::npos) {
+				Yarns* y = new Yarns(filenames[n]);
+				m_pOwner->render_panel->raytracer.s.addObject(y);
+			}
+
+			if (filenames[n].Lower().find(".titopo") != std::string::npos) {
+				if (m_pOwner->render_panel->selected_object < 0 || m_pOwner->render_panel->selected_object >= m_pOwner->render_panel->raytracer.s.objects.size()) {
+					wxMessageBox("No object was selected to apply the BRDF to", "Error", wxOK);
+					return true;
+				}
+				if (filenames[n].Lower().find(".titopoh") != std::string::npos) {
+					m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf = new TitopoBRDF(filenames[n].ToStdString(),45,45,180);
+				} else {
+					m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf = new TitopoBRDF(filenames[n].ToStdString(),90,90,360);
+				}
+				continue;
+			}
+			if (filenames[n].Lower().find(".binary") != std::string::npos) {
+				if (m_pOwner->render_panel->selected_object < 0 || m_pOwner->render_panel->selected_object >= m_pOwner->render_panel->raytracer.s.objects.size()) {
+					wxMessageBox("No object was selected to apply the BRDF to", "Error", wxOK);
+					return true;
+				}
+				m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf = new IsoMERLBRDF(filenames[n].ToStdString());
 				continue;
 			}
 		}		

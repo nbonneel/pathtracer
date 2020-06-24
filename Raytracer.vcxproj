@@ -80,6 +80,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <TargetName>$(ProjectName)4</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -108,12 +109,12 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>wxUSE_GUI=1;__WXMSW__;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>wxUSE_GUI=1;__WXMSW__;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalIncludeDirectories>C:\SharedLibs\wxWidgets-3.1.0\include;C:\SharedLibs\wxWidgets-3.1.0\include\msvc</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\SharedLibs\wxWidgets-3.1.2\include;C:\SharedLibs\wxWidgets-3.1.2\include\msvc</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -121,7 +122,7 @@
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <StackReserveSize>10000000</StackReserveSize>
       <StackCommitSize>10000000</StackCommitSize>
-      <AdditionalLibraryDirectories>C:\SharedLibs\wxWidgets-3.1.0\lib\vc_x64_lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\SharedLibs\wxWidgets-3.1.2\lib\vc_x64_lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>wxmsw31ud_core.lib;wxbase31ud.lib;wxtiffd.lib;wxjpegd.lib;wxpngd.lib;wxzlibd.lib;wxregexud.lib;wxexpatd.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -158,7 +159,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>wxUSE_GUI=1;__WXMSW__;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>wxUSE_GUI=1;__WXMSW__;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
@@ -188,10 +189,12 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="fluid.cpp" />
     <ClCompile Include="Geometry.cpp" />
     <ClCompile Include="hdrloader.cpp" />
     <ClCompile Include="hdrwriter.cpp" />
     <ClCompile Include="mainApp.cpp" />
+    <ClCompile Include="MERLBRDFRead.cpp" />
     <ClCompile Include="PointSet.cpp" />
     <ClCompile Include="Raytracer.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -205,9 +208,11 @@
   <ItemGroup>
     <ClInclude Include="chrono.h" />
     <ClInclude Include="CImg.h" />
+    <ClInclude Include="fluid.h" />
     <ClInclude Include="Geometry.h" />
     <ClInclude Include="hdrloader.h" />
     <ClInclude Include="hdrwriter.h" />
+    <ClInclude Include="MERLBRDFRead.h" />
     <ClInclude Include="nanoflann.hpp" />
     <ClInclude Include="PointSet.h" />
     <ClInclude Include="Raytracer.h" />

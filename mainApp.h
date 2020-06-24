@@ -18,6 +18,7 @@
 
 #include "Raytracer.h"
 
+
 #define EDGES_CHECKBOX 1001
 #define INTERP_CHECKBOX 1002
 #define FOV_SLIDER 1003
@@ -59,6 +60,14 @@
 #define RECORD_KEYFRAME 1031
 #define RENDER_VIDEO 1032
 #define COLOR_ANISOTROPY 1033
+#define RANDOM_COLOR 1034
+#define FLUIDRESX 1035
+#define FLUIDRESY 1036
+#define FLUIDRESZ 1037
+#define ADD_FLUID 1038
+#define FLUIDNPARTICLES 1039
+#define FLUIDPARTICLESIZE 1040
+#define FLUIDTIMESTEP 1041
 
 #define ID_ALBEDO_DELETE 10
 #define ID_MOVEUP 11
@@ -357,7 +366,7 @@ class RenderPanel : public wxPanel
 
 public:
 
-	RenderPanel(RaytracerFrame* parent, RaytracerApp* app):wxPanel(parent) {
+	RenderPanel(RaytracerFrame* parent, RaytracerApp* app) :wxPanel(parent) {
 		Connect(wxEVT_PAINT, wxPaintEventHandler(RenderPanel::paintEvent));
 
 		raytracer_app = app;
@@ -427,9 +436,8 @@ public:
 		return 0;
 	}*/
 
-	void paintEvent(wxPaintEvent& evt)
-	{
-	   //test();
+	void paintEvent(wxPaintEvent& evt) {
+		//test();
 		wxPaintDC dc(this);
 		render(dc);
 	}
@@ -462,6 +470,15 @@ public:
 		start_render();
 	}
 
+	void randomColors(wxCommandEvent& event) {
+		if (selected_object < 0) return;
+		if (selected_object >= raytracer.s.objects.size()) return;
+
+		stop_render();
+		raytracer.s.objects[selected_object]->randomColors();
+		start_render();
+	}
+
 	void add_keyframe(wxCommandEvent& event) {
 		if (selected_object < 0) return;
 		if (selected_object >= raytracer.s.objects.size()) return;
@@ -483,20 +500,9 @@ public:
 		start_render();
 	}
 
-	void render_video(wxCommandEvent& event) {
-		stop_render();
-		PerfChrono perf;
-		perf.Start();
-		raytracer.stopped = false;
-		for (int i = 0; i < raytracer.s.nbframes; i++) {
-			raytracer.clear_image();
-			raytracer.s.current_frame = i;
-			raytracer.s.current_time = i*raytracer.s.duration / (double)raytracer.s.nbframes;
-			raytracer.render_image();
-		}
-		raytracer.stopped = true;
-		start_render();
-	}
+	void add_fluid(wxCommandEvent& event);
+
+	void render_video(wxCommandEvent& event);
 
 	void update_textures_and_render(wxCommandEvent& event);
 	void update_parameters_and_render(wxCommandEvent& event);
@@ -614,7 +620,7 @@ public:
 		
 
 		/*if (!wasDragging)*/ {
-			Ray r = raytracer.cam.generateDirection((displayH - (mouse_init_y - 1.))*(double)raytracer.H / displayH, mouse_init_x*(double)raytracer.W / displayW, 0, 0, 0, 0, 0, raytracer.W, raytracer.H);
+			Ray r = raytracer.cam.generateDirection((displayH - (mouse_init_y - 1.))*(double)raytracer.H / displayH, mouse_init_x*(double)raytracer.W / displayW, raytracer.s.current_time, 0, 0, 0, 0, raytracer.W, raytracer.H);
 
 			Vector P;
 			int new_selected, new_tri;
@@ -705,10 +711,10 @@ public:
 	wxRadioButton *uniformFogRadio, *expFogRadio;
 	wxColourDialog* colPicker;
 	wxFileDialog* texOpenDlg;
-	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays, *nbviews, *nbpixslice, *nbframesctrl;
-	wxSpinCtrlDouble *duration;
+	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays, *nbviews, *nbpixslice, *nbframesctrl, *fluidresX, *fluidresY, *fluidresZ, *fluidnparticles;
+	wxSpinCtrlDouble *duration, *fluidparticlesize, *fluidtimestep;
 	wxSpinCtrlDouble* refractionIndex;
-	wxButton *deleteObject, *launchRender, *addKeyframe, *renderVideo, *colorAnisotropy;
+	wxButton *deleteObject, *launchRender, *addKeyframe, *renderVideo, *colorAnisotropy, *randomColors, *addFluid;
 	wxToggleButton*recordKeyframes;
 	wxStaticText* infoModel;
 	wxStaticText* infoPerf;

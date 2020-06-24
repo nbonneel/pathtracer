@@ -17,6 +17,9 @@ Vector operator*(const Vector &b, double a) {
 Vector operator/(const Vector& a, double b) {
 	return Vector(a[0]/b, a[1]/b, a[2]/b);
 }
+Vector operator/(const Vector& a, const Vector &b) {
+	return Vector(a[0] / b[0], a[1] / b[1], a[2] / b[2]);
+}
 Vector operator-(const Vector& a) {
 	return Vector(-a[0], -a[1], -a[2]);
 }
@@ -62,29 +65,7 @@ Vector random_cos(const Vector &N) {
 	return direction_aleatoire_repere_local[2] * N + direction_aleatoire_repere_local[0] * tangent1 + direction_aleatoire_repere_local[1] * tangent2;
 }
 
-Vector random_Phong(const Vector &R, double phong_exponent) {
 
-	double r1 = uniform(engine);
-	double r2 = uniform(engine);
-	double facteur = sqrt(1 - std::pow(r2, 2. / (phong_exponent + 1)));
-	Vector direction_aleatoire_repere_local(cos(2 * M_PI*r1)*facteur, sin(2 * M_PI*r1)*facteur, std::pow(r2, 1./(phong_exponent+1)));
-	//Vector aleatoire(uniform(engine) - 0.5, uniform(engine) - 0.5, uniform(engine) - 0.5);
-	//Vector tangent1 = cross(R, aleatoire); tangent1.normalize();
-	Vector tangent1;
-	Vector absR(abs(R[0]), abs(R[1]), abs(R[2]));
-	if (absR[0] <= absR[1] && absR[0] <= absR[2]) {
-		tangent1 = Vector(0, -R[2], R[1]);
-	} else
-		if (absR[1] <= absR[0] && absR[1] <= absR[2]) {
-			tangent1 = Vector(-R[2], 0, R[0]);
-		} else
-			tangent1 = Vector(-R[1], R[0], 0);
-		tangent1.normalize();
-
-	Vector tangent2 = cross(tangent1, R);
-
-	return direction_aleatoire_repere_local[2] * R + direction_aleatoire_repere_local[0] * tangent1 + direction_aleatoire_repere_local[1] * tangent2;
-}
 
 Vector random_uniform() {
 	double r1 = uniform(engine);

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <map>
 #include "utils.h"
+#include "MERLBRDFRead.h"
 
 #define cimg_display 0
 #include "CImg.h"
@@ -36,6 +37,229 @@ public:
 	bool transp;
 	double refr_index;
 };
+
+class BRDF {
+public:
+	BRDF() {};
+	virtual void setParameters(const MaterialValues &m) = 0;
+	virtual Vector sample(const Vector& wi, const Vector& N, double &pdf) const = 0;
+	virtual Vector eval(const Vector& wi, const Vector& wo, const Vector& N) const = 0;
+};
+
+
+
+class PhongBRDF : public BRDF {
+public:
+	PhongBRDF(const Vector &Kd, const Vector &Ks, const Vector &Ne):Kd(Kd), Ks(Ks), Ne(Ne) {};
+	void setParameters(const MaterialValues &m) {
+		Kd = m.Kd;
+		Ks = m.Ks;
+		Ne = m.Ne;
+	}
+	static Vector random_Phong(const Vector &R, double phong_exponent) {
+		double r1 = uniform(engine);
+		double r2 = uniform(engine);
+		double facteur = sqrt(1 - std::pow(r2, 2. / (phong_exponent + 1)));
+		Vector direction_aleatoire_repere_local(cos(2 * M_PI*r1)*facteur, sin(2 * M_PI*r1)*facteur, std::pow(r2, 1. / (phong_exponent + 1)));
+		//Vector aleatoire(uniform(engine) - 0.5, uniform(engine) - 0.5, uniform(engine) - 0.5);
+		//Vector tangent1 = cross(R, aleatoire); tangent1.normalize();
+		Vector tangent1;
+		Vector absR(abs(R[0]), abs(R[1]), abs(R[2]));
+		if (absR[0] <= absR[1] && absR[0] <= absR[2]) {
+			tangent1 = Vector(0, -R[2], R[1]);
+		} else
+			if (absR[1] <= absR[0] && absR[1] <= absR[2]) {
+				tangent1 = Vector(-R[2], 0, R[0]);
+			} else
+				tangent1 = Vector(-R[1], R[0], 0);
+			tangent1.normalize();
+
+			Vector tangent2 = cross(tangent1, R);
+
+			return direction_aleatoire_repere_local[2] * R + direction_aleatoire_repere_local[0] * tangent1 + direction_aleatoire_repere_local[1] * tangent2;
+	}
+	Vector sample(const Vector& wo, const Vector& N, double &pdf) const {  // performs MIS Kd-Ks
+		double avgNe = (Ne[0] + Ne[1] + Ne[2]) / 3.;
+		Vector direction_aleatoire;
+		double p = 1 - (Ks[0] + Ks[1] + Ks[2]) / 3.;
+		/*if (s.objects[sphere_id]->ghost) {
+			p = std::max(0.2, p);
+		}*/
+		bool sample_diffuse;
+		Vector R = (-wo).reflect(N); // reflect takes a ray going towards a surface and reflects it outwards of it
+		if (uniform(engine) < p) {
+			sample_diffuse = true;
+			direction_aleatoire = random_cos(N);
+		} else {
+			sample_diffuse = false;
+			direction_aleatoire = random_Phong(R, avgNe);
+		}
+
+		double proba_phong = (avgNe + 1) / (2.*M_PI) * pow(dot(R, direction_aleatoire), avgNe);
+		double proba_globale = p * dot(N, direction_aleatoire) / (M_PI)+(1. - p)*proba_phong;
+		pdf = proba_globale;
+
+		return direction_aleatoire;
+
+	}
+	Vector eval(const Vector& wi, const Vector& wo, const Vector& N) const {
+		Vector reflechi = (-wo).reflect(N);
+		double d = dot(reflechi, wi);
+		if (d < 0) return Kd / M_PI;
+		Vector lobe = pow(Vector(d, d, d), Ne) * ((Ne + Vector(2., 2., 2.)) / (2.*M_PI));
+		return Kd / M_PI + lobe*Ks;
+	}
+	Vector Kd, Ks, Ne;
+};
+
+class LambertBRDF : public BRDF {
+public:
+	LambertBRDF(const Vector &Kd) :Kd(Kd) {};
+	void setParameters(const MaterialValues &m) {
+		Kd = m.Kd;
+	}
+	Vector sample(const Vector& wo, const Vector& N, double &pdf) const {  // performs MIS Kd-Ks		
+		Vector direction_aleatoire = random_cos(N);		
+		pdf = dot(N, direction_aleatoire) / (M_PI);
+		return direction_aleatoire;
+	}
+	Vector eval(const Vector& wi, const Vector& wo, const Vector& N) const {				
+		return Kd / M_PI;
+	}
+	Vector Kd;
+};
+
+
+class TitopoBRDF : public BRDF { //our internal thetai,thetao, phio format
+public:
+	TitopoBRDF(std::string filename, int Nthetai, int Nthetao, int Nphid):Nthetai(Nthetai), Nthetao(Nthetao), Nphid(Nphid){
+		data.resize(Nthetai * Nthetao * Nphid * 3);
+		FILE* f = fopen(filename.c_str(), "rb");
+		fread(&data[0], sizeof(float), Nthetai * Nthetao * Nphid * 3, f); // half
+		fclose(f);
+
+	}
+
+	void setParameters(const MaterialValues &m) {};
+	Vector sample(const Vector& wi, const Vector& N, double &pdf) const {
+		Vector d = random_cos(N);
+		pdf = dot(N, d) / (M_PI);
+		return d;
+	}
+	Vector eval(const Vector& wi, const Vector& wo, const Vector& N) const {
+
+		/*Vector sumVal(0., 0., 0.);
+		for (int i = 0; i < Nthetai*Nthetao*Nphio; i++) {
+			sumVal += Vector(&data[i * 3]);
+		}
+		std::cout << sumVal[0] << " " << sumVal[1] << " " << sumVal[2] << std::endl;*/
+
+		Vector tangent1;
+		Vector absN(abs(N[0]), abs(N[1]), abs(N[2]));
+		if (absN[0] <= absN[1] && absN[0] <= absN[2]) {
+			tangent1 = Vector(0, -N[2], N[1]);
+		} else {
+			if (absN[1] <= absN[0] && absN[1] <= absN[2]) {
+				tangent1 = Vector(-N[2], 0, N[0]);
+			} else
+				tangent1 = Vector(-N[1], N[0], 0);
+		}
+		tangent1.normalize();
+		Vector tangent2 = cross(tangent1, N);
+
+		Vector wilocal = Vector(dot(wi, tangent1), dot(wi, tangent2), dot(wi, N));
+		Vector wolocal = Vector(dot(wo, tangent1), dot(wo, tangent2), dot(wo, N));
+
+		double thetai = acos(wilocal[2]);
+		if (thetai >= M_PI / 2) return Vector(0.,0.,0.);
+		double thetao = acos(wolocal[2]);
+		if (thetao >= M_PI / 2) return Vector(0., 0., 0.);
+		double phid = atan2(wolocal[1], wolocal[0]) - atan2(wilocal[1], wilocal[0]); // in -pi..pi 
+		if (phid < 0) phid += 2 * M_PI;  // => 0..2pi
+		if (phid < 0) phid += 2 * M_PI;  // => 0..2pi
+		if (phid >= 2*M_PI) phid -= 2 * M_PI;  // => 0..2pi
+		if (phid >= 2 * M_PI) phid -= 2 * M_PI;  // => 0..2pi
+		int idthetai = (int)(thetai / (M_PI / 2.)*Nthetai);
+		int idthetao = (int)(thetao / (M_PI / 2.)*Nthetao);
+		int idphid = (int)(phid / (M_PI * 2.)*Nphid);
+		int idthetai2 = ((idthetai < Nthetai - 1) ? (idthetai + 1) : idthetai);
+		int idthetao2 = ((idthetao < Nthetao - 1) ? (idthetao + 1) : idthetao);
+		int idphid2 = ((idphid < Nphid - 1) ? (idphid + 1) : idphid);
+		double fthetai = thetai / (M_PI / 2.)*Nthetai - idthetai;
+		double fthetao = thetao / (M_PI / 2.)*Nthetao - idthetao;
+		double fphid = phid / (M_PI * 2.)*Nphid - idphid;
+		Vector val000 = Vector(&data[(idthetai*Nthetao*Nphid + idthetao * Nphid + idphid)*3]);
+		Vector val001 = Vector(&data[(idthetai*Nthetao*Nphid + idthetao * Nphid + idphid2) * 3]);
+		Vector val010 = Vector(&data[(idthetai*Nthetao*Nphid + idthetao2 * Nphid + idphid) * 3]);
+		Vector val100 = Vector(&data[(idthetai2*Nthetao*Nphid + idthetao * Nphid + idphid) * 3]);
+		Vector val101 = Vector(&data[(idthetai2*Nthetao*Nphid + idthetao * Nphid + idphid2) * 3]);
+		Vector val110 = Vector(&data[(idthetai2*Nthetao*Nphid + idthetao2 * Nphid + idphid) * 3]);
+		Vector val011 = Vector(&data[(idthetai*Nthetao*Nphid + idthetao2 * Nphid + idphid2) * 3]);
+		Vector val111 = Vector(&data[(idthetai2*Nthetao*Nphid + idthetao2 * Nphid + idphid2) * 3]);
+		Vector lerpVal = ((val000*(1. - fphid) + val001 * fphid)*(1. - fthetao) + (val010*(1. - fphid) + val011 * fphid)*fthetao) * (1. - fthetai)
+			+ ((val100*(1. - fphid) + val101 * fphid)*(1. - fthetao) + (val110*(1. - fphid) + val111 * fphid)*fthetao) * fthetai;
+		return lerpVal;
+	}
+	std::vector<float> data;
+	int Nthetai;
+	int Nthetao;
+	int Nphid;
+};
+
+class IsoMERLBRDF : public BRDF { // todo
+public:
+	IsoMERLBRDF(std::string filename) {		
+		read_brdf(filename.c_str(), data);
+	}
+
+	void setParameters(const MaterialValues &m) {};
+	Vector sample(const Vector& wi, const Vector& N, double &pdf) const {
+		Vector d = random_cos(N);
+		pdf = dot(N, d) / (M_PI);
+		return d;
+	}
+	Vector eval(const Vector& wi, const Vector& wo, const Vector& N) const {
+
+		/*Vector sumVal(0., 0., 0.);
+		for (int i = 0; i < 90*90*360/2; i++) {
+			sumVal += Vector(data[i] * RED_SCALE, data[i + BRDF_SAMPLING_RES_THETA_H * BRDF_SAMPLING_RES_THETA_D*BRDF_SAMPLING_RES_PHI_D / 2] * GREEN_SCALE, data[i + BRDF_SAMPLING_RES_THETA_H * BRDF_SAMPLING_RES_THETA_D*BRDF_SAMPLING_RES_PHI_D] * BLUE_SCALE);
+		}
+		std::cout << sumVal[0] << " " << sumVal[1] << " " << sumVal[2] << std::endl;*/
+
+		Vector tangent1;
+		Vector absN(abs(N[0]), abs(N[1]), abs(N[2]));
+		if (absN[0] <= absN[1] && absN[0] <= absN[2]) {
+			tangent1 = Vector(0, -N[2], N[1]);
+		} else {
+			if (absN[1] <= absN[0] && absN[1] <= absN[2]) {
+				tangent1 = Vector(-N[2], 0, N[0]);
+			} else
+				tangent1 = Vector(-N[1], N[0], 0);
+		}
+		tangent1.normalize();
+		Vector tangent2 = cross(tangent1, N);
+
+		Vector wilocal = Vector(dot(wi, tangent1), dot(wi, tangent2), dot(wi, N));
+		Vector wolocal = Vector(dot(wo, tangent1), dot(wo, tangent2), dot(wo, N));
+		
+
+		double thetai = acos(wilocal[2]);
+		if (thetai >= M_PI / 2) return Vector(0., 0., 0.);
+		double thetao = acos(wolocal[2]);
+		if (thetao >= M_PI / 2) return Vector(0., 0., 0.);
+		double phio = atan2(wolocal[1], wolocal[0]); // in -pi..pi 
+		if (phio < 0) phio += 2 * M_PI;  // => 0..2pi
+		double phii = atan2(wilocal[1], wilocal[0]); // in -pi..pi 
+		if (phii < 0) phii += 2 * M_PI;  // => 0..2pi
+
+		Vector result;
+		lookup_brdf_val(data, thetai, phii, thetao, phio, result[0], result[1], result[2]);
+		return result;
+
+	}
+	double* data;
+};
+
 
 class Texture {
 public:
@@ -358,8 +582,8 @@ public:
 
 class Object {
 public:
-  virtual ~Object() {};
-	Object() { scale = 1; flip_normals = false; miroir = false; ghost = false;  };
+	virtual ~Object() {};
+	Object() { scale = 1; flip_normals = false; miroir = false; ghost = false; brdf = new PhongBRDF(Vector(0, 0, 0), Vector(0, 0, 0), Vector(0.,0.,0.)); };
 	virtual bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const = 0;
 	virtual bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const = 0;
 
@@ -539,6 +763,11 @@ public:
 	}
 
 	virtual void colorAnisotropy() {
+		// see tri meshes
+	}
+
+	virtual void randomColors() {
+		// see tri meshes
 	}
 
 	virtual void save_to_file(FILE* f) {
@@ -599,11 +828,16 @@ public:
 		}
 	}
 
-	virtual void load_from_file(FILE* f) {
+	virtual void load_from_file(FILE* f, const char* replacedNames = NULL) {
 		char line[512];
 		int mybool;
 		fscanf(f, "name: %[^\n]\n", line);
 		name = std::string(line);
+
+		if (replacedNames) {
+			name.replace(name.find("#"), std::string("#").length(), std::string(replacedNames));
+		}
+
 		fscanf(f, "miroir: %u\n", &mybool); miroir = mybool;
 		fscanf(f, "%[^\n]\n", line);
 		if (line[0] == 'g') {
@@ -720,7 +954,7 @@ public:
 		}
 	}
 
-	static Object* create_from_file(FILE* f);
+	static Object* create_from_file(FILE* f, const char* replacedNames = NULL);
 
 	virtual void add_texture(const char* filename);
 	virtual void set_texture(const char* filename, int idx);
@@ -775,9 +1009,54 @@ public:
 
 	std::vector<Texture> textures, specularmap, alphamap, roughnessmap, normal_map, transparent_map, refr_index_map;
 	double trans_matrix[12], inv_trans_matrix[12], rot_matrix[9];
+	BRDF* brdf;
 };
 
 
+class Cylinder : public Object {
+public:
+	Cylinder() {};
+	Cylinder(const Vector& A, const Vector&B, double R):A(A),B(B), R(R) {
+		d = (B - A).getNormalized();
+		len = sqrt((B - A).getNorm2());
+	}
+
+	bool intersection(const Ray& r, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const {
+
+		// norm2(X*t+Y) = R^2
+		Vector X = r.direction - dot(r.direction, d)*d;
+		Vector Y = r.origin - A - dot(r.origin - A, d)*d;
+		double a = X.getNorm2();
+		double b = 2 * dot(X, Y);
+		double c = Y.getNorm2() - R*R;
+		double delta = b*b - 4 * a*c;
+		if (delta < 0) return false;
+		double sdelta = sqrt(delta);
+		double t2 = (-b + sdelta) / (2 * a);
+		if (t2 < 0) return false;
+		double t1 = (-b - sdelta) / (2 * a);
+		if (t1 > 0) t = t1; else t = t2;
+		P = r.origin + t*r.direction;
+		double dP = dot(P - A, d);
+		if (dP < 0 || dP > len) return false;
+		
+		Vector proj = A + dP*d;
+		mat = queryMaterial(0, dP/len, 0.5);
+		mat.shadingN = (P - proj).getNormalized();
+		if (flip_normals) mat.shadingN = -mat.shadingN;
+		triangle_id = -1;
+		return true;
+	}
+	bool intersection_shadow(const Ray& r, double &t, double cur_best_t, double dist_light) const {
+		Vector P;
+		MaterialValues mat;
+		int tri;
+		return intersection(r, P, t, mat, cur_best_t, tri);
+	}
+
+	Vector A, B, d;
+	double R, len;
+};
 
 
 class Sphere : public Object {
@@ -796,6 +1075,7 @@ public:
 		envmapfilename = "";
 		if (has_envmap) {
 			load_envmap(envmap_file);
+			flip_normals = true;
 		}
 		this->rotation_center = origin;
 		name = "Sphere";

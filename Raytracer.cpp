@@ -17,16 +17,6 @@
 inline double sqr(double x) { return x*x; }
 
 
-Vector Phong_BRDF(const Vector& wi, const Vector& wo, const Vector& N, const Vector& phong_exponent) {
-
-	Vector reflechi = wo.reflect(N);
-	double d = dot(reflechi, wi);
-	if (d < 0) return Vector(0., 0., 0.);
-	Vector lobe = pow(Vector(d,d,d), phong_exponent) * ((phong_exponent + Vector(2.,2.,2.)) / (2.*M_PI));
-	return lobe;
-}
-
-
 double int_exponential(double y0, double ysol, double beta, double s, double uy) {
 	double 	result = 0.1 * exp((-y0 + ysol)*beta) * (1 - exp(-s*uy*beta)) / (uy*beta);
 	return result;
@@ -43,7 +33,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 	int sphere_id, tri_id;
 	double t;
 	bool has_inter = s.intersection(r, P, sphere_id, t, mat, tri_id);
-	const Vector &N = mat.shadingN;
+	Vector N = mat.shadingN;	
 
 	/*Vector randV(uniform(engine), uniform(engine), uniform(engine));
 	Vector T1 = cross(randV, N); T1.normalize();
@@ -64,12 +54,22 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 
 	Vector intensite_pixel(0, 0, 0);
 	if (has_inter) {
-		if (no_envmap && sphere_id == 1) {
-			return Vector(0, 0, 0);
+		if (sphere_id == 1) {
+			if (no_envmap)
+				return Vector(0, 0, 0);
+			else {
+				Sphere* env = dynamic_cast<Sphere*>(s.objects[1]);
+				if (env) {
+					return s.envmap_intensity*mat.Ke;
+				}
+			}
+				
 		}
 		if (sphere_id == 0) {
 			intensite_pixel = show_lights ? (/*s.lumiere->albedo **/Vector(1.,1.,1.)* (s.intensite_lumiere / sqr(lum_scale))) : Vector(0., 0., 0.);
 		} else {
+			BRDF* brdf = s.objects[sphere_id]->brdf;
+			brdf->setParameters(mat);
 
 			intensite_pixel += mat.Ke*s.envmap_intensity;
 
@@ -141,7 +141,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 					Vector wi = (point_aleatoire - P).getNormalized();
 					double d_light2 = (point_aleatoire - P).getNorm2();
 					Vector Np = dir_aleatoire;
-					Vector kd =  mat.Kd;
+					//Vector kd =  mat.Kd;
 					Vector tr;
 					if (s.objects[sphere_id]->ghost) {
 						Vector offset;   // try to be robust here since we don't do nbrebonds-1
@@ -155,14 +155,14 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 					double t_light;
 					bool has_inter_light = s.intersection_shadow(ray_light, t_light, sqrt(d_light2), true);
 					bool direct_visible = true;
-					if ((has_inter_light) || (dot(N, wi) < 0)) {
+					if ((has_inter_light) ) {
 						intensite_pixel += Vector(0, 0, 0);
 						direct_visible = false;
 					} else {
 						//intensite_pixel = (s.intensite_lumiere / (4.*M_PI*d_light2) * std::max(0., dot(N, wi)) * dot(Np, -wi) / dot(axeOP, dir_aleatoire))*(M_PI) * ((1. - s.objects[sphere_id]->ks)*albedo/ (M_PI) + Phong_BRDF(wi, r.direction, N, s.objects[sphere_id]->phong_exponent)*s.objects[sphere_id]->ks * albedo);
-
+						if (dot(N, wi) < 0) N = -N;
 						//Vector BRDF = albedo / M_PI   * (1. - s.objects[sphere_id]->ks)   + s.objects[sphere_id]->ks*Phong_BRDF(wi, r.direction, N, s.objects[sphere_id]->phong_exponent)*albedo;
-						Vector BRDF = kd / M_PI + Phong_BRDF(wi, r.direction, N, mat.Ne)*mat.Ks;
+						Vector BRDF = brdf->eval(wi, -r.direction, N);// kd / M_PI + Phong_BRDF(wi, r.direction, N, mat.Ne)*mat.Ks;
 						double J = 1.*dot(Np, -wi) / d_light2;
 						double proba = dot(axeOP, dir_aleatoire) / (M_PI * s.lumiere->R*s.lumiere->R*lum_scale*lum_scale);
 						if (s.objects[sphere_id]->ghost) {
@@ -177,34 +177,21 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 					}
 
 					// ajout de la contribution indirecte
-					double avgNe = (mat.Ne[0] + mat.Ne[1] + mat.Ne[2]) / 3.;
-					Vector direction_aleatoire;
-					double p = 1 - (mat.Ks[0] + mat.Ks[1] + mat.Ks[2]) / 3.;
-					if (s.objects[sphere_id]->ghost) {
-						p = std::max(0.2, p);
-					}
-					bool sample_diffuse;
-					Vector R = r.direction.reflect(N);
-					if (uniform(engine) < p) {
-						sample_diffuse = true;
-						direction_aleatoire = random_cos(N);
-					} else {
-						sample_diffuse = false;
-						direction_aleatoire = random_Phong(R, avgNe);
-					}
+					double proba_globale;
+					Vector direction_aleatoire = brdf->sample(-r.direction, N, proba_globale);
 
 					if (dot(direction_aleatoire, N) < 0) return intensite_pixel;
-					if (dot(direction_aleatoire, R) < 0) return intensite_pixel;
+					if (dot(direction_aleatoire, r.direction.reflect(N)) < 0) return intensite_pixel;
 
 					Ray	rayon_aleatoire(P + 0.01*direction_aleatoire, direction_aleatoire, r.time);
 
-					double proba_phong = (avgNe + 1) / (2.*M_PI) * pow(dot(R, direction_aleatoire), avgNe);
-					double proba_globale = p * dot(N, direction_aleatoire) / (M_PI)+(1. - p)*proba_phong;
 					if (proba_globale <= 0) return intensite_pixel;
 
-					if (s.objects[sphere_id]->ghost) {
-						/*if (nbrebonds != nb_bounces)
-							return intensite_pixel;*/
+					intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false, no_envmap)  * ((dot(N, direction_aleatoire) / proba_globale)) *brdf->eval(direction_aleatoire, -r.direction, N);
+
+					/*if (s.objects[sphere_id]->ghost) {
+						//if (nbrebonds != nb_bounces)
+						//	return intensite_pixel;
 						if (sample_diffuse)
 							intensite_pixel += tr / 196964.699 / M_PI *getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false, direct_visible)  / proba_globale;
 						else
@@ -214,7 +201,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 							intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false, no_envmap) * ((dot(N, direction_aleatoire) / (M_PI) / proba_globale)) * kd;
 						else
 							intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false, no_envmap)  * ((dot(N, direction_aleatoire) / proba_globale)) *mat.Ks * Phong_BRDF(direction_aleatoire, r.direction, N, mat.Ne);
-					}
+					}*/
 					//intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, false)  * dot(N, direction_aleatoire) * Phong_BRDF(direction_aleatoire, r.direction, N, s.objects[sphere_id]->phong_exponent)*s.objects[sphere_id]->ks * albedo / proba_globale;
 				}
 		}
@@ -368,7 +355,7 @@ void Raytracer::save_scene(const char* filename) {
 }
 
 
-void Raytracer::load_scene(const char* filename) {
+void Raytracer::load_scene(const char* filename, const char* replacedNames) {
 
 	s.clear();
 	char line[255], bg[255];
@@ -411,7 +398,7 @@ void Raytracer::load_scene(const char* filename) {
 	}
 
 	for (int i = 0; i < nbo; i++) {
-		s.objects.push_back(Object::create_from_file(f));
+		s.objects.push_back(Object::create_from_file(f, replacedNames));
 	}
 
 	fscanf(f, "fog_density: %lf\n", &s.fog_density);
@@ -442,7 +429,7 @@ void Raytracer::loadScene() {
 	nb_bounces = 3;
 
 	Sphere* slum = new Sphere(Vector(10, 23, 15), 10);   //sphere light: position, rayon, albedo (qui sert à rien)
-	Sphere* s2 = new Sphere(Vector(0, 0, 0), 1000000); // envmap  
+	Sphere* s2 = new Sphere(Vector(0, 0, 0), 1000000); s2->flip_normals = true; // envmap  
 
 	Plane* plane = new Plane(Vector(0, 0, 0), Vector(0., 1., 0.));
 	plane->max_translation = Vector(0.,-27.3,0.);
@@ -566,7 +553,7 @@ void Raytracer::render_image()
 							double dx_aperture = (uniform(engine) - 0.5) * cam.aperture;
 							double dy_aperture = (uniform(engine) - 0.5) * cam.aperture;
 
-							double time = time_step / 60. + uniform(engine) / 60.;
+							double time = s.current_time + time_step / 60. + uniform(engine) / 60.;
 
 
 
@@ -641,7 +628,7 @@ void Raytracer::render_image()
 
 		std::ostringstream os;
 		//os << "testFog_" << time_step << ".bmp";
-		os << "export" << s.current_frame << ".bmp";
+		os << "exportC" << s.current_frame << ".bmp";
 		save_image(os.str().c_str(), &image[0], W, H);
 	}
 

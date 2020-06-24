@@ -30,7 +30,7 @@ public:
 	};
 	void stopRender() { stopped = true; };
 	void save_scene(const char* filename);
-	void load_scene(const char* filename);
+	void load_scene(const char* filename, const char* replacedNames = NULL);
 
 	Vector getColor(const Ray &r, const Scene &s, int nbrebonds, int screenI, int screenJ, bool show_lights = true, bool no_envmap = false);
 
