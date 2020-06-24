@@ -11,6 +11,8 @@ bool RaytracerApp::OnInit()
 {
 	int arc = wxApp::argc;
 	//wxCmdLineArgsArray argv(wxApp::argv);
+	for (int i=0; i<64; i++)
+		engine[i].seed(i*100+1);
 
 	/*Fluid fl(BBox(Vector(-10, -10, -10), Vector(10, 10, 10)), 64, 64, 64, 200000, 1000.);
 	fl.run();
@@ -248,7 +250,7 @@ bool RaytracerApp::OnInit()
 
 	wxBoxSizer * nbrays_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* nbrays_text = new wxStaticText(panelRenderer, 9999 - 1, "nb paths per pixel: ");
-	nbrays = new wxSpinCtrl(panelRenderer, NBRAYS, wxString("1000"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 10000, 1000);
+	nbrays = new wxSpinCtrl(panelRenderer, NBRAYS, wxString("100"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 10000, 100);
 	Connect(NBRAYS, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	nbrays_sizer->Add(nbrays_text, 0, wxEXPAND);
 	nbrays_sizer->Add(nbrays, 1, wxEXPAND);
@@ -413,7 +415,7 @@ bool RaytracerApp::OnInit()
 
 	wxBoxSizer * duration_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* duration_text = new wxStaticText(panelAnimation, 9999 - 1, "duration (s): ");
-	duration = new wxSpinCtrlDouble(panelAnimation, DURATION, wxString("1"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.001, 1000, 1, 0.1);
+	duration = new wxSpinCtrlDouble(panelAnimation, DURATION, wxString("1"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.001, 10000, 1, 0.1);
 	Connect(DURATION, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	duration_sizer->Add(duration_text, 0, wxEXPAND);
 	duration_sizer->Add(duration, 1, wxEXPAND);
@@ -442,9 +444,9 @@ bool RaytracerApp::OnInit()
 
 	wxBoxSizer * fluidres_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* fluidres_text = new wxStaticText(panelFluids, 9999 - 1, "Resolution: ");
-	fluidresX = new wxSpinCtrl(panelFluids, FLUIDRESX, wxString("32"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 4, 512, 32);
-	fluidresY = new wxSpinCtrl(panelFluids, FLUIDRESY, wxString("32"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 4, 512, 32);
-	fluidresZ = new wxSpinCtrl(panelFluids, FLUIDRESZ, wxString("32"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 4, 512, 32);
+	fluidresX = new wxSpinCtrl(panelFluids, FLUIDRESX, wxString("64"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 4, 512, 32);
+	fluidresY = new wxSpinCtrl(panelFluids, FLUIDRESY, wxString("64"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 4, 512, 32);
+	fluidresZ = new wxSpinCtrl(panelFluids, FLUIDRESZ, wxString("64"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 4, 512, 32);
 	Connect(FLUIDRESX, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	Connect(FLUIDRESY, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	Connect(FLUIDRESZ, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
@@ -456,7 +458,7 @@ bool RaytracerApp::OnInit()
 
 	wxBoxSizer * fluidnparticles_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* fluidnparticles_text = new wxStaticText(panelFluids, 9999 - 1, "Nb particles: ");
-	fluidnparticles = new wxSpinCtrl(panelFluids, FLUIDNPARTICLES, wxString("4000000"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 10000000, 4000000);
+	fluidnparticles = new wxSpinCtrl(panelFluids, FLUIDNPARTICLES, wxString("1000000"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 10000000, 4000000);
 	Connect(FLUIDNPARTICLES, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	fluidnparticles_sizer->Add(fluidnparticles_text, 0, wxEXPAND);
 	fluidnparticles_sizer->Add(fluidnparticles, 1, wxEXPAND);
@@ -464,7 +466,7 @@ bool RaytracerApp::OnInit()
 
 	wxBoxSizer * fluidparticlesize_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* fluidparticlesize_text = new wxStaticText(panelFluids, 9999 - 1, "Particle size: ");
-	fluidparticlesize = new wxSpinCtrlDouble(panelFluids, FLUIDPARTICLESIZE, wxString("0.05"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.01, 1, 0.05, 0.01);
+	fluidparticlesize = new wxSpinCtrlDouble(panelFluids, FLUIDPARTICLESIZE, wxString("0.16"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.01, 1, 0.05, 0.01);
 	Connect(FLUIDPARTICLESIZE, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	fluidparticlesize_sizer->Add(fluidparticlesize_text, 0, wxEXPAND);
 	fluidparticlesize_sizer->Add(fluidparticlesize, 1, wxEXPAND);
@@ -472,11 +474,29 @@ bool RaytracerApp::OnInit()
 
 	wxBoxSizer * fluidtimestep_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* fluidtimestep_text = new wxStaticText(panelFluids, 9999 - 1, "Time step: ");
-	fluidtimestep = new wxSpinCtrlDouble(panelFluids, FLUIDTIMESTEP, wxString("0.033"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.001, 2, 1./30., 0.01);
+	fluidtimestep = new wxSpinCtrlDouble(panelFluids, FLUIDTIMESTEP, wxString("0.025"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.001, 2, 1./30., 0.01);
 	Connect(FLUIDTIMESTEP, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	fluidtimestep_sizer->Add(fluidtimestep_text, 0, wxEXPAND);
 	fluidtimestep_sizer->Add(fluidtimestep, 1, wxEXPAND);
 	panelFluids_sizer->Add(fluidtimestep_sizer, 0, wxEXPAND);
+
+
+	wxBoxSizer * fluidsubsteps_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* fluidsubsteps_text = new wxStaticText(panelFluids, 9999 - 1, "Nb substeps: ");
+	fluidsubsteps = new wxSpinCtrl(panelFluids, FLUIDNSUBSTEPS, wxString("5"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 1000, 5);
+	Connect(FLUIDNSUBSTEPS, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	fluidsubsteps_sizer->Add(fluidsubsteps_text, 0, wxEXPAND);
+	fluidsubsteps_sizer->Add(fluidsubsteps, 1, wxEXPAND);
+	panelFluids_sizer->Add(fluidsubsteps_sizer, 0, wxEXPAND);
+	
+
+	wxBoxSizer *initfluid_sizer = new wxBoxSizer(wxHORIZONTAL);	
+	initfluid = new wxCheckBox(panelFluids, IS_FLUID_INIT_CHECKBOX, "Init fluid with selected mesh", wxDefaultPosition, wxDefaultSize);
+	Connect(IS_FLUID_INIT_CHECKBOX, wxEVT_CHECKBOX, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);	
+	initfluid_sizer->Add(initfluid, 1, wxEXPAND);
+	panelFluids_sizer->Add(initfluid_sizer, 0, wxEXPAND);
+
+	
 
 	addFluid = new wxButton(panelFluids, ADD_FLUID, "Add fluid", wxDefaultPosition, wxDefaultSize);
 	Connect(ADD_FLUID, wxEVT_BUTTON, wxCommandEventHandler(RenderPanel::add_fluid), NULL, renderPanel);
@@ -635,6 +655,11 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 		Fluid* f = dynamic_cast<Fluid*>(raytracer.s.objects[i]);
 		if (!f) continue;
 		f->build_bvh(raytracer_app->time_slider->GetValue(), 0, f->Nparticles);
+		f->build_grid(raytracer_app->time_slider->GetValue());
+	}
+
+	if (selected_object >=0 && selected_object< raytracer.s.objects.size() && dynamic_cast<Fluid*>(raytracer.s.objects[selected_object])) {
+		dynamic_cast<Fluid*>(raytracer.s.objects[selected_object])->radius = raytracer_app->fluidparticlesize->GetValue();
 	}
 
 
@@ -656,7 +681,8 @@ void RenderPanel::update_textures_and_render(wxCommandEvent& event) {
 void RenderPanel::add_fluid(wxCommandEvent& event) {
 	raytracer_app->renderPanel->stop_render();
 
-	Fluid* fl = new Fluid(raytracer.s, BBox(Vector(-18, -27.3, -18), Vector(18, -27.3+36, 18)), raytracer_app->fluidresX->GetValue(), raytracer_app->fluidresY->GetValue(), raytracer_app->fluidresZ->GetValue(), raytracer_app->fluidnparticles->GetValue(), 1000., raytracer_app->fluidparticlesize->GetValue(), raytracer_app->nbframesctrl->GetValue(), raytracer_app->fluidtimestep->GetValue());
+	Fluid* fl = new Fluid(raytracer.s, BBox(Vector(-18, -27.3, -18), Vector(18, -27.3+50, 18)), raytracer_app->fluidresX->GetValue(), raytracer_app->fluidresY->GetValue(), raytracer_app->fluidresZ->GetValue(), raytracer_app->fluidnparticles->GetValue(), 1000., raytracer_app->fluidparticlesize->GetValue(), raytracer_app->nbframesctrl->GetValue(), raytracer_app->fluidtimestep->GetValue(), raytracer_app->fluidsubsteps->GetValue());
+	fl->init_particles(this->raytracer_app->initfluid->GetValue(), this->raytracer_app->renderPanel->selected_object);
 	fl->run();
 	
 	raytracer.s.addObject(fl);
@@ -678,6 +704,7 @@ void RenderPanel::render_video(wxCommandEvent& event) {
 			Fluid* f = dynamic_cast<Fluid*>(raytracer.s.objects[j]);
 			if (!f) continue;
 			f->build_bvh(i, 0, f->Nparticles);
+			f->build_grid(i);
 		}
 
 		raytracer.render_image();

@@ -54,6 +54,8 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 
 	Vector intensite_pixel(0, 0, 0);
 	if (has_inter) {
+		int threadid = omp_get_thread_num();
+
 		if (sphere_id == 1) {
 			if (no_envmap)
 				return Vector(0, 0, 0);
@@ -62,13 +64,12 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 				if (env) {
 					return s.envmap_intensity*mat.Ke;
 				}
-			}
-				
+			}				
 		}
 		if (sphere_id == 0) {
 			intensite_pixel = show_lights ? (/*s.lumiere->albedo **/Vector(1.,1.,1.)* (s.intensite_lumiere / sqr(lum_scale))) : Vector(0., 0., 0.);
 		} else {
-			BRDF* brdf = s.objects[sphere_id]->brdf;
+			BRDF* brdf = s.objects[sphere_id]->brdf->clone();  // thread safety issues if not cloned
 			brdf->setParameters(mat);
 
 			intensite_pixel += mat.Ke*s.envmap_intensity;
@@ -106,7 +107,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 							R = R0 + (1 - R0)*std::pow(1 - dot(direction_refracte, N), 5);
 						}
 
-						if (uniform(engine) < R) {
+						if (uniform(engine[threadid]) < R) {
 							new_ray = Ray(P + 0.001*normale_pour_transparence, r.direction.reflect(N), r.time);
 						} else {
 							new_ray = Ray(P - 0.001*normale_pour_transparence, direction_refracte, r.time);
@@ -180,12 +181,13 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 					double proba_globale;
 					Vector direction_aleatoire = brdf->sample(-r.direction, N, proba_globale);
 
-					if (dot(direction_aleatoire, N) < 0) return intensite_pixel;
-					if (dot(direction_aleatoire, r.direction.reflect(N)) < 0) return intensite_pixel;
+					if (dot(direction_aleatoire, N) < 0 || dot(direction_aleatoire, r.direction.reflect(N)) < 0 || proba_globale <= 0) {
+						delete brdf;
+						return intensite_pixel;
+					}
+
 
 					Ray	rayon_aleatoire(P + 0.01*direction_aleatoire, direction_aleatoire, r.time);
-
-					if (proba_globale <= 0) return intensite_pixel;
 
 					intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, screenI, screenJ, false, no_envmap)  * ((dot(N, direction_aleatoire) / proba_globale)) *brdf->eval(direction_aleatoire, -r.direction, N);
 
@@ -204,6 +206,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 					}*/
 					//intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, false)  * dot(N, direction_aleatoire) * Phong_BRDF(direction_aleatoire, r.direction, N, s.objects[sphere_id]->phong_exponent)*s.objects[sphere_id]->ks * albedo / proba_globale;
 				}
+				delete brdf;
 		}
 	}
 	if (s.fog_density==0)
@@ -225,17 +228,17 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 	}
 	double T = exp(-int_ext);
 
-
+	int threadid = omp_get_thread_num();
 	double proba_t, random_t;
 	double clamped_t = std::min(1000., t);
 	if (uniform_sampling_ray) {		
-		random_t = uniform(engine)*clamped_t;
+		random_t = uniform(engine[threadid])*clamped_t;
 		proba_t = 1. / clamped_t;
 	} else {
 		double alpha = 5. / clamped_t;
 
 		do {
-			random_t = -log(uniform(engine)) / alpha;
+			random_t = -log(uniform(engine[threadid])) / alpha;
 		} while (random_t > clamped_t);
 
 		double normalization = 1. / alpha * (1 - exp(-alpha*clamped_t));
@@ -258,7 +261,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 	Vector point_aleatoire;
 	Vector axeOP = (random_P - centerLight).getNormalized();
 	bool is_uniform;
-	if (uniform(engine) < p_uniform) {
+	if (uniform(engine[threadid]) < p_uniform) {
 		random_dir = random_uniform();				
 		is_uniform = true;
 	} else {		
@@ -414,8 +417,8 @@ void Raytracer::loadScene() {
 	//W = 1000;
 	//H = 1200;
 #ifdef _DEBUG
-	W = 100;
-	H = 80;
+	W = 320;
+	H = 400;
 #else
 	W = 1000;
 	H = 800;
@@ -487,6 +490,9 @@ void Raytracer::render_image()
 	std::fill(sample_count.begin(), sample_count.end(), 0);
 	std::fill(imagedouble_lowres.begin(), imagedouble_lowres.end(), 0);
 
+	for (int i = 0; i < omp_get_max_threads(); i++) {
+		engine[i] = std::default_random_engine(i);
+	}
 	
 	//static int nbcalls = 0;
 	std::vector<std::pair<int, int> > permut(64);
@@ -544,16 +550,17 @@ void Raytracer::render_image()
 					}
 #pragma omp parallel for schedule(dynamic, 2)
 					for (int i = i1; i < H; i += 8) {
+						int threadid = omp_get_thread_num();
 
 						for (int j = j1; j < W; j += 8) {
 
-							double dx = uniform(engine) - 0.5;
-							double dy = uniform(engine) - 0.5;
+							double dx = uniform(engine[threadid]) - 0.5;
+							double dy = uniform(engine[threadid]) - 0.5;
 
-							double dx_aperture = (uniform(engine) - 0.5) * cam.aperture;
-							double dy_aperture = (uniform(engine) - 0.5) * cam.aperture;
+							double dx_aperture = (uniform(engine[threadid]) - 0.5) * cam.aperture;
+							double dy_aperture = (uniform(engine[threadid]) - 0.5) * cam.aperture;
 
-							double time = s.current_time + time_step / 60. + uniform(engine) / 60.;
+							double time = s.current_time + time_step / 60. + uniform(engine[threadid]) / 60.;
 
 
 
@@ -628,7 +635,7 @@ void Raytracer::render_image()
 
 		std::ostringstream os;
 		//os << "testFog_" << time_step << ".bmp";
-		os << "exportC" << s.current_frame << ".bmp";
+		os << "exportD" << s.current_frame << ".bmp";
 		save_image(os.str().c_str(), &image[0], W, H);
 	}
 
