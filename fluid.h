@@ -872,7 +872,7 @@ public:
 		addforces();
 		conjGrad();
 		pressure_update();
-		extrapolateVel2();
+		//extrapolateVel2();
 		//extrapolateVel();
 		
 		moveparticles(visualparticlesnew, visualparticles);
