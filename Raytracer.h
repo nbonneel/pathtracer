@@ -16,7 +16,7 @@ public:
 	};
 	void loadScene();
 	void render_image();
-	void clear_image() { load_scene
+	void clear_image() { 
 
 		image.resize(W*H * 3, 0);
 		imagedouble.resize(W*H * 3, 0.);
