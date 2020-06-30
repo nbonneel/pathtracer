@@ -1993,9 +1993,11 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 					return true;
 				}
 				if (filenames[n].Lower().find(".titopoh") != std::string::npos) {
-					m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf = new TitopoBRDF(filenames[n].ToStdString(),45,45,180);
+					for (int i = 0; i < omp_get_max_threads(); i++)
+						m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf[i] = new TitopoBRDF(filenames[n].ToStdString(), 45, 45, 180);
 				} else {
-					m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf = new TitopoBRDF(filenames[n].ToStdString(),90,90,360);
+					for (int i = 0; i < omp_get_max_threads(); i++)
+						m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf[i] = new TitopoBRDF(filenames[n].ToStdString(), 90, 90, 360);
 				}
 				continue;
 			}
@@ -2004,7 +2006,8 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 					wxMessageBox("No object was selected to apply the BRDF to", "Error", wxOK);
 					return true;
 				}
-				m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf = new IsoMERLBRDF(filenames[n].ToStdString());
+				for (int i = 0; i < omp_get_max_threads(); i++)
+					m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf[i] = new IsoMERLBRDF(filenames[n].ToStdString());
 				continue;
 			}
 		}		

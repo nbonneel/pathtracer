@@ -44,6 +44,7 @@ class BRDF {
 public:
 	BRDF() {};
 	virtual BRDF* clone() = 0;
+	virtual ~BRDF() {};
 	virtual void setParameters(const MaterialValues &m) = 0;
 	virtual Vector sample(const Vector& wi, const Vector& N, double &pdf) const = 0;
 	virtual Vector eval(const Vector& wi, const Vector& wo, const Vector& N) const = 0;
@@ -212,7 +213,7 @@ public:
 		Vector val111 = Vector(&data[(idthetai2*Nthetao*Nphid + idthetao2 * Nphid + idphid2) * 3]);
 		Vector lerpVal = ((val000*(1. - fphid) + val001 * fphid)*(1. - fthetao) + (val010*(1. - fphid) + val011 * fphid)*fthetao) * (1. - fthetai)
 			+ ((val100*(1. - fphid) + val101 * fphid)*(1. - fthetao) + (val110*(1. - fphid) + val111 * fphid)*fthetao) * fthetai;
-		return lerpVal;
+		return lerpVal /*/ Vector(1.0, 1.15, 1.66)*/;
 	}
 	std::vector<float> data;
 	int Nthetai;
@@ -600,7 +601,14 @@ public:
 class Object {
 public:
 	virtual ~Object() {};
-	Object() { scale = 1; flip_normals = false; miroir = false; ghost = false; brdf = new PhongBRDF(Vector(0, 0, 0), Vector(0, 0, 0), Vector(0.,0.,0.)); };
+	Object() { 
+		scale = 1; 
+		flip_normals = false; 
+		miroir = false; 
+		ghost = false; 
+		for (int i=0; i<omp_get_max_threads(); i++)
+			brdf[i] = new PhongBRDF(Vector(0, 0, 0), Vector(0, 0, 0), Vector(0., 0., 0.));
+	};
 	virtual bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const = 0;
 	virtual bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const = 0;
 
@@ -1026,7 +1034,7 @@ public:
 
 	std::vector<Texture> textures, specularmap, alphamap, roughnessmap, normal_map, transparent_map, refr_index_map;
 	double trans_matrix[12], inv_trans_matrix[12], rot_matrix[9];
-	BRDF* brdf;
+	BRDF* brdf[128];
 };
 
 
