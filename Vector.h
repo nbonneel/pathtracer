@@ -395,6 +395,11 @@ public:
 		lenticular_nb_images = 10;
 		lenticular_pixel_width = 1;
 		is_lenticular = false;
+		isArray = false;
+		current_viewX = 0; 
+		current_viewY = 0; 
+		nbviewX = 1;
+		nbviewY = 1;
 	};
 
 	void translate(const Vector& translation, double time) {
@@ -493,6 +498,8 @@ public:
 	double lenticular_max_angle;
 	int lenticular_nb_images, lenticular_pixel_width;
 	bool is_lenticular;
+	int current_viewX, current_viewY, nbviewX, nbviewY;
+	bool isArray;
 
 private:
 	Vector initial_position, initial_direction, initial_up;

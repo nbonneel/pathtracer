@@ -394,6 +394,34 @@ bool RaytracerApp::OnInit()
 	maxangle_sizer->Add(maxangle_slider, 1, wxEXPAND);
 	panelLenticular_sizer->Add(maxangle_sizer, 0, wxEXPAND);
 
+
+	isArrayCheck = new wxCheckBox(panelLenticular, IS_ARRAY_CHECKBOX, "Camera Array", wxDefaultPosition, wxDefaultSize);
+	Connect(IS_ARRAY_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	panelLenticular_sizer->Add(isArrayCheck, 0, wxEXPAND);
+
+	wxBoxSizer * nbviewsXY_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* nbviewsXY_text = new wxStaticText(panelLenticular, 9999 - 1, "nb views x, y: ");
+	nbviewsX = new wxSpinCtrl(panelLenticular, NBVIEWSX, wxString("1"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 1000, 1);
+	Connect(NBVIEWSX, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	nbviewsY = new wxSpinCtrl(panelLenticular, NBVIEWSY, wxString("1"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 1000, 1);
+	Connect(NBVIEWSX, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	nbviewsXY_sizer->Add(nbviewsXY_text, 0, wxEXPAND);
+	nbviewsXY_sizer->Add(nbviewsX, 1, wxEXPAND);
+	nbviewsXY_sizer->Add(nbviewsY, 1, wxEXPAND);
+	panelLenticular_sizer->Add(nbviewsXY_sizer, 0, wxEXPAND);
+
+	wxBoxSizer * spacing_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* spacing_text = new wxStaticText(panelLenticular, 9999 - 1, "Max distance x, y: ");
+	maxspacingX = new wxSpinCtrlDouble(panelLenticular, MAXSPACINGX, wxString("3.0"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.01, 200, 1.0, 0.1);
+	Connect(MAXSPACINGX, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	maxspacingY = new wxSpinCtrlDouble(panelLenticular, MAXSPACINGY, wxString("3.0"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0.01, 200, 1.0, 0.1);
+	Connect(MAXSPACINGY, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	spacing_sizer->Add(spacing_text, 0, wxEXPAND);
+	spacing_sizer->Add(maxspacingX, 1, wxEXPAND);
+	spacing_sizer->Add(maxspacingY, 1, wxEXPAND);
+	panelLenticular_sizer->Add(spacing_sizer, 0, wxEXPAND);
+
+
 	panelLenticular->SetSizer(panelLenticular_sizer);
 	m_bookCtrl->AddPage(panelLenticular, wxT("Lenticular"), false);
 
@@ -695,6 +723,7 @@ void RenderPanel::render_video(wxCommandEvent& event) {
 	PerfChrono perf;
 	perf.Start();
 	raytracer.stopped = false;
+
 	for (int i = 0; i < raytracer.s.nbframes; i++) {
 		raytracer.clear_image();
 		raytracer.s.current_frame = i;
@@ -707,7 +736,32 @@ void RenderPanel::render_video(wxCommandEvent& event) {
 			f->build_grid(i);
 		}
 
-		raytracer.render_image();
+		if (raytracer_app->isArrayCheck->GetValue()) {
+			raytracer.cam.nbviewX = raytracer_app->nbviewsX->GetValue();
+			raytracer.cam.nbviewY = raytracer_app->nbviewsY->GetValue();
+			Vector pos = raytracer.cam.position;
+			Vector right = cross(raytracer.cam.direction, raytracer.cam.up);
+			double dx = raytracer_app->maxspacingX->GetValue() / raytracer_app->nbviewsX->GetValue();
+			double dy = raytracer_app->maxspacingY->GetValue() / raytracer_app->nbviewsY->GetValue();
+			raytracer.cam.isArray = true;
+			for (int j = 0; j < raytracer_app->nbviewsY->GetValue(); j++) {
+				for (int k = 0; k < raytracer_app->nbviewsX->GetValue(); k++) {
+					raytracer.cam.current_viewX = k;
+					raytracer.cam.current_viewY = j;
+
+					raytracer.cam.position = pos + (k - raytracer.cam.nbviewX / 2)*dx * right + (-j+ raytracer.cam.nbviewY / 2)*dy * raytracer.cam.up;
+					raytracer.clear_image();
+					raytracer.render_image();
+				}
+			}
+			raytracer.cam.position = pos;
+		}
+		else {
+			raytracer.cam.isArray = false;
+			raytracer.render_image();
+		}
+
+		
 	}
 	raytracer.stopped = true;
 	start_render();
