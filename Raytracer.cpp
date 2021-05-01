@@ -69,7 +69,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 		if (sphere_id == 0) {
 			intensite_pixel = show_lights ? (/*s.lumiere->albedo **/Vector(1.,1.,1.)* (s.intensite_lumiere / sqr(lum_scale))) : Vector(0., 0., 0.);
 		} else {
-			BRDF* brdf = s.objects[sphere_id]->brdf->clone();  // thread safety issues if not cloned
+			BRDF* brdf = s.objects[sphere_id]->brdf[threadid]; 
 			brdf->setParameters(mat);
 
 			intensite_pixel += mat.Ke*s.envmap_intensity;
@@ -182,7 +182,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 					Vector direction_aleatoire = brdf->sample(-r.direction, N, proba_globale);
 
 					if (dot(direction_aleatoire, N) < 0 || dot(direction_aleatoire, r.direction.reflect(N)) < 0 || proba_globale <= 0) {
-						delete brdf;
+						//delete brdf;
 						return intensite_pixel;
 					}
 
@@ -206,7 +206,7 @@ Vector Raytracer::getColor(const Ray &r, const Scene &s, int nbrebonds, int scre
 					}*/
 					//intensite_pixel += getColor(rayon_aleatoire, s, nbrebonds - 1, false)  * dot(N, direction_aleatoire) * Phong_BRDF(direction_aleatoire, r.direction, N, s.objects[sphere_id]->phong_exponent)*s.objects[sphere_id]->ks * albedo / proba_globale;
 				}
-				delete brdf;
+				//delete brdf;
 		}
 	}
 	if (s.fog_density==0)

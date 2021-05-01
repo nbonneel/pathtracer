@@ -94,7 +94,8 @@ public:
 		velZ.resize(Nx*Ny*(Nz + 1), 0.);
 		pressure.resize(Nx*Ny*Nz, 0.);
 		celltypes.resize(Nx*Ny*Nz, 0);
-		this->brdf = new LambertBRDF(Vector(0.5, 0.6, 0.9));
+		for (int i = 0; i < omp_get_max_threads(); i++)
+			this->brdf[i] = new LambertBRDF(Vector(0.5, 0.6, 0.9));
 		opaque = true;
 
 		newVelX.resize((Nx + 1)*Ny*Nz, 0.);
@@ -872,7 +873,7 @@ public:
 		addforces();
 		conjGrad();
 		pressure_update();
-		extrapolateVel2();
+		//extrapolateVel2();
 		//extrapolateVel();
 		
 		moveparticles(visualparticlesnew, visualparticles);

@@ -22,7 +22,7 @@
     <ProjectGuid>{919DB086-6B26-423A-95FC-E83A12C64EEF}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>Raytracer</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -113,7 +113,7 @@
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
-      <OpenMPSupport>true</OpenMPSupport>
+      <OpenMPSupport>false</OpenMPSupport>
       <AdditionalIncludeDirectories>C:\SharedLibs\wxWidgets-3.1.2\include;C:\SharedLibs\wxWidgets-3.1.2\include\msvc</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -164,7 +164,7 @@
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalIncludeDirectories>D:\Programmation\wxWidgets-3.1.0\include;D:\Programmation\wxWidgets-3.1.0\include\msvc</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\SharedLibs\wxWidgets-3.1.2\include;C:\SharedLibs\wxWidgets-3.1.2\include\msvc</AdditionalIncludeDirectories>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <OmitFramePointers>true</OmitFramePointers>
@@ -181,7 +181,7 @@
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <StackReserveSize>10000000</StackReserveSize>
       <StackCommitSize>10000000</StackCommitSize>
-      <AdditionalLibraryDirectories>D:\Programmation\wxWidgets-3.1.0\lib\vc_x64_lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\SharedLibs\wxWidgets-3.1.2\lib\vc_x64_lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>wxmsw31u_core.lib;wxbase31u.lib;wxtiff.lib;wxjpeg.lib;wxpng.lib;wxzlib.lib;wxregexu.lib;wxexpat.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
