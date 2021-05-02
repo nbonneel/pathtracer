@@ -636,7 +636,7 @@ void Raytracer::render_image()
 		std::ostringstream os;
 		//os << "testFog_" << time_step << ".bmp";
 		if (cam.isArray) {
-			os << "exportD" << s.current_frame <<"_"<<cam.current_viewX<<"_"<< cam.nbviewX<<"_" << cam.current_viewY << "_" << cam.nbviewY << "_"<< ".jpg";
+			os << "exportD" << s.current_frame <<"_"<<cam.current_viewX<<"_"<< cam.nbviewX<<"_" << cam.current_viewY << "_" << cam.nbviewY << ".jpg";
 		} else {
 			os << "exportD" << s.current_frame << ".jpg";
 		}
