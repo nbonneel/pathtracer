@@ -14,6 +14,13 @@
 
 #include <omp.h>
 
+#define USE_EMBREE
+
+#ifdef USE_EMBREE
+#include "embree3/rtcore.h"
+
+#endif
+
 #ifdef min
 #undef min
 #endif
@@ -21,8 +28,11 @@
 #undef max
 #endif
 
+enum ObjectType {OT_TRIMESH, OT_SPHERE, OT_PLANE, OT_POINTSET, OT_CYLINDER, OT_YARNS, OT_FLUID};
 
 void load_bmp(const char* filename, std::vector<unsigned char> &tex, int &W, int& H);
+
+class Scene;
 
 class PointSet;
 
@@ -43,30 +53,23 @@ public:
 class BRDF {
 public:
 	BRDF() {};
-	virtual BRDF* clone() = 0;
-	virtual ~BRDF() {};
-	virtual void setParameters(const MaterialValues &m) = 0;
-	virtual Vector sample(const Vector& wi, const Vector& N, double &pdf) const = 0;
-	virtual Vector eval(const Vector& wi, const Vector& wo, const Vector& N) const = 0;
+	virtual Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, double &pdf, double r1, double r2) const = 0;
+	virtual Vector eval(const MaterialValues& mat, const Vector& wi, const Vector& wo, const Vector& N) const = 0;
+
+	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, double &pdf) const {  // performs MIS Kd-Ks
+		int threadid = omp_get_thread_num();
+		double invmax = 1.f / engine[threadid].max();
+		return sample(mat, wo, N, pdf, engine[threadid]()*invmax, engine[threadid]()*invmax);
+	}
 };
 
 
 
 class PhongBRDF : public BRDF {
 public:
-	PhongBRDF(const Vector &Kd, const Vector &Ks, const Vector &Ne):Kd(Kd), Ks(Ks), Ne(Ne) {};
-	void setParameters(const MaterialValues &m) {
-		Kd = m.Kd;
-		Ks = m.Ks;
-		Ne = m.Ne;
-	}
-	virtual PhongBRDF* clone() {
-		return new PhongBRDF(*this);
-	}
-	static Vector random_Phong(const Vector &R, double phong_exponent) {
-		int threadid = omp_get_thread_num();
-		double r1 = uniform(engine[threadid]);
-		double r2 = uniform(engine[threadid]);
+	PhongBRDF(){};
+
+	static Vector random_Phong(const Vector &R, double phong_exponent, double r1, double r2) {
 		double facteur = sqrt(1 - std::pow(r2, 2. / (phong_exponent + 1)));
 		Vector direction_aleatoire_repere_local(cos(2 * M_PI*r1)*facteur, sin(2 * M_PI*r1)*facteur, std::pow(r2, 1. / (phong_exponent + 1)));
 		//Vector aleatoire(uniform(engine) - 0.5, uniform(engine) - 0.5, uniform(engine) - 0.5);
@@ -86,22 +89,23 @@ public:
 
 			return direction_aleatoire_repere_local[2] * R + direction_aleatoire_repere_local[0] * tangent1 + direction_aleatoire_repere_local[1] * tangent2;
 	}
-	Vector sample(const Vector& wo, const Vector& N, double &pdf) const {  // performs MIS Kd-Ks
+
+	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, double &pdf, double r1, double r2) const {  // performs MIS Kd-Ks
 		int threadid = omp_get_thread_num();
-		double avgNe = (Ne[0] + Ne[1] + Ne[2]) / 3.;
+		double avgNe = (mat.Ne[0] + mat.Ne[1] + mat.Ne[2]) / 3.;
 		Vector direction_aleatoire;
-		double p = 1 - (Ks[0] + Ks[1] + Ks[2]) / 3.;
+		double p = 1 - (mat.Ks[0] + mat.Ks[1] + mat.Ks[2]) / 3.;
 		/*if (s.objects[sphere_id]->ghost) {
 			p = std::max(0.2, p);
 		}*/
 		bool sample_diffuse;
 		Vector R = (-wo).reflect(N); // reflect takes a ray going towards a surface and reflects it outwards of it
-		if (uniform(engine[threadid]) < p) {
+		if (engine[threadid]() / (double)engine[threadid].max() < p) {
 			sample_diffuse = true;
-			direction_aleatoire = random_cos(N);
+			direction_aleatoire = random_cos(N, r1, r2);
 		} else {
 			sample_diffuse = false;
-			direction_aleatoire = random_Phong(R, avgNe);
+			direction_aleatoire = random_Phong(R, avgNe, r1, r2);
 		}
 
 		double proba_phong = (avgNe + 1) / (2.*M_PI) * pow(dot(R, direction_aleatoire), avgNe);
@@ -109,34 +113,28 @@ public:
 		pdf = proba_globale;
 
 		return direction_aleatoire;
-
 	}
-	Vector eval(const Vector& wi, const Vector& wo, const Vector& N) const {
+
+	Vector eval(const MaterialValues& mat, const Vector& wi, const Vector& wo, const Vector& N) const {
 		Vector reflechi = (-wo).reflect(N);
 		double d = dot(reflechi, wi);
-		if (d < 0) return Kd / M_PI;
-		Vector lobe = pow(Vector(d, d, d), Ne) * ((Ne + Vector(2., 2., 2.)) / (2.*M_PI));
-		return Kd / M_PI + lobe*Ks;
+		if (d < 0) return mat.Kd / M_PI;
+		Vector lobe = pow(Vector(d, d, d), mat.Ne) * ((mat.Ne + Vector(2., 2., 2.)) / (2.*M_PI));
+		return mat.Kd / M_PI + lobe* mat.Ks;
 	}
-	Vector Kd, Ks, Ne;
 };
 
 class LambertBRDF : public BRDF {
 public:
-	LambertBRDF(const Vector &Kd) :Kd(Kd) {};
-	void setParameters(const MaterialValues &m) {
-		Kd = m.Kd;
-	}
-	virtual LambertBRDF* clone() {
-		return new LambertBRDF(*this);
-	}
-	Vector sample(const Vector& wo, const Vector& N, double &pdf) const {  // performs MIS Kd-Ks		
-		Vector direction_aleatoire = random_cos(N);		
+	LambertBRDF() {};
+
+	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, double &pdf, double r1, double r2) const {  // performs MIS Kd-Ks		
+		Vector direction_aleatoire = random_cos(N, r1, r2);		
 		pdf = dot(N, direction_aleatoire) / (M_PI);
 		return direction_aleatoire;
 	}
-	Vector eval(const Vector& wi, const Vector& wo, const Vector& N) const {				
-		return Kd / M_PI;
+	Vector eval(const MaterialValues& mat, const Vector& wi, const Vector& wo, const Vector& N) const {
+		return mat.Kd / M_PI;
 	}
 	Vector Kd;
 };
@@ -152,16 +150,12 @@ public:
 
 	}
 
-	void setParameters(const MaterialValues &m) {};
-	virtual TitopoBRDF* clone() {
-		return new TitopoBRDF(*this);
-	}
-	Vector sample(const Vector& wi, const Vector& N, double &pdf) const {
-		Vector d = random_cos(N);
+	Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, double &pdf, double r1, double r2) const {
+		Vector d = random_cos(N, r1, r2);
 		pdf = dot(N, d) / (M_PI);
 		return d;
 	}
-	Vector eval(const Vector& wi, const Vector& wo, const Vector& N) const {
+	Vector eval(const MaterialValues& mat, const Vector& wi, const Vector& wo, const Vector& N) const {
 
 		/*Vector sumVal(0., 0., 0.);
 		for (int i = 0; i < Nthetai*Nthetao*Nphio; i++) {
@@ -226,16 +220,13 @@ public:
 	IsoMERLBRDF(std::string filename) {		
 		read_brdf(filename.c_str(), data);
 	}
-	virtual IsoMERLBRDF* clone() {
-		return new IsoMERLBRDF(*this);
-	}
 	void setParameters(const MaterialValues &m) {};
-	Vector sample(const Vector& wi, const Vector& N, double &pdf) const {
-		Vector d = random_cos(N);
+	Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, double &pdf, double r1, double r2) const {
+		Vector d = random_cos(N, r1, r2);
 		pdf = dot(N, d) / (M_PI);
 		return d;
 	}
-	Vector eval(const Vector& wi, const Vector& wo, const Vector& N) const {
+	Vector eval(const MaterialValues& mat, const Vector& wi, const Vector& wo, const Vector& N) const {
 
 		/*Vector sumVal(0., 0., 0.);
 		for (int i = 0; i < 90*90*360/2; i++) {
@@ -606,8 +597,8 @@ public:
 		flip_normals = false; 
 		miroir = false; 
 		ghost = false; 
-		for (int i=0; i<omp_get_max_threads(); i++)
-			brdf[i] = new PhongBRDF(Vector(0, 0, 0), Vector(0, 0, 0), Vector(0., 0., 0.));
+		scene = NULL;
+		brdf = new PhongBRDF();
 	};
 	virtual bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const = 0;
 	virtual bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const = 0;
@@ -751,6 +742,7 @@ public:
 		v2[2] = inv_trans_matrix[8] * v[0] + inv_trans_matrix[9] * v[1] + inv_trans_matrix[10] * v[2];
 		return v2;
 	}
+
 
 	MaterialValues queryMaterial(int idx, double u, double v) const {
 		
@@ -979,7 +971,7 @@ public:
 		}
 	}
 
-	static Object* create_from_file(FILE* f, const char* replacedNames = NULL);
+	static Object* create_from_file(FILE* f, Scene* s, const char* replacedNames = NULL);
 
 	virtual void add_texture(const char* filename);
 	virtual void set_texture(const char* filename, int idx);
@@ -1031,19 +1023,22 @@ public:
 	Vector rotation_center;
 	double scale;
 	bool display_edges, interp_normals, flip_normals, ghost;
+	ObjectType type;
 
 	std::vector<Texture> textures, specularmap, alphamap, roughnessmap, normal_map, transparent_map, refr_index_map;
 	double trans_matrix[12], inv_trans_matrix[12], rot_matrix[9];
-	BRDF* brdf[128];
+	BRDF* brdf;
+	Scene* scene;
 };
 
 
 class Cylinder : public Object {
 public:
-	Cylinder() {};
+	Cylinder() { type = OT_CYLINDER; };
 	Cylinder(const Vector& A, const Vector&B, double R):A(A),B(B), R(R) {
 		d = (B - A).getNormalized();
 		len = sqrt((B - A).getNorm2());
+		type = OT_CYLINDER;
 	}
 
 	bool intersection(const Ray& r, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const {
@@ -1067,7 +1062,7 @@ public:
 		
 		Vector proj = A + dP*d;
 		mat = queryMaterial(0, dP/len, 0.5);
-		mat.shadingN = (P - proj).getNormalized();
+		mat.shadingN = (P - proj); // .getNormalized();
 		if (flip_normals) mat.shadingN = -mat.shadingN;
 		triangle_id = -1;
 		return true;
@@ -1086,12 +1081,13 @@ public:
 
 class Sphere : public Object {
 public:
-	Sphere() {};
+	Sphere() { type = OT_SPHERE; };
 	Sphere(const Vector &origin, double rayon, bool mirror = false, bool normal_swapped = false, const char* envmap_file = NULL) {
 		init(origin, rayon, mirror, normal_swapped, envmap_file);
 	};
 
 	void init(const Vector &origin, double rayon, bool mirror = false, bool normal_swapped = false, const char* envmap_file = NULL) {
+		type = OT_SPHERE;
 		O = origin;
 		R = rayon;
 		miroir = mirror;
@@ -1152,23 +1148,39 @@ public:
 	}
 
 	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const {
+		/*if (has_envmap) {
+			P = d.origin + R * d.direction;
+			Vector N = d.direction;
+			double theta = 1 - acos(N[1]) / M_PI;
+			double phi = (atan2(-N[2], N[0]) + M_PI) / (2.*M_PI);
+			mat = queryMaterial(0, theta, phi);
+			mat.shadingN = N;
+			int idx = (int)(theta*(envH - 1.))*envW + (int)(phi*(envW - 1.));
+			if (idx < 0 || idx >= envW * envH) mat.Ke = Vector(0., 0., 0.); else
+				mat.Ke = Vector(envtex[idx * 3 + 0], envtex[idx * 3 + 1], envtex[idx * 3 + 2]) / 255. *100000.;
+
+			if (flip_normals) mat.shadingN = -mat.shadingN;
+			triangle_id = -1;
+			return true;
+		}*/
+		
 		//if (!bbox.intersection(d)) return false;
 
 		// resout a*t^2 + b*t + c = 0
-		double a = d.direction.getNorm2();
-		double b = 2 * dot(d.direction, d.origin - O);
+		double a =  d.direction.getNorm2(); // can't suppose unit norm as objects are scaled by scaling ray length
+		double b =  dot(d.direction, d.origin - O);
 		double c = (d.origin - O).getNorm2() - R*R;
 
-		double delta = b*b - 4 * a*c;
+		double delta = b*b - a*c;
 		if (delta < 0) return false;
 		
 		double sqDelta = sqrt(delta);
-		double inv2a = 1. / (2. * a);
-		double t2 = (-b + sqDelta) * inv2a;
+		double inva = 1. / a;		
+		double t2 = (-b + sqDelta)*inva;
 
 		if (t2 < 0) return false;
-
-		double t1 = (-b - sqDelta) * inv2a;
+		
+		double t1 = (-b - sqDelta)*inva;
 
 		if (t1 > 0)
 			t = t1;
@@ -1176,20 +1188,33 @@ public:
 			t = t2;
 
 		P = d.origin + t*d.direction;
-		Vector N = (P - O).getNormalized();
+		Vector N = (P - O);
 
-		double theta = 1 - acos(N[1]) / M_PI;
-		double phi = (atan2(-N[2], N[0]) + M_PI) / (2.*M_PI);
-		mat = queryMaterial(0, theta, phi);
+		if (has_envmap) {
+			//P = d.origin + R * d.direction;
+			//Vector N = d.direction;
+			N.fast_normalize();
+			double theta = 1 - acos(N[1]) / M_PI;
+			double phi = (atan2(-N[2], N[0]) + M_PI) / (2.*M_PI);
+			mat = queryMaterial(0, theta, phi);
+			mat.shadingN = -N;
+			int idx = 3*((int)(theta*(envH - 1.))*envW + (int)(phi*(envW - 1.)));
+			if (idx < 0 || idx >= 3*envW * envH) mat.Ke = Vector(0., 0., 0.); else
+				mat.Ke = Vector(envtex[idx + 0], envtex[idx + 1], envtex[idx + 2]) / 255. *100000.;
+			//if (flip_normals) mat.shadingN = -mat.shadingN;
+			triangle_id = -1;
+			return true;
+		}
+
+		if (textures.size() != 0 || specularmap.size() != 0 || roughnessmap.size() != 0 || transparent_map.size() != 0 || refr_index_map.size() != 0) {
+			N.fast_normalize();
+			double theta = 1 - acos(N[1]) / M_PI;
+			double phi = (atan2(-N[2], N[0]) + M_PI) / (2.*M_PI);
+			mat = queryMaterial(0, theta, phi);
+		}
 
 		mat.shadingN = N;
-		if (has_envmap) {
-			int idx = (int)(theta*(envH-1.))*envW + (int)(phi*(envW-1.));		
-			if (idx<0 || idx>=envW*envH) mat.Ke = Vector(0., 0., 0.); else
-			mat.Ke = Vector(envtex[idx*3+0], envtex[idx * 3 + 1], envtex[idx * 3 + 2])/255. *100000.;
-		} else {
-			mat.Ke = Vector(0.,0.,0.);
-		}
+		mat.Ke = Vector(0.,0.,0.);
 
 		if (flip_normals) mat.shadingN = -mat.shadingN;
 		triangle_id = -1;
@@ -1252,7 +1277,7 @@ public:
 
 class Plane : public Object {
 public:
-	Plane() {};
+	Plane() { type = OT_PLANE; };
 	Plane(const Vector& A, const Vector &N, bool mirror = false) {
 		init(A, N, mirror);
 	};
@@ -1262,6 +1287,7 @@ public:
 		this->vecN = N;
 		miroir = mirror;
 		name = "Plane";
+		type = OT_PLANE;
 	}
 
 	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const {
@@ -1322,11 +1348,53 @@ class Scene {
 public:
 	Scene() {
 		backgroundW = 0; backgroundH = 0; current_time = 0; current_frame = 0; duration = 1;
+
+#ifdef USE_EMBREE
+#if _DEBUG
+		const char * config = "verbose=3";
+#else
+		const char * config = "";
+#endif		
+		// embree init
+		embree_device = rtcNewDevice(config);
+		embree_scene = rtcNewScene(embree_device);
+		//rtcSetSceneFlags(embree_scene, RTC_SCENE_FLAG_DYNAMIC | RTC_SCENE_FLAG_ROBUST);
+		rtcSetSceneBuildQuality(embree_scene, RTC_BUILD_QUALITY_HIGH);
+		for (int i = 0; i < 64; i++) {
+			embree_coherent[i] = { RTC_INTERSECT_CONTEXT_FLAG_COHERENT,    0, {} };
+			embree_incoherent[i] = { RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,  0, {} };
+			rtcInitIntersectContext(&embree_coherent[i]);
+			rtcInitIntersectContext(&embree_incoherent[i]);
+		}
+		embree_bvh_up_to_date = false;
+#endif
 	};
 
-	void addObject(Object* o) { objects.push_back(o); }
+	~Scene() {
+#ifdef USE_EMBREE
+		rtcReleaseScene(embree_scene);
+		rtcReleaseDevice(embree_device);
+#endif
+	}
+
+	void prepare_render();
+
+	void addObject(Object* o);
 
 	void clear() {
+#ifdef USE_EMBREE
+		for (int i = 0; i < embree_objects.size(); i++) {
+			rtcDetachGeometry(embree_scene, embree_objects[i]);
+		}
+		embree_to_real_objects.clear();
+		embree_bvh_up_to_date = false;
+		/*for (int i = 0; i < objects.size(); i++) {
+			if (objects[i]->type == OT_TRIMESH) {
+				Geometry* g = dynamic_cast<Geometry*>(objects[i]);
+			}
+		}*/
+#endif
+
 		for (int i = 0; i < objects.size(); i++) {
 			delete objects[i];
 		}
@@ -1336,68 +1404,35 @@ public:
 	}
 	void deleteObject(int id) {
 		if (id < 0 || id >= objects.size()) return;
+
+#ifdef USE_EMBREE
+		int embreeID = -1;
+		for (int i = 0; i < embree_to_real_objects.size(); i++) {
+			int realID = embree_to_real_objects[i];
+			if (realID == id) {
+				embreeID = i;
+				rtcDetachGeometry(embree_scene, embree_objects[i]);				
+			}
+		}
+		embree_to_real_objects.erase(embree_to_real_objects.begin() + embreeID);
+		for (int i = 0; i < embree_to_real_objects.size(); i++) {
+			int realID = embree_to_real_objects[i];
+			if (realID >= id) {
+				embree_to_real_objects[i]--;
+			}
+		}
+#endif
+
 		delete objects[id];
 		objects.erase(objects.begin() + id);
 	}
 
 
-	bool intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id, bool avoid_ghosts = false) const {
-
-		bool has_inter = false;
-		min_t = 1E99;
-
-		for (int i = 0; i < objects.size(); i++) {
-			if (avoid_ghosts && objects[i]->ghost) continue;
-			Vector localP;
-			MaterialValues localmat;
-			double t;
-
-			Vector transformed_dir = objects[i]->apply_inverse_rotation_scaling(d.direction);
-			Vector new_origin = objects[i]->apply_inverse_transformation(d.origin); 
-			Ray transformed_ray(new_origin, transformed_dir, d.time);
-
-			bool local_has_inter = objects[i]->intersection(transformed_ray, localP, t, localmat, min_t, triangle_id);
-
-			if (local_has_inter) {		
-				if (t < min_t) {
-					has_inter = true;
-					min_t = t;
-					
-					P = objects[i]->apply_transformation(localP);
-					sphere_id = i;
-					mat = localmat;
-					mat.shadingN = objects[i]->apply_rotation(localmat.shadingN); 
-				}
-			}
-		}
-
-		return has_inter;
-	}
+	bool intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id, bool avoid_ghosts = false, bool isCoherent = false) const;
 
 
-	bool intersection_shadow(const Ray& d, double &min_t, double dist_light, bool avoid_ghosts = false) const {
+	bool intersection_shadow(const Ray& d, double &min_t, double dist_light, bool avoid_ghosts = false) const;
 
-		min_t = 1E99;
-
-		for (int i = 0; i < objects.size(); i++) {
-			if (avoid_ghosts && objects[i]->ghost) continue;
-			Vector transformed_dir = objects[i]->apply_inverse_rotation_scaling(d.direction);
-			Vector new_origin = objects[i]->apply_inverse_transformation(d.origin); 
-			Ray transformed_ray(new_origin, transformed_dir, d.time);
-
-			double t;
-
-			bool local_has_inter = objects[i]->intersection_shadow(transformed_ray, t, min_t, dist_light);
-
-			if (local_has_inter) {
-				if (t < dist_light*0.999) {
-					return true;
-				}
-			}
-		}
-
-		return false;
-	}
 	void clear_background() {
 		background.clear();
 		backgroundW = 0;
@@ -1425,4 +1460,14 @@ public:
 	int nbframes, current_frame;
 	double duration, current_time;
 	int fog_type; // 0 : uniform, 1: exponential
+
+#ifdef USE_EMBREE
+	RTCDevice embree_device;
+	RTCScene embree_scene;
+	mutable RTCIntersectContext embree_coherent[64];   //  primary rays
+	mutable RTCIntersectContext embree_incoherent[64]; // secondary/visibility rays
+	bool embree_bvh_up_to_date;
+	std::vector<int> embree_objects;
+	std::vector<int> embree_to_real_objects;
+#endif
 };

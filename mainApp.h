@@ -161,10 +161,7 @@ public:
 
 
 	void OnPaint(wxPaintEvent& event) {};
-	void OnSize(wxSizeEvent& event) {
-		Refresh();
-		event.Skip();
-	}
+	void OnSize(wxSizeEvent& event);
 	void OnClose(wxCloseEvent& event);
 
 	void OnLeftDown(wxMouseEvent& event) {};
@@ -498,12 +495,12 @@ public:
 		PerfChrono perf;
 		perf.Start();
 		raytracer.stopped = false;
-		raytracer.render_image();
+		raytracer.render_image_nopreviz();
 		raytracer.stopped = true;
 		double t = perf.GetDiffMs();
-		FILE* f = fopen("time.txt", "a+");
+		/*FILE* f = fopen("time.txt", "a+");
 		fprintf(f, "%e\n", t);
-		fclose(f);
+		fclose(f);*/
 		start_render();
 	}
 
@@ -615,6 +612,9 @@ public:
 		mouse_prev_x = mouse_x;
 		mouse_prev_y = mouse_y;
 
+#ifdef USE_EMBREE
+		raytracer.s.embree_bvh_up_to_date = false;
+#endif
 		paintNow();
 	}
 
@@ -650,6 +650,9 @@ public:
 			alt_down = false;
 
 		wasDragging = false;
+#ifdef USE_EMBREE
+		raytracer.s.embree_bvh_up_to_date = false;
+#endif
 	}
 
 	void mouseWheel(wxMouseEvent& event) {
@@ -657,6 +660,9 @@ public:
 			if (selected_object >= 0 && selected_object < raytracer.s.objects.size()) {
 				raytracer.s.objects[selected_object]->scale *= (event.GetWheelRotation() > 0) ? 1.1 : (1 / 1.1);
 				stop_render();
+#ifdef USE_EMBREE
+				raytracer.s.embree_bvh_up_to_date = false;
+#endif
 				start_render();
 			}
 		} else {
@@ -665,6 +671,7 @@ public:
 			stop_render();
 			start_render();
 		}
+
 		paintNow();
 	}
 

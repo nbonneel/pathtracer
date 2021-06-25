@@ -25,7 +25,7 @@ bool RaytracerApp::OnInit()
 			raytracer.load_scene(wxApp::argv[1], wxApp::argv[3]);
 		else
 			raytracer.load_scene(wxApp::argv[1]);
-		raytracer.render_image();
+		raytracer.render_image_nopreviz();
 		if (arc>2)
 			save_image(wxApp::argv[2], &raytracer.image[0], raytracer.W, raytracer.H);
 		exit(0);
@@ -40,7 +40,7 @@ bool RaytracerApp::OnInit()
 	frame->SetSize(1200, 1000);
 
 	renderPanel = new RenderPanel(frame, this);
-	renderPanel->displayW = 600;
+	renderPanel->displayW = 1000;
 	renderPanel->displayH = 800;
 
 	wxBoxSizer * statusbar_sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -569,6 +569,17 @@ bool RaytracerApp::OnInit()
     return true;
 }
 
+void RaytracerFrame::OnSize(wxSizeEvent& event) {
+	if (render_panel) {
+		int displayWidth = render_panel->GetClientSize().GetX();
+		render_panel->displayH = std::min(render_panel->GetClientSize().GetY()-1, (int)(render_panel->raytracer.H / (double)render_panel->raytracer.W * displayWidth));
+		render_panel->displayW = std::min(render_panel->GetClientSize().GetX() - 1, (int)(render_panel->displayH * render_panel->raytracer.W/ (double)render_panel->raytracer.H));
+		render_panel->displayH = std::min(render_panel->GetClientSize().GetY() - 1, (int)(render_panel->raytracer.H / (double)render_panel->raytracer.W * render_panel->displayW));
+	}
+	Refresh();
+
+	event.Skip();
+}
 
 void RaytracerApp::activateRenderLoop(bool on)
 {
@@ -634,25 +645,23 @@ RaytracerFrame::RaytracerFrame()
 
 void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 
-	if (selected_object < 0) return;
-	if (selected_object >= raytracer.s.objects.size()) return;
-
 	stop_render();
 
 	raytracer.W = raytracer_app->renderwidth->GetValue();
 	raytracer.H = raytracer_app->renderheight->GetValue();
+
+	int displayWidth = GetClientSize().GetX();
+	displayH = std::min(GetClientSize().GetY() - 1, (int)(raytracer.H / (double)raytracer.W * displayWidth));
+	displayW = std::min(GetClientSize().GetX() - 1, (int)(displayH * raytracer.W / (double)raytracer.H));
+	displayH = std::min(GetClientSize().GetY() - 1, (int)(raytracer.H / (double)raytracer.W * displayW));
+
 	raytracer.nrays = raytracer_app->nbrays->GetValue();
-	raytracer.s.objects[selected_object]->display_edges = raytracer_app->show_edges->IsChecked();
-	raytracer.s.objects[selected_object]->interp_normals = raytracer_app->interp_normals->IsChecked();	
 	raytracer.cam.fov = raytracer_app->fov_slider->GetValue() * M_PI / 180.;
 	raytracer.cam.aperture = raytracer_app->aperture_slider->GetValue() / 1000.;
 	raytracer.cam.focus_distance = raytracer_app->focus_slider->GetValue() / 100.;
 	raytracer.cam.is_lenticular = raytracer_app->isLenticularCheck->IsChecked();
 	raytracer.sigma_filter = raytracer_app->filter_slider->GetValue() / 10.;
-	//wxColour alb = raytracer_app->albedoColorPicker->GetColour();
-	//raytracer.s.objects[selected_object]->albedo = Vector(alb.Red()/255., alb.Green()/255., alb.Blue()/255.);
 
-	//raytracer.s.objects[selected_object]->ks = raytracer_app->ks_slider->GetValue() / 100.;
 	raytracer.s.fog_density = raytracer_app->fogdensity_slider->GetValue() / 100.;
 
 	raytracer.s.intensite_lumiere = raytracer_app->lightintensity_slider->GetValue() / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
@@ -664,9 +673,6 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 	raytracer.s.fog_type = raytracer_app->uniformFogRadio->GetValue() ? 0 : 1;
 	raytracer.nb_bounces = raytracer_app->bounces->GetValue();
 
-	raytracer.s.objects[selected_object]->flip_normals = raytracer_app->flipnormals->IsChecked();	
-	raytracer.s.objects[selected_object]->ghost = raytracer_app->ghost->IsChecked();
-
 	raytracer.s.nbframes = raytracer_app->nbframesctrl->GetValue();
 	raytracer_app->time_slider->SetMax(raytracer.s.nbframes);
 	raytracer.s.duration = raytracer_app->duration->GetValue();
@@ -674,19 +680,47 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 	raytracer.s.current_time = raytracer.s.current_frame / (double)raytracer.s.nbframes*raytracer.s.duration;
 	raytracer.is_recording = raytracer_app->recordKeyframes->GetValue();
 
+	if (selected_object < 0 || (selected_object >= raytracer.s.objects.size())) {
+		start_render();
+		return;
+	}
+
+
+	raytracer.s.objects[selected_object]->display_edges = raytracer_app->show_edges->IsChecked();
+	raytracer.s.objects[selected_object]->interp_normals = raytracer_app->interp_normals->IsChecked();	
+	
+	//wxColour alb = raytracer_app->albedoColorPicker->GetColour();
+	//raytracer.s.objects[selected_object]->albedo = Vector(alb.Red()/255., alb.Green()/255., alb.Blue()/255.);
+
+	//raytracer.s.objects[selected_object]->ks = raytracer_app->ks_slider->GetValue() / 100.;
+
+	raytracer.s.objects[selected_object]->flip_normals = raytracer_app->flipnormals->IsChecked();	
+	raytracer.s.objects[selected_object]->ghost = raytracer_app->ghost->IsChecked();
+#ifdef USE_EMBREE
+	if (raytracer.s.objects[selected_object]->type == OT_TRIMESH) {
+		Geometry* g = dynamic_cast<Geometry*>(raytracer.s.objects[selected_object]);
+		if (raytracer.s.objects[selected_object]->ghost)
+			rtcSetGeometryMask(g->instance_geom, 1);
+		else
+			rtcSetGeometryMask(g->instance_geom, -1);
+	}
+#endif
+
+
+
 	for (int i = 0; i < raytracer.s.objects.size(); i++) {
 		raytracer.s.objects[i]->max_translation = raytracer.s.objects[i]->get_translation(raytracer.s.current_frame, false);
 		raytracer.s.objects[i]->mat_rotation = raytracer.s.objects[i]->get_rotation(raytracer.s.current_frame, false);
 		raytracer.s.objects[i]->scale = raytracer.s.objects[i]->get_scale(raytracer.s.current_frame, false);
 	}
 	for (int i = 0; i < raytracer.s.objects.size(); i++) {
+		if (raytracer.s.objects[i]->type != OT_FLUID) continue;
 		Fluid* f = dynamic_cast<Fluid*>(raytracer.s.objects[i]);
-		if (!f) continue;
 		f->build_bvh(raytracer_app->time_slider->GetValue(), 0, f->Nparticles);
 		f->build_grid(raytracer_app->time_slider->GetValue());
 	}
 
-	if (selected_object >=0 && selected_object< raytracer.s.objects.size() && dynamic_cast<Fluid*>(raytracer.s.objects[selected_object])) {
+	if (selected_object >=0 && selected_object< raytracer.s.objects.size() && (raytracer.s.objects[selected_object]->type == OT_FLUID)) {
 		dynamic_cast<Fluid*>(raytracer.s.objects[selected_object])->radius = raytracer_app->fluidparticlesize->GetValue();
 	}
 
@@ -751,14 +785,14 @@ void RenderPanel::render_video(wxCommandEvent& event) {
 
 					raytracer.cam.position = pos + (k - raytracer.cam.nbviewX / 2)*dx * right + (-j+ raytracer.cam.nbviewY / 2)*dy * raytracer.cam.up;
 					raytracer.clear_image();
-					raytracer.render_image();
+					raytracer.render_image_nopreviz();
 				}
 			}
 			raytracer.cam.position = pos;
 		}
 		else {
 			raytracer.cam.isArray = false;
-			raytracer.render_image();
+			raytracer.render_image_nopreviz();
 		}
 
 		
@@ -769,43 +803,22 @@ void RenderPanel::render_video(wxCommandEvent& event) {
 
 void RenderPanel::update_gui() {
 
-	if ((selected_object < 0) || (selected_object >= raytracer.s.objects.size())) {
-		raytracer_app->objectName->SetLabelText(" ");
-		return;
-	}
-
-	Geometry* g = dynamic_cast<Geometry*>(raytracer.s.objects[selected_object]);
-	if (g) {
-		std::ostringstream os;
-		os << "triangles: " << g->indices.size() << ", vertices: " << g->vertices.size() << ", bvh leaves size: " << g->max_bvh_triangles << ", bvh max depth: " << g->bvh_depth << ", bvh avg depth:" << g->bvh_avg_depth << ", bvh nb nodes: " << g->bvh_nb_nodes << ", mouse distance: " << selected_object_t;
-		raytracer_app->infoModel->SetLabelText(os.str().c_str());
-	} else {
-		std::ostringstream os;
-		os << "mouse distance: " << selected_object_t;
-		raytracer_app->infoModel->SetLabelText(os.str().c_str());
-	}
-
 	raytracer_app->renderwidth->SetValue(raytracer.W);
 	raytracer_app->renderheight->SetValue(raytracer.H);
+
 	raytracer_app->nbrays->SetValue(raytracer.nrays);
-	raytracer_app->objectName->SetLabelText(raytracer.s.objects[selected_object]->name);
-	raytracer_app->show_edges->SetValue(raytracer.s.objects[selected_object]->display_edges);
 	raytracer_app->isLenticularCheck->SetValue(raytracer.cam.is_lenticular);
-	raytracer_app->maxangle_slider->SetValue(raytracer.cam.lenticular_max_angle*180./M_PI);
-	raytracer_app->interp_normals->SetValue(raytracer.s.objects[selected_object]->interp_normals);
+	raytracer_app->maxangle_slider->SetValue(raytracer.cam.lenticular_max_angle*180. / M_PI);
 	raytracer_app->fov_slider->SetValue(raytracer.cam.fov * 180. / M_PI);
 	raytracer_app->aperture_slider->SetValue(raytracer.cam.aperture * 1000);
 	raytracer_app->focus_slider->SetValue(raytracer.cam.focus_distance*100.);
-	//raytracer_app->ks_slider->SetValue(raytracer.s.objects[selected_object]->ks*100.);
 	raytracer_app->filter_slider->SetValue(raytracer.sigma_filter*10.);
-	raytracer_app->bounces->SetValue(raytracer.nb_bounces);	
-	raytracer_app->flipnormals->SetValue(raytracer.s.objects[selected_object]->flip_normals);	
-	raytracer_app->ghost->SetValue(raytracer.s.objects[selected_object]->ghost);
-
+	raytracer_app->bounces->SetValue(raytracer.nb_bounces);
 	raytracer_app->nbviews->SetValue(raytracer.cam.lenticular_nb_images);
-	raytracer_app->nbpixslice->SetValue(raytracer.cam.lenticular_pixel_width);	
+	raytracer_app->nbpixslice->SetValue(raytracer.cam.lenticular_pixel_width);
 	raytracer_app->nbframesctrl->SetValue(raytracer.s.nbframes);
 	raytracer_app->time_slider->SetMax(raytracer.s.nbframes);
+
 
 	raytracer_app->fogdensity_slider->SetValue(raytracer.s.fog_density*100.);
 	raytracer_app->uniformFogRadio->SetValue(raytracer.s.fog_type == 0);
@@ -817,6 +830,34 @@ void RenderPanel::update_gui() {
 	raytracer_app->duration->SetValue(raytracer.s.duration);
 	raytracer_app->time_slider->SetValue(raytracer.s.current_frame);
 	raytracer_app->recordKeyframes->SetValue(raytracer.is_recording);
+
+
+	if ((selected_object < 0) || (selected_object >= raytracer.s.objects.size())) {
+		raytracer_app->objectName->SetLabelText(" ");
+		return;
+	}
+
+	
+	if (raytracer.s.objects[selected_object]->type == OT_TRIMESH) {
+		Geometry* g = dynamic_cast<Geometry*>(raytracer.s.objects[selected_object]);
+		std::ostringstream os;
+		os << "triangles: " << g->indices.size() << ", vertices: " << g->vertices.size() << ", bvh leaves size: " << g->max_bvh_triangles << ", bvh max depth: " << g->bvh_depth << ", bvh avg depth:" << g->bvh_avg_depth << ", bvh nb nodes: " << g->bvh_nb_nodes << ", mouse distance: " << selected_object_t;
+		raytracer_app->infoModel->SetLabelText(os.str().c_str());
+	} else {
+		std::ostringstream os;
+		os << "mouse distance: " << selected_object_t;
+		raytracer_app->infoModel->SetLabelText(os.str().c_str());
+	}
+
+
+	raytracer_app->objectName->SetLabelText(raytracer.s.objects[selected_object]->name);
+	raytracer_app->show_edges->SetValue(raytracer.s.objects[selected_object]->display_edges);
+	raytracer_app->interp_normals->SetValue(raytracer.s.objects[selected_object]->interp_normals);
+	//raytracer_app->ks_slider->SetValue(raytracer.s.objects[selected_object]->ks*100.);
+
+	raytracer_app->flipnormals->SetValue(raytracer.s.objects[selected_object]->flip_normals);	
+	raytracer_app->ghost->SetValue(raytracer.s.objects[selected_object]->ghost);
+
 
 	//Vector alb = raytracer.s.objects[selected_object]->albedo;
 	//raytracer_app->albedoColorPicker->SetColour(wxColour(alb[0] * 255., alb[1] * 255., alb[2] * 255.));
@@ -916,7 +957,8 @@ void RenderPanel::update_gui() {
 			raytracer_app->m_RefrFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
 	}
 
-	if (g) {
+	if (raytracer.s.objects[selected_object]->type == OT_TRIMESH) {
+		Geometry* g = dynamic_cast<Geometry*>(raytracer.s.objects[selected_object]);
 		int id = g->indices[selected_tri].group;
 		raytracer_app->m_AlbedoFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
 		raytracer_app->m_NormalFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
@@ -948,6 +990,7 @@ void RenderPanel::render(wxDC& dc)
 	os << "Time per ray: " << raytracer.curTimePerFrame / 1000. << " s";
 	raytracer_app->infoPerf->SetLabelText(os.str().c_str());
 
+#if 1
 	gamma_corrected_image.resize(raytracer.W*raytracer.H * 3);
 	extrapolated_image = raytracer.imagedouble;
 	/*computed = raytracer.computed;
@@ -1041,6 +1084,7 @@ void RenderPanel::render(wxDC& dc)
 	dc.SetUserScale(scale_x, scale_y);
 	dc.DrawBitmap(bmpBuf, 0, 0);
 	dc.SetUserScale(1.0, 1.0);
+#endif
 }
 
 
@@ -1103,8 +1147,13 @@ void RaytracerFrame::Open(wxCommandEvent &evt) {
 
 	render_panel->stop_render();
 	render_panel->raytracer.load_scene(openFileDialog.GetPath());
-	render_panel->update_gui();
+	render_panel->update_gui();	
 	render_panel->start_render();
+#ifdef USE_EMBREE
+	Sleep(100);  // crazy, but I need to do that, otherwise the gometries only show after the threads are stopped/relaunched
+	render_panel->stop_render();
+	render_panel->start_render();
+#endif
 }
 
 
@@ -1933,6 +1982,7 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 	size_t nFiles = filenames.GetCount();
 	if (m_pOwner != NULL) {
 		m_pOwner->render_panel->stop_render();
+		bool has_loaded_obj = false;
 		for (size_t n = 0; n < nFiles; n++) {			
 
 			if (filenames[n].Lower().find(".seg") != std::string::npos) {
@@ -2028,10 +2078,11 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 
 			if ((filenames[n].Lower().find(".obj") != std::string::npos)  || (filenames[n].Lower().find(".wrl") != std::string::npos) || (filenames[n].Lower().find(".off") != std::string::npos)) {
 				bool center = (wxMessageBox("Should the model be normalized / centered ?", "Normalization ?", wxYES_NO | wxCENTRE) == wxYES);
-				Geometry* g = new Geometry(filenames[n], 1, Vector(0, 0, 0), false, NULL, false, center);
+				Geometry* g = new Geometry(&m_pOwner->render_panel->raytracer.s, filenames[n], 1, Vector(0, 0, 0), false, NULL, false, center);
 				g->scale = 30;
 				g->display_edges = false;
-				g->max_translation = Vector(0, m_pOwner->render_panel->raytracer.s.objects[2]->get_translation(m_pOwner->render_panel->raytracer.s.current_time, m_pOwner->render_panel->raytracer.is_recording)[1] - (g->bvh.bbox.bounds[0][1])*g->scale, 0);
+				has_loaded_obj = true;
+				g->max_translation = Vector(0, m_pOwner->render_panel->raytracer.s.objects[2]->get_translation(m_pOwner->render_panel->raytracer.s.current_time, m_pOwner->render_panel->raytracer.is_recording)[1] - (g->bbox.bounds[0][1])*g->scale, 0);
 				m_pOwner->render_panel->raytracer.s.addObject(g);
 				continue;
 			}
@@ -2047,11 +2098,9 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 					return true;
 				}
 				if (filenames[n].Lower().find(".titopoh") != std::string::npos) {
-					for (int i = 0; i < omp_get_max_threads(); i++)
-						m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf[i] = new TitopoBRDF(filenames[n].ToStdString(), 45, 45, 180);
+					m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf = new TitopoBRDF(filenames[n].ToStdString(), 45, 45, 180);
 				} else {
-					for (int i = 0; i < omp_get_max_threads(); i++)
-						m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf[i] = new TitopoBRDF(filenames[n].ToStdString(), 90, 90, 360);
+					m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf = new TitopoBRDF(filenames[n].ToStdString(), 90, 90, 360);
 				}
 				continue;
 			}
@@ -2060,12 +2109,20 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 					wxMessageBox("No object was selected to apply the BRDF to", "Error", wxOK);
 					return true;
 				}
-				for (int i = 0; i < omp_get_max_threads(); i++)
-					m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf[i] = new IsoMERLBRDF(filenames[n].ToStdString());
+
+				m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]->brdf = new IsoMERLBRDF(filenames[n].ToStdString());
 				continue;
 			}
 		}		
 		m_pOwner->render_panel->start_render();
+
+#ifdef USE_EMBREE
+		if (has_loaded_obj) {
+			Sleep(100);  // crazy, but I need to do that, otherwise the gometries only show after the threads are stopped/relaunched
+			m_pOwner->render_panel->stop_render();
+			m_pOwner->render_panel->start_render();
+		}
+#endif
 	}
 	return true;
 }

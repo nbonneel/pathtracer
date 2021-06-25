@@ -41,7 +41,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -115,6 +115,8 @@
       <PrecompiledHeaderOutputFile />
       <OpenMPSupport>false</OpenMPSupport>
       <AdditionalIncludeDirectories>C:\SharedLibs\wxWidgets-3.1.2\include;C:\SharedLibs\wxWidgets-3.1.2\include\msvc</AdditionalIncludeDirectories>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -122,8 +124,8 @@
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <StackReserveSize>10000000</StackReserveSize>
       <StackCommitSize>10000000</StackCommitSize>
-      <AdditionalLibraryDirectories>C:\SharedLibs\wxWidgets-3.1.2\lib\vc_x64_lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>wxmsw31ud_core.lib;wxbase31ud.lib;wxtiffd.lib;wxjpegd.lib;wxpngd.lib;wxzlibd.lib;wxregexud.lib;wxexpatd.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\SharedLibs\wxWidgets-3.1.2\lib\vc_x64_lib;.\libs\Debug</AdditionalLibraryDirectories>
+      <AdditionalDependencies>embree3.lib;wxmsw31ud_core.lib;wxbase31ud.lib;wxtiffd.lib;wxjpegd.lib;wxpngd.lib;wxzlibd.lib;wxregexud.lib;wxexpatd.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -181,8 +183,8 @@
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <StackReserveSize>10000000</StackReserveSize>
       <StackCommitSize>10000000</StackCommitSize>
-      <AdditionalLibraryDirectories>C:\SharedLibs\wxWidgets-3.1.2\lib\vc_x64_lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>wxmsw31u_core.lib;wxbase31u.lib;wxtiff.lib;wxjpeg.lib;wxpng.lib;wxzlib.lib;wxregexu.lib;wxexpat.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\SharedLibs\wxWidgets-3.1.2\lib\vc_x64_lib;.\libs\Release</AdditionalLibraryDirectories>
+      <AdditionalDependencies>embree3.lib;wxmsw31u_core.lib;wxbase31u.lib;wxtiff.lib;wxjpeg.lib;wxpng.lib;wxzlib.lib;wxregexu.lib;wxexpat.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

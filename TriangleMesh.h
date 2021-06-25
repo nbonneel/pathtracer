@@ -19,6 +19,8 @@ public:
 };
 
 
+
+
 class Edge {
 public:
 	Edge(int i = 0, int j = 0) {
@@ -103,10 +105,10 @@ Vector TransformH(const Vector &in, float H); // transform hue of a color
 class Geometry : public Object {
 public:
   ~Geometry() {}
-	Geometry() {};
-	Geometry(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
+	Geometry() { type = OT_TRIMESH; };
+	Geometry(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
 
-	void init(const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool load_textures = true, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
+	void init(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool load_textures = true, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
 
 	void readOBJ(const char* filename, bool load_textures);
 	void readVRML(const char* filename);
@@ -128,7 +130,7 @@ public:
 		fprintf(f, "csv_file: %s\n", csv_file.c_str());
 	}
 
-	static Geometry* create_from_file(FILE* f, const char* replacedNames = NULL) {
+	static Geometry* create_from_file(FILE* f, Scene* scene, const char* replacedNames = NULL) {
 		Geometry* result = new Geometry();
 		result->Object::load_from_file(f, replacedNames);
 		int hascsv;
@@ -149,7 +151,7 @@ public:
 		else
 			fscanf(f, "csv_file: \n");
 
-		result->init(result->name.c_str(), 1., Vector(0, 0, 0), result->miroir, hascsv ? line : NULL, false, false, is_centered, result->rotation_center);
+		result->init(scene, result->name.c_str(), 1., Vector(0, 0, 0), result->miroir, hascsv ? line : NULL, false, false, is_centered, result->rotation_center);
 		return result;
 	}
 
@@ -207,18 +209,33 @@ public:
 	std::vector<Vector> bitangents;
 	std::string csv_file;
 
+#ifdef USE_EMBREE
+	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const { return false; };
+	bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const { return false;  };
+#else
 	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const;
 	bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const;
+#endif
+
+	MaterialValues getMaterial(int triId, double alpha, double beta, double gamma) const;
 
 	BBox build_bbox(int i0, int i1);
+	BBox bbox;
+
+#ifdef USE_EMBREE
+	RTCScene embree_scene_for_instance;
+	RTCGeometry instance_geom;
+#else
+	BVH bvh;	
 	BBox build_centers_bbox(int i0, int i1);
 
 	void build_bvh(BVH* node, int i0, int i1);
 	void build_bvh_recur(BVH* b, int node, int i0, int i1, int depth);
+#endif
 
 	bool is_centered;
 
-	BVH bvh;
+
 	int max_bvh_triangles;
 	int bvh_depth;
 	double bvh_avg_depth;
@@ -234,8 +251,9 @@ private:
 
 class Yarns : public Object {
 public:
-	Yarns() {};
+	Yarns() { type = OT_YARNS; };
 	Yarns(const char* filename) {
+		type = OT_YARNS;
 		FILE* f = fopen(filename, "r+");
 		int nbyarns;
 		fscanf(f, "%u\n", &nbyarns);

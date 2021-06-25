@@ -16,8 +16,15 @@
 /*static __declspec(thread) std::default_random_engine engine;
 static __declspec(thread) std::uniform_real_distribution<double> uniform(0, 1);*/
 
-static thread_local std::default_random_engine engine[64];
+/*static thread_local std::minstd_rand  engine[64];
 static thread_local std::uniform_real_distribution<double> uniform(0, 1);
+static thread_local std::uniform_real_distribution<float> uniformf(0, 1);*/
+
+#include "pcg_random.hpp"
+
+static thread_local pcg32  engine[64];
+//static thread_local std::uniform_real_distribution<double> uniform(0, 1);
+static thread_local std::uniform_real_distribution<float> uniformf(0, 1);
 
 class Vector;
 
@@ -267,6 +274,20 @@ static inline Matrix<3, 3> createRotationMatrixZ(double angleZ) {
 	R[8] = cos(angleZ);
 	return R;
 }
+static inline float invSqRoot(float n) {
+
+	const float threehalfs = 1.5F;
+	float y = n;
+
+	long i = *(long *)&y;
+
+	i = 0x5f3759df - (i >> 1);
+	y = *(float *)&i;
+
+	y = y * (threehalfs - ((n * 0.5F) * y * y));
+
+	return y;
+}
 
 class Vector {
 public:
@@ -294,6 +315,13 @@ public:
 		coord[0] /= norm;
 		coord[1] /= norm;
 		coord[2] /= norm;
+	}
+	void fast_normalize() {
+		double norm2 = getNorm2();
+		double invnorm = invSqRoot(norm2);  // 1. / sqrt(norm2); // 
+		coord[0] *= invnorm;
+		coord[1] *= invnorm;
+		coord[2] *= invnorm;
 	}
 	Vector getNormalized() const {
 		Vector result(*this);
@@ -373,6 +401,7 @@ Vector min(const Vector& a, const Vector& b);
 Vector max(const Vector& a, const Vector& b);
 Vector pow(const Vector& a, const Vector& b);
 Vector random_cos(const Vector &N);
+Vector random_cos(const Vector &N, double r1, double r2);
 Vector random_uniform();
 
 Vector rotate_dir(const Vector&v, const Vector &angles);
@@ -484,7 +513,8 @@ public:
 			direction_vec = Vector(j - W / 2 + 0.5 + dx_sensor, i - H / 2 + 0.5 + dy_sensor, k);
 
 		}
-		direction_vec.normalize();
+		//direction_vec.normalize();
+		direction_vec.fast_normalize();
 		direction_vec = camera_right * direction_vec[0] + up*direction_vec[1] + direction*direction_vec[2];
 		Vector destination = C1 + focus_distance * direction_vec;
 		Vector new_origin = C1 + dx_aperture*camera_right + dy_aperture*up;

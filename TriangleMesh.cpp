@@ -698,16 +698,18 @@ void Geometry::setup_tangents() {
 }
 
 
-Geometry::Geometry(const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool preserve_input, bool center, Vector rot_center) {
-	init(obj, scaling, offset, mirror, colors_csv_filename, true, preserve_input, center, rot_center);
+Geometry::Geometry(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool preserve_input, bool center, Vector rot_center) {
+	init(scene, obj, scaling, offset, mirror, colors_csv_filename, true, preserve_input, center, rot_center);
 }
 
-void Geometry::init(const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool load_textures, bool preserve_input, bool center, Vector rot_center) {
+void Geometry::init(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool load_textures, bool preserve_input, bool center, Vector rot_center) {
 	display_edges = false;
 	interp_normals = true;
 	miroir = mirror;
 	name = obj;
+	type = OT_TRIMESH;
 	is_centered = center;
+	this->scene = scene;
 
 	std::string filename(obj);
 	std::string lowerFilename = filename;
@@ -765,16 +767,42 @@ void Geometry::init(const char* obj, double scaling, const Vector& offset, bool 
 		permuted_triangle_index[i] = i;
 	}
 	max_bvh_triangles = 0;
+
+#ifdef USE_EMBREE
+	embree_scene_for_instance = rtcNewScene(scene->embree_device); // a scene containing a single object, that will be used for instancing with different transforms
+
+	RTCGeometry geom = rtcNewGeometry(scene->embree_device, RTC_GEOMETRY_TYPE_TRIANGLE);
+	rtcSetGeometryBuildQuality(geom, RTC_BUILD_QUALITY_HIGH);
+	float *positions = (float*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, 3 * sizeof(float), vertices.size());
+	for (int i = 0; i < vertices.size(); i++) {
+		positions[i * 3] = vertices[i][0];
+		positions[i * 3 + 1] = vertices[i][1];
+		positions[i * 3 + 2] = vertices[i][2];
+	}
+	unsigned int *embree_indices = (unsigned int*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, 3 * sizeof(unsigned int), indices.size());
+	for (int i = 0; i < indices.size(); i++) {
+		embree_indices[i * 3] = indices[i].vtxi;
+		embree_indices[i * 3 + 1] = indices[i].vtxj;
+		embree_indices[i * 3 + 2] = indices[i].vtxk;
+	}
+	rtcCommitGeometry(geom);
+	int geomID = rtcAttachGeometry(embree_scene_for_instance, geom);	
+	rtcReleaseGeometry(geom);
+	rtcCommitScene(embree_scene_for_instance); // builds the BVH of that scene/object
+#else
 	if (!preserve_input) {
 		build_bvh(&bvh, 0, indices.size());
 	}
+#endif
+	bbox = build_bbox(0, indices.size());
+
 	triangleSoup.resize(indices.size());
 	for (int i = 0; i < indices.size(); i++) {
 		triangleSoup[i] = Triangle(vertices[indices[i].vtxi], vertices[indices[i].vtxj], vertices[indices[i].vtxk]);
 	}
 
 	if (isnan(rot_center[0])) {
-		rotation_center = (bvh.bbox.bounds[0] + bvh.bbox.bounds[1])*0.5;
+		rotation_center = (bbox.bounds[0] + bbox.bounds[1])*0.5;
 	} else {
 		rotation_center = rot_center;
 	}
@@ -784,6 +812,7 @@ void Geometry::init(const char* obj, double scaling, const Vector& offset, bool 
 		setup_tangents();
 	}
 }
+
 
 BBox Geometry::build_bbox(int i0, int i1) {
 
@@ -803,6 +832,7 @@ BBox Geometry::build_bbox(int i0, int i1) {
 	return result;
 }
 
+#ifndef USE_EMBREE
 BBox Geometry::build_centers_bbox(int i0, int i1) {
 
 	BBox result;
@@ -826,6 +856,7 @@ void Geometry::build_bvh(BVH* b, int i0, int i1) {
 	build_bvh_recur(b, 0, i0, i1, 0);
 	bvh_avg_depth /= (double)bvh_nb_nodes;
 }
+#endif
 
 void Geometry::saveOBJ(const char* obj) {
 	FILE* f = fopen(obj, "w+");
@@ -857,6 +888,107 @@ void Geometry::saveOBJ(const char* obj) {
 	fclose(f);
 }
 
+
+MaterialValues Geometry::getMaterial(int triId, double alpha, double beta, double gamma) const {
+
+	double u = 0, v = 0;
+	int textureId = indices[triId].group;
+	bool has_uv = false;
+
+	const TriangleIndices &tri = indices[triId];
+
+	if ((uvs.size() != 0) && (tri.group >= 0) && (tri.uvi >= 0) && (tri.uvj >= 0) && (tri.uvk >= 0)) {
+		if (!(tri.uvi >= uvs.size() || tri.uvj >= uvs.size() || tri.uvk >= uvs.size())) {
+			u = (uvs[tri.uvi][0] * alpha + uvs[tri.uvj][0] * beta + uvs[tri.uvk][0] * gamma);
+			v = (uvs[tri.uvi][1] * alpha + uvs[tri.uvj][1] * beta + uvs[tri.uvk][1] * gamma);
+			u = Texture::wrap(u);
+			v = Texture::wrap(v);
+			has_uv = true;
+		}
+	}
+
+	MaterialValues mat = queryMaterial(textureId, u, v);
+
+	if (!interp_normals || (indices[triId].ni == -1)) {
+		mat.shadingN = triangleSoup[triId].N.getNormalized();
+	} else {
+		mat.shadingN = normals[tri.ni] * alpha + normals[tri.nj] * beta + normals[tri.nk] * gamma;
+		mat.shadingN.normalize();
+	}
+	//if (dot(mat.shadingN, d.direction) > 0 && mat.transp) mat.shadingN = -mat.shadingN;  // why did I write that ?
+	if (flip_normals) mat.shadingN = -mat.shadingN;
+
+
+	if ((normal_map.size() != 0) && has_uv && (textureId < normal_map.size())) {
+
+		Vector tangent = (tangents[tri.vtxi] * alpha + tangents[tri.vtxj] * beta + tangents[tri.vtxk] * gamma).getNormalized();
+		Vector bitangent = (bitangents[tri.vtxi] * alpha + bitangents[tri.vtxj] * beta + bitangents[tri.vtxk] * gamma).getNormalized();
+
+		Vector NsLocal = normal_map[textureId].getNormal(u, v);
+		Vector Ns = NsLocal[0] * tangent + NsLocal[1] * bitangent + NsLocal[2] * mat.shadingN;
+		if (Ns[0] == 0. && Ns[1] == 0 && Ns[2] == 0)
+			Ns = mat.shadingN;
+		Ns.normalize();
+		if (!(isnan(Ns[0]) || isnan(Ns[1]) || isnan(Ns[2])))
+			mat.shadingN = Ns;
+		//if (dot(mat.shadingN, d.direction) > 0) mat.shadingN = -mat.shadingN; // why did I write that ?
+	}
+
+
+	if (vertexcolors.size() != 0) {
+		Vector col = (vertexcolors[tri.vtxi] * alpha + vertexcolors[tri.vtxj] * beta + vertexcolors[tri.vtxk] * gamma);
+		mat.Kd = col;
+		if (display_edges) {
+			if ((alpha < 0.05) && (tri.showEdges[1]))
+				mat.Kd = Vector(0., 0., 0.);
+			if ((beta < 0.05) && (tri.showEdges[2]))
+				mat.Kd = Vector(0., 0., 0.);
+			if ((gamma < 0.05) && (tri.showEdges[0]))
+				mat.Kd = Vector(0., 0., 0.);
+		}
+	}
+	if (facecolors.size() != 0) {
+		mat.Kd = facecolors[triId];
+	}
+
+	if (display_edges) {
+		if (edgecolor.size() != 0) {
+			if (alpha < 0.05 || beta < 0.05 || gamma < 0.05) {
+				int id1, id2;
+				if (alpha < 0.05) {
+					id1 = std::min(tri.vtxj, tri.vtxk);
+					id2 = std::max(tri.vtxj, tri.vtxk);
+				}
+				if (beta < 0.05) {
+					id1 = std::min(tri.vtxi, tri.vtxk);
+					id2 = std::max(tri.vtxi, tri.vtxk);
+				}
+				if (gamma < 0.05) {
+					id1 = std::min(tri.vtxj, tri.vtxi);
+					id2 = std::max(tri.vtxj, tri.vtxi);
+				}
+
+				const std::map<int, Vector> *curmap = &edgecolor[id1];
+				const std::map<int, Vector>::iterator it = const_cast<std::map<int, Vector> *>(curmap)->find(id2);
+				if (it != const_cast<std::map<int, Vector> *>(curmap)->end())
+					mat.Kd = it->second;
+				else
+					mat.Kd = Vector(0., 0., 0.);
+			}
+		} else {
+			if ((alpha < 0.05) && (tri.showEdges[1]))
+				mat.Kd = Vector(0., 0., 0.);
+			if ((beta < 0.05) && (tri.showEdges[2]))
+				mat.Kd = Vector(0., 0., 0.);
+			if ((gamma < 0.05) && (tri.showEdges[0]))
+				mat.Kd = Vector(0., 0., 0.);
+		}
+	}
+
+	return mat;
+}
+
+#ifndef USE_EMBREE
 void Geometry::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
 
 	BVHNodes n;
@@ -1058,97 +1190,8 @@ bool Geometry::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 
 		//localN.normalize();
 		P = localP;
-
-		double u = 0, v = 0;
-		int textureId = indices[i].group;
-		bool has_uv = false;
-
-		if ((uvs.size() != 0) && (indices[i].group >= 0) && (indices[i].uvi >= 0) && (indices[i].uvj >= 0) && (indices[i].uvk >= 0)) {
-			if (!(indices[i].uvi >= uvs.size() || indices[i].uvj >= uvs.size() || indices[i].uvk >= uvs.size())) {
-				u = (uvs[indices[i].uvi][0] * alpha + uvs[indices[i].uvj][0] * beta + uvs[indices[i].uvk][0] * gamma);
-				v = (uvs[indices[i].uvi][1] * alpha + uvs[indices[i].uvj][1] * beta + uvs[indices[i].uvk][1] * gamma);
-				u = Texture::wrap(u);
-				v = Texture::wrap(v);
-				has_uv = true;
-			}
-		}
-		mat = queryMaterial(textureId, u, v);
-
-		if (!interp_normals || (indices[i].ni == -1)) {
-			mat.shadingN = triangleSoup[i].N.getNormalized();
-		} else {
-			mat.shadingN = normals[indices[i].ni] * alpha + normals[indices[i].nj] * beta + normals[indices[i].nk] * gamma;
-			mat.shadingN.normalize();
-		}
-		//if (dot(mat.shadingN, d.direction) > 0 && mat.transp) mat.shadingN = -mat.shadingN;  // why did I wrote that ?
-		if (flip_normals) mat.shadingN = -mat.shadingN;
-
-
-		if ((normal_map.size() != 0) && has_uv && (textureId < normal_map.size())) {
-
-			Vector tangent = (tangents[indices[i].vtxi] * alpha + tangents[indices[i].vtxj] * beta + tangents[indices[i].vtxk] * gamma).getNormalized();
-			Vector bitangent = (bitangents[indices[i].vtxi] * alpha + bitangents[indices[i].vtxj] * beta + bitangents[indices[i].vtxk] * gamma).getNormalized();
-
-			Vector NsLocal = normal_map[textureId].getNormal(u, v);
-			Vector Ns = NsLocal[0] * tangent + NsLocal[1] * bitangent + NsLocal[2] * mat.shadingN;
-			if (Ns[0] == 0. && Ns[1] == 0 && Ns[2] == 0)
-				Ns = mat.shadingN;
-			Ns.normalize();
-			if (!(isnan(Ns[0]) || isnan(Ns[1]) || isnan(Ns[2])))
-				mat.shadingN = Ns;
-			//if (dot(mat.shadingN, d.direction) > 0) mat.shadingN = -mat.shadingN; // why did I wrote that ?
-		}
-
-
-		if (vertexcolors.size() != 0) {
-			Vector col = (vertexcolors[indices[i].vtxi] * alpha + vertexcolors[indices[i].vtxj] * beta + vertexcolors[indices[i].vtxk] * gamma);
-			mat.Kd = col;
-			if (display_edges) {
-				if ((alpha < 0.05) && (indices[i].showEdges[1]))
-					mat.Kd = Vector(0., 0., 0.);
-				if ((beta < 0.05) && (indices[i].showEdges[2]))
-					mat.Kd = Vector(0., 0., 0.);
-				if ((gamma < 0.05) && (indices[i].showEdges[0]))
-					mat.Kd = Vector(0., 0., 0.);
-			}
-		}
-		if (facecolors.size() != 0) {
-			mat.Kd = facecolors[i];
-		}
-
-		if (display_edges) {
-			if (edgecolor.size() != 0) {
-				if (alpha < 0.05 || beta < 0.05 || gamma < 0.05) {
-					int id1, id2;
-					if (alpha < 0.05) {
-						id1 = std::min(indices[i].vtxj, indices[i].vtxk);
-						id2 = std::max(indices[i].vtxj, indices[i].vtxk);
-					}
-					if (beta < 0.05) {
-						id1 = std::min(indices[i].vtxi, indices[i].vtxk);
-						id2 = std::max(indices[i].vtxi, indices[i].vtxk);
-					}
-					if (gamma < 0.05) {
-						id1 = std::min(indices[i].vtxj, indices[i].vtxi);
-						id2 = std::max(indices[i].vtxj, indices[i].vtxi);
-					}
-
-					const std::map<int, Vector> *curmap = &edgecolor[id1];
-					const std::map<int, Vector>::iterator it = const_cast<std::map<int, Vector> *>(curmap)->find(id2);
-					if (it != const_cast<std::map<int, Vector> *>(curmap)->end())
-						mat.Kd = it->second;
-					else
-						mat.Kd = Vector(0., 0., 0.);
-				}
-			} else {
-				if ((alpha < 0.05) && (indices[i].showEdges[1]))
-					mat.Kd = Vector(0., 0., 0.);
-				if ((beta < 0.05) && (indices[i].showEdges[2]))
-					mat.Kd = Vector(0., 0., 0.);
-				if ((gamma < 0.05) && (indices[i].showEdges[0]))
-					mat.Kd = Vector(0., 0., 0.);
-			}
-		}
+		
+		mat = getMaterial(i, alpha, beta, gamma);
 	}
 
 	return has_inter;
@@ -1237,7 +1280,7 @@ bool Geometry::intersection_shadow(const Ray& d, double &t, double cur_best_t, d
 
 	return has_inter;
 }
-
+#endif
 
 void Geometry::findQuads(int &nbTriangles, int &nbOthers, int &nbRealEdges) {
 	std::map<Edge, std::pair<bool, std::vector<int> > > edges_to_faces;

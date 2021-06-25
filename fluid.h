@@ -94,9 +94,9 @@ public:
 		velZ.resize(Nx*Ny*(Nz + 1), 0.);
 		pressure.resize(Nx*Ny*Nz, 0.);
 		celltypes.resize(Nx*Ny*Nz, 0);
-		for (int i = 0; i < omp_get_max_threads(); i++)
-			this->brdf[i] = new LambertBRDF(Vector(0.5, 0.6, 0.9));
+	    this->brdf = new LambertBRDF();
 		opaque = true;
+		type = OT_FLUID;
 
 		newVelX.resize((Nx + 1)*Ny*Nz, 0.);
 		newVelY.resize(Nx*(Ny + 1)*Nz, 0.);

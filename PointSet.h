@@ -37,12 +37,13 @@ struct PointCloud
 
 class PointSet : public Object {
 public:
-	PointSet() {};
+	PointSet() { type = OT_POINTSET; };
 	PointSet(const char* filename, int nbcols, int *cols, bool mirror = false, bool normal_swapped = false, bool centered = true) {
 		init(filename, nbcols, cols, mirror, normal_swapped, centered);
 	};
 
 	void init(const char* filename, int nbcols, int *cols, bool mirror = false, bool normal_swapped = false, bool centered = true) {
+		type = OT_POINTSET;
 		miroir = mirror;
 		flip_normals = normal_swapped;
 		this->nbcols = nbcols;

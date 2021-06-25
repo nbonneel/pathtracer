@@ -44,35 +44,43 @@ Vector cross(const Vector&a, const Vector& b) {
 	return Vector(a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]);
 }
 
-Vector random_cos(const Vector &N) {
-	int threadid = omp_get_thread_num();
-	double r1 = uniform(engine[threadid]);
-	double r2 = uniform(engine[threadid]);
+Vector random_cos(const Vector &N, double r1, double r2) {
 	double sr2 = sqrt(1. - r2);
-	Vector direction_aleatoire_repere_local(cos(2 * M_PI*r1)*sr2, sin(2 * M_PI*r1)*sr2, sqrt(r2));
-	/*Vector aleatoire(uniform(engine) - 0.5, uniform(engine) - 0.5, uniform(engine) - 0.5);	
+
+	Vector direction_aleatoire_repere_local(cos(2. * M_PI*r1)*sr2, sin(2. * M_PI*r1)*sr2, sqrt(r2));
+	/*Vector aleatoire(uniform(engine) - 0.5, uniform(engine) - 0.5, uniform(engine) - 0.5);
 	Vector tangent1 = cross(N, aleatoire); tangent1.normalize();*/
 	Vector tangent1;
 	Vector absN(abs(N[0]), abs(N[1]), abs(N[2]));
-	if (absN[0] <= absN[1] && absN[0]<=absN[2]) {
+	if (absN[0] <= absN[1] && absN[0] <= absN[2]) {
 		tangent1 = Vector(0, -N[2], N[1]);
-	}else
-		if (absN[1] <= absN[0] && absN[1]<=absN[2]) {
+	} else
+		if (absN[1] <= absN[0] && absN[1] <= absN[2]) {
 			tangent1 = Vector(-N[2], 0, N[0]);
 		} else
 			tangent1 = Vector(-N[1], N[0], 0);
-	tangent1.normalize();
+		tangent1.normalize();
 	Vector tangent2 = cross(tangent1, N);
-
 	return direction_aleatoire_repere_local[2] * N + direction_aleatoire_repere_local[0] * tangent1 + direction_aleatoire_repere_local[1] * tangent2;
+}
+
+Vector random_cos(const Vector &N) {
+	int threadid = omp_get_thread_num();
+	/*float r1 = uniformf(engine[threadid]);
+	float r2 = uniformf(engine[threadid]);*/
+	const float invmax = 1.f / engine[threadid].max();
+	float r1 = engine[threadid]()*invmax;
+	float r2 = engine[threadid]()*invmax;
+	return random_cos(N, r1, r2);
 }
 
 
 
 Vector random_uniform() {
 	int threadid = omp_get_thread_num();
-	double r1 = uniform(engine[threadid]);
-	double r2 = uniform(engine[threadid]);
+	float invmax = 1.f/engine[threadid].max();
+	float r1 = engine[threadid]()*invmax; // uniform(engine[threadid]);
+	float r2 = engine[threadid]()*invmax; // uniform(engine[threadid]);
 	Vector result;
 	result[0] = 2.*cos(2.*M_PI*r1)*sqrt(r2*(1 - r2));
 	result[1] = 2.*sin(2.*M_PI*r1)*sqrt(r2*(1 - r2));

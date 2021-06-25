@@ -11,11 +11,14 @@
 class Raytracer {
 public:
 
-	Raytracer() {
+	Raytracer() : invmax(1.f / engine[0].max())
+	{
 		stopped = false; current_nb_rays = 0; curTimePerFrame = 0; is_recording = false;  gamma = 2.2;
+		
 	};
 	void loadScene();
 	void render_image();
+	void render_image_nopreviz();
 	void clear_image() { 
 
 		image.resize(W*H * 3, 0);
@@ -33,7 +36,7 @@ public:
 	void save_scene(const char* filename);
 	void load_scene(const char* filename, const char* replacedNames = NULL);
 
-	Vector getColor(const Ray &r, const Scene &s, int nbrebonds, int screenI, int screenJ, bool show_lights = true, bool no_envmap = false);
+	Vector getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, bool show_lights = true, bool no_envmap = false);
 
 	int W, H, Wlr, Hlr;
 	int nrays;  
@@ -53,6 +56,7 @@ public:
 	std::vector<bool> computed;
 	double curTimePerFrame;
 	PerfChrono chrono;
+	const float invmax;
 	std::vector<double> filter_value;
 	std::vector<double> filter_integral;
 
@@ -62,5 +66,8 @@ public:
 
 	std::vector<double> imagedouble_lowres;
 	std::vector<double> sample_count;
+
+	std::vector<Vector> samples2d;
+	std::vector<Vector> randomPerPixel;
 };
 
