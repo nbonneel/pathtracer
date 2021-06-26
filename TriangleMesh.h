@@ -102,11 +102,11 @@ public:
 
 Vector TransformH(const Vector &in, float H); // transform hue of a color
 
-class Geometry : public Object {
+class TriMesh : public Object {
 public:
-  ~Geometry() {}
-	Geometry() { type = OT_TRIMESH; };
-	Geometry(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
+  ~TriMesh() {}
+	TriMesh() { type = OT_TRIMESH; };
+	TriMesh(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
 
 	void init(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool load_textures = true, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
 
@@ -130,8 +130,8 @@ public:
 		fprintf(f, "csv_file: %s\n", csv_file.c_str());
 	}
 
-	static Geometry* create_from_file(FILE* f, Scene* scene, const char* replacedNames = NULL) {
-		Geometry* result = new Geometry();
+	static TriMesh* create_from_file(FILE* f, Scene* scene, const char* replacedNames = NULL) {
+		TriMesh* result = new TriMesh();
 		result->Object::load_from_file(f, replacedNames);
 		int hascsv;
 		char line[512];

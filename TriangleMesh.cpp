@@ -7,7 +7,7 @@
 #include <set>
 #include <list>
 
-void Geometry::readVRML(const char* obj) {
+void TriMesh::readVRML(const char* obj) {
 	bool shuffle_colors = false;
 
 	FILE* f;
@@ -104,7 +104,7 @@ void Geometry::readVRML(const char* obj) {
 }
 
 
-void Geometry::readOFF(const char* filename) {
+void TriMesh::readOFF(const char* filename) {
 	FILE* f = fopen(filename, "r+");
 
 	const char* s[4];
@@ -129,7 +129,7 @@ void Geometry::readOFF(const char* filename) {
 	fclose(f);
 }
 
-void Geometry::load_edge_colors(const char* csvfilename) {
+void TriMesh::load_edge_colors(const char* csvfilename) {
 	if (!csvfilename) return;
 
 	edgecolor.resize(vertices.size());
@@ -237,7 +237,7 @@ Vector TransformH(
 }
 
 
-void Geometry::readOBJ(const char* obj, bool load_textures) {
+void TriMesh::readOBJ(const char* obj, bool load_textures) {
 
 	char matfile[255];
 	char grp[255];
@@ -567,7 +567,7 @@ void Geometry::readOBJ(const char* obj, bool load_textures) {
 	//uvIds.clear();
 }
 
-void Geometry::exportMTL(const char* mtlfile) {
+void TriMesh::exportMTL(const char* mtlfile) {
 
 	FILE* f = fopen(mtlfile, "w+");
 
@@ -597,7 +597,7 @@ void Geometry::exportMTL(const char* mtlfile) {
 }
 
 
-void Geometry::setup_tangents() {
+void TriMesh::setup_tangents() {
 
 	std::vector<Vector> tan1(vertices.size(), Vector(0, 0, 0));
 	std::vector<Vector> tan2(vertices.size(), Vector(0, 0, 0));
@@ -698,11 +698,11 @@ void Geometry::setup_tangents() {
 }
 
 
-Geometry::Geometry(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool preserve_input, bool center, Vector rot_center) {
+TriMesh::TriMesh(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool preserve_input, bool center, Vector rot_center) {
 	init(scene, obj, scaling, offset, mirror, colors_csv_filename, true, preserve_input, center, rot_center);
 }
 
-void Geometry::init(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool load_textures, bool preserve_input, bool center, Vector rot_center) {
+void TriMesh::init(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool load_textures, bool preserve_input, bool center, Vector rot_center) {
 	display_edges = false;
 	interp_normals = true;
 	miroir = mirror;
@@ -814,7 +814,7 @@ void Geometry::init(Scene* scene, const char* obj, double scaling, const Vector&
 }
 
 
-BBox Geometry::build_bbox(int i0, int i1) {
+BBox TriMesh::build_bbox(int i0, int i1) {
 
 	BBox result;
 	result.bounds[1] = vertices[indices[i0].vtxi];
@@ -833,7 +833,7 @@ BBox Geometry::build_bbox(int i0, int i1) {
 }
 
 #ifndef USE_EMBREE
-BBox Geometry::build_centers_bbox(int i0, int i1) {
+BBox TriMesh::build_centers_bbox(int i0, int i1) {
 
 	BBox result;
 	result.bounds[1] = (vertices[indices[i0].vtxi] + vertices[indices[i0].vtxj] + vertices[indices[i0].vtxk]) / 3.;
@@ -848,7 +848,7 @@ BBox Geometry::build_centers_bbox(int i0, int i1) {
 	return result;
 }
 
-void Geometry::build_bvh(BVH* b, int i0, int i1) {
+void TriMesh::build_bvh(BVH* b, int i0, int i1) {
 	bvh.bbox = build_bbox(i0, i1);
 	bvh.nodes.reserve(indices.size() * 2);
 	bvh_avg_depth = 0;
@@ -858,7 +858,7 @@ void Geometry::build_bvh(BVH* b, int i0, int i1) {
 }
 #endif
 
-void Geometry::saveOBJ(const char* obj) {
+void TriMesh::saveOBJ(const char* obj) {
 	FILE* f = fopen(obj, "w+");
 	for (int i = 0; i < vertices.size(); i++) {
 		fprintf(f, "v %f %f %f", vertices[i][0], vertices[i][1], vertices[i][2]);
@@ -889,7 +889,7 @@ void Geometry::saveOBJ(const char* obj) {
 }
 
 
-MaterialValues Geometry::getMaterial(int triId, double alpha, double beta, double gamma) const {
+MaterialValues TriMesh::getMaterial(int triId, double alpha, double beta, double gamma) const {
 
 	double u = 0, v = 0;
 	int textureId = indices[triId].group;
@@ -989,7 +989,7 @@ MaterialValues Geometry::getMaterial(int triId, double alpha, double beta, doubl
 }
 
 #ifndef USE_EMBREE
-void Geometry::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
+void TriMesh::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
 
 	BVHNodes n;
 	//n.i0 = i0;
@@ -1093,7 +1093,7 @@ void Geometry::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
 }
 
 
-bool Geometry::intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const
+bool TriMesh::intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const
 {
 	t = cur_best_t;
 	bool has_inter = false;
@@ -1199,7 +1199,7 @@ bool Geometry::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 
 
 
-bool Geometry::intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const
+bool TriMesh::intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const
 {
 	t = cur_best_t;
 	bool has_inter = false;
@@ -1282,7 +1282,7 @@ bool Geometry::intersection_shadow(const Ray& d, double &t, double cur_best_t, d
 }
 #endif
 
-void Geometry::findQuads(int &nbTriangles, int &nbOthers, int &nbRealEdges) {
+void TriMesh::findQuads(int &nbTriangles, int &nbOthers, int &nbRealEdges) {
 	std::map<Edge, std::pair<bool, std::vector<int> > > edges_to_faces;
 
 	int nb_hidden = 0;
@@ -1309,7 +1309,7 @@ void Geometry::findQuads(int &nbTriangles, int &nbOthers, int &nbRealEdges) {
 	nbOthers = nbFacets - nbTriangles;
 }
 
-int Geometry::getNbConnected(int &alsoReturnsNbEdges, int &nonManifoldFaces, int &nbBoundaryEdges) {
+int TriMesh::getNbConnected(int &alsoReturnsNbEdges, int &nonManifoldFaces, int &nbBoundaryEdges) {
 
 	std::map<Edge, std::vector<int> > edges_to_faces;
 	for (int i = 0; i < indices.size(); i++) {		

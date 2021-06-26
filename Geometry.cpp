@@ -13,7 +13,7 @@ Object* Object::create_from_file(FILE* f, Scene* scene, const char* replacedName
 	char line[255];
 	fscanf(f, "%[^\n]\n", line);
 	if (line[4] == 'M') { // mesh
-		return Geometry::create_from_file(f, scene, replacedNames);
+		return TriMesh::create_from_file(f, scene, replacedNames);
 	}
 	if (line[4] == 'S') { // sphere
 		return Sphere::create_from_file(f);
@@ -230,7 +230,7 @@ void Scene::addObject(Object* o) {
 
 #ifdef USE_EMBREE
 	embree_bvh_up_to_date = false;
-	Geometry* g = dynamic_cast<Geometry*>(o);
+	TriMesh* g = dynamic_cast<TriMesh*>(o);
 	if (g) {
 		g->instance_geom = rtcNewGeometry(embree_device, RTC_GEOMETRY_TYPE_INSTANCE);
 		rtcSetGeometryInstancedScene(g->instance_geom, g->embree_scene_for_instance);
@@ -260,7 +260,7 @@ void Scene::prepare_render() {
 		for (int i = 0; i < objects.size(); i++) {
 
 			if (objects[i]->type == OT_TRIMESH) {
-				Geometry* g = dynamic_cast<Geometry*>(objects[i]);
+				TriMesh* g = dynamic_cast<TriMesh*>(objects[i]);
 				float trans[16];
 				for (int j = 0; j < 12; j++) {
 					trans[j] = g->trans_matrix[j];
@@ -357,7 +357,7 @@ bool Scene::intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t,
 			P = d.origin + min_t * d.direction;
 			int systemObjectID = embree_to_real_objects[embreeObjectID];
 			sphere_id = systemObjectID;
-			Geometry* g = dynamic_cast<Geometry*>(objects[systemObjectID]);
+			TriMesh* g = dynamic_cast<TriMesh*>(objects[systemObjectID]);
 			mat = g->getMaterial(triangle_id, 1 - embree_ray.hit.u - embree_ray.hit.v, embree_ray.hit.u, embree_ray.hit.v);			
 		} else {
 			P = objects[sphere_id]->apply_transformation(P);			

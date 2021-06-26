@@ -208,6 +208,7 @@
     <ClCompile Include="Vector.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BRDF.h" />
     <ClInclude Include="chrono.h" />
     <ClInclude Include="CImg.h" />
     <ClInclude Include="fluid.h" />

@@ -698,7 +698,7 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 	raytracer.s.objects[selected_object]->ghost = raytracer_app->ghost->IsChecked();
 #ifdef USE_EMBREE
 	if (raytracer.s.objects[selected_object]->type == OT_TRIMESH) {
-		Geometry* g = dynamic_cast<Geometry*>(raytracer.s.objects[selected_object]);
+		TriMesh* g = dynamic_cast<TriMesh*>(raytracer.s.objects[selected_object]);
 		if (raytracer.s.objects[selected_object]->ghost)
 			rtcSetGeometryMask(g->instance_geom, 1);
 		else
@@ -839,7 +839,7 @@ void RenderPanel::update_gui() {
 
 	
 	if (raytracer.s.objects[selected_object]->type == OT_TRIMESH) {
-		Geometry* g = dynamic_cast<Geometry*>(raytracer.s.objects[selected_object]);
+		TriMesh* g = dynamic_cast<TriMesh*>(raytracer.s.objects[selected_object]);
 		std::ostringstream os;
 		os << "triangles: " << g->indices.size() << ", vertices: " << g->vertices.size() << ", bvh leaves size: " << g->max_bvh_triangles << ", bvh max depth: " << g->bvh_depth << ", bvh avg depth:" << g->bvh_avg_depth << ", bvh nb nodes: " << g->bvh_nb_nodes << ", mouse distance: " << selected_object_t;
 		raytracer_app->infoModel->SetLabelText(os.str().c_str());
@@ -958,7 +958,7 @@ void RenderPanel::update_gui() {
 	}
 
 	if (raytracer.s.objects[selected_object]->type == OT_TRIMESH) {
-		Geometry* g = dynamic_cast<Geometry*>(raytracer.s.objects[selected_object]);
+		TriMesh* g = dynamic_cast<TriMesh*>(raytracer.s.objects[selected_object]);
 		int id = g->indices[selected_tri].group;
 		raytracer_app->m_AlbedoFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
 		raytracer_app->m_NormalFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
@@ -1126,7 +1126,7 @@ void RaytracerFrame::ExportMtl(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	Geometry* g = dynamic_cast<Geometry*>(render_panel->raytracer.s.objects[obj_id]);
+	TriMesh* g = dynamic_cast<TriMesh*>(render_panel->raytracer.s.objects[obj_id]);
 	if (!g) return;
 
 	wxFileDialog
@@ -1161,7 +1161,7 @@ void RaytracerFrame::ShowMeshInfo(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
 	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
-	Geometry* g = dynamic_cast<Geometry*>(render_panel->raytracer.s.objects[obj_id]);
+	TriMesh* g = dynamic_cast<TriMesh*>(render_panel->raytracer.s.objects[obj_id]);
 	if (!g) return;
 
 	int nbE, nbNonM, nbBoundaries;
@@ -1990,7 +1990,7 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 					wxMessageBox("No triangle mesh was selected to apply the segments to", "Error", wxOK) ;
 					return true;
 				}
-				Geometry* g = dynamic_cast<Geometry*>(m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]);
+				TriMesh* g = dynamic_cast<TriMesh*>(m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]);
 				if (!g) {
 					wxMessageBox("Selected object is not a triangle mesh", "Error", wxOK);
 					return true;
@@ -2019,7 +2019,7 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 					wxMessageBox("No triangle mesh was selected to apply the segments to", "Error", wxOK);
 					return true;
 				}
-				Geometry* g = dynamic_cast<Geometry*>(m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]);
+				TriMesh* g = dynamic_cast<TriMesh*>(m_pOwner->render_panel->raytracer.s.objects[m_pOwner->render_panel->selected_object]);
 				if (!g) {
 					wxMessageBox("Selected object is not a triangle mesh", "Error", wxOK);
 					return true;
@@ -2078,7 +2078,7 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 
 			if ((filenames[n].Lower().find(".obj") != std::string::npos)  || (filenames[n].Lower().find(".wrl") != std::string::npos) || (filenames[n].Lower().find(".off") != std::string::npos)) {
 				bool center = (wxMessageBox("Should the model be normalized / centered ?", "Normalization ?", wxYES_NO | wxCENTRE) == wxYES);
-				Geometry* g = new Geometry(&m_pOwner->render_panel->raytracer.s, filenames[n], 1, Vector(0, 0, 0), false, NULL, false, center);
+				TriMesh* g = new TriMesh(&m_pOwner->render_panel->raytracer.s, filenames[n], 1, Vector(0, 0, 0), false, NULL, false, center);
 				g->scale = 30;
 				g->display_edges = false;
 				has_loaded_obj = true;
