@@ -31,6 +31,7 @@ if(APPLE)
 endif()
 find_package(OpenMP REQUIRED)
 
+#----- Embree
 if(USE_EMBREE)
   message(STATUS "Embree enabled")
   find_package(embree 3.0 REQUIRED)
@@ -51,6 +52,12 @@ if(USE_EMBREE)
     ENDIF()
   ENDIF()
   set(DepsLibs "embree")
+  if (EMBREE_RAY_MASK)
+    message(STATUS "   EMBREE_RAY_MASK enabled.")
+  else()
+    message(FATAL "Embree must have been compiled with the EMBREE_RAY_MASK enabled.")
+  endif()
+  
 endif()
 
 
