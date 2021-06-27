@@ -14,10 +14,8 @@
 
 #include <omp.h>
 
-#define USE_EMBREE
-
 #ifdef USE_EMBREE
-#include "embree3/rtcore.h"
+#include <embree3/rtcore.h>
 
 #endif
 
