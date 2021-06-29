@@ -2,7 +2,7 @@
 Minimalist Quick'n Dirty Path Tracer. (almost) No keyboard needed, just drag'n drop files.
 
 ## Supports:
-* Phong BRDF model ; some defaults materials from Ngan's fits, as well as support for measured BRDFs from Matusik
+* Phong BRDF model ; some defaults materials from Ngan's fits, as well as support for measured BRDFs from Matusik. Basic subsurface scattering.
 * Environment maps
 * Normal maps, Alpha maps, textures for Albedo, Specular Ks, Shininess, Refraction, Refraction Index
 * OBJ (with materials) and VRML import, XYZ import for point clouds (can also estimate normals)
