@@ -1183,7 +1183,7 @@ void RaytracerFrame::Open(wxCommandEvent &evt) {
 	render_panel->update_gui();	
 	render_panel->start_render();
 #ifdef USE_EMBREE
-	Sleep(100);  // crazy, but I need to do that, otherwise the gometries only show after the threads are stopped/relaunched
+  std::this_thread::sleep_for(std::chrono::milliseconds(100) );
 	render_panel->stop_render();
 	render_panel->start_render();
 #endif
@@ -2237,7 +2237,8 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 
 #ifdef USE_EMBREE
 		if (has_loaded_obj) {
-			Sleep(100);  // crazy, but I need to do that, otherwise the gometries only show after the threads are stopped/relaunched
+      std::this_thread::sleep_for(std::chrono::milliseconds(100) );
+      // crazy, but I need to do that, otherwise the gometries only show after the threads are stopped/relaunched
 			m_pOwner->render_panel->stop_render();
 			m_pOwner->render_panel->start_render();
 		}
