@@ -367,7 +367,9 @@ public:
 		posNormalized[0] = std::max(0., std::min(Nx - 1.000001, posNormalized[0]));
 		posNormalized[1] = std::max(0., std::min(Ny - 1.000001, posNormalized[1]));
 		posNormalized[2] = std::max(0., std::min(Nz - 1.000001, posNormalized[2]));
-		int icoords[3] = {posNormalized[0], posNormalized[1] , posNormalized[2]};
+		int icoords[3] = {static_cast<int>(std::round(posNormalized[0])),
+                      static_cast<int>(std::round(posNormalized[1])),
+                      static_cast<int>(std::round(posNormalized[2]))};
 		//if (icoords[0] >= Nx - 1 || icoords[1] >= Ny - 1 || icoords[2] >= Nz - 1) return T(0);
 		//if (icoords[0] < 0 || icoords[1] <0 || icoords[2] <0) return T(0);
 
@@ -859,7 +861,7 @@ public:
 				particles_new[i] = particles_old[i] + curdt/6.*(k1+2*k2+2*k3+k4);
 
 				Vector pgrid = (particles_new[i] - extent.bounds[0]) / dx;
-				int pi[3] = { pgrid[0], pgrid[1] , pgrid[2] };
+				int pi[3] = { static_cast<int>(std::round(pgrid[0])), static_cast<int>(std::round(pgrid[1] )), static_cast<int>(std::round(pgrid[2])) };
 				if ((pi[0] < 0 || pi[1] < 0 || pi[2] < 0) || (pi[0] >= Nx || pi[1] >= Ny || pi[2] >= Nz) || (celltypes[pi[2] * Ny*Nx + pi[1] * Nx + pi[0]] == 2)) {
 					curdt *= 0.75;
 				} else break;
@@ -889,7 +891,7 @@ public:
 		int fluidcount = 0;
 		for (int i = 0; i < ghostparticles.size(); i++) {
 			Vector pgrid = (ghostparticles[i] - extent.bounds[0]) / dx;
-			int pi[3] = {pgrid[0], pgrid[1] , pgrid[2] };
+			int pi[3] = {static_cast<int>(std::round(pgrid[0])), static_cast<int>(std::round(pgrid[1])) , static_cast<int>(std::round(pgrid[2])) };
 			if (pi[0] < 0 || pi[1] < 0 || pi[2] < 0) continue;
 			if (pi[0] >= Nx || pi[1] >= Ny || pi[2] >= Nz) continue;
 			if (celltypes[pi[2] * Ny*Nx + pi[1] * Nx + pi[0]] != 0) continue;
@@ -901,7 +903,7 @@ public:
 		fclose(f);
 		for (int i = 0; i < visualparticles.size(); i++) {
 			Vector pgrid = (visualparticles[i] - extent.bounds[0]) / dx;
-			int pi[3] = { pgrid[0], pgrid[1] , pgrid[2] };
+			int pi[3] = { static_cast<int>(std::round(pgrid[0])), static_cast<int>(std::round(pgrid[1])) , static_cast<int>(std::round(pgrid[2] ))};
 			if (pi[0] < 0 || pi[1] < 0 || pi[2] < 0) continue;
 			if (pi[0] >= Nx || pi[1] >= Ny || pi[2] >= Nz) continue;
 			if (celltypes[pi[2] * Ny*Nx + pi[1] * Nx + pi[0]] != 0) continue;

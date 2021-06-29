@@ -83,7 +83,7 @@ bool Fluid::intersection_transparent2(const Ray& d, Vector& P, double &t, Materi
 	int threadid = omp_get_thread_num();
 	int interid = 0;
 	Vector startingP = d.origin + (t_box_left+1E-9) * d.direction;
-	int boxid[3] = { (startingP[0] - extent.bounds[0][0]) / dx[0], (startingP[1] - extent.bounds[0][1]) / dx[1] , (startingP[2] - extent.bounds[0][2]) / dx[2] };
+	int boxid[3] = { static_cast<int>(std::round((startingP[0] - extent.bounds[0][0]) / dx[0])), static_cast<int>(std::round((startingP[1] - extent.bounds[0][1]) / dx[1] )), static_cast<int>(std::round((startingP[2] - extent.bounds[0][2]) / dx[2] ))};
 	if (boxid[0] < 0 || boxid[1] < 0 || boxid[2] < 0 || boxid[0] >= Nx || boxid[1] >= Ny || boxid[2] >= Nz) return false;
 
 	char stepX = signs[0] * 2 - 1;
@@ -193,7 +193,7 @@ bool Fluid::intersection_opaque2(const Ray& d, Vector& P, double &t, MaterialVal
 	int threadid = omp_get_thread_num();
 	int interid = 0;
 	Vector startingP = d.origin + (t_box_left + 1E-9) * d.direction;
-	int boxid[3] = { (startingP[0] - extent.bounds[0][0]) / dx[0], (startingP[1] - extent.bounds[0][1]) / dx[1] , (startingP[2] - extent.bounds[0][2]) / dx[2] };
+	int boxid[3] = { static_cast<int>(std::round((startingP[0] - extent.bounds[0][0]) / dx[0])), static_cast<int>(std::round((startingP[1] - extent.bounds[0][1]) / dx[1])) , static_cast<int>(std::round((startingP[2] - extent.bounds[0][2]) / dx[2])) };
 	if (boxid[0] < 0 || boxid[1] < 0 || boxid[2] < 0 || boxid[0] >= Nx || boxid[1] >= Ny || boxid[2] >= Nz) return false;
 
 	char stepX = signs[0] * 2 - 1;
@@ -281,7 +281,7 @@ bool Fluid::intersection_shadow2(const Ray& d, double &t, double cur_best_t, dou
 	int threadid = omp_get_thread_num();
 	int interid = 0;
 	Vector startingP = d.origin + (t_box_left + 1E-9) * d.direction;
-	int boxid[3] = { (startingP[0] - extent.bounds[0][0]) / dx[0], (startingP[1] - extent.bounds[0][1]) / dx[1] , (startingP[2] - extent.bounds[0][2]) / dx[2] };
+	int boxid[3] = { static_cast<int>(std::round((startingP[0] - extent.bounds[0][0]) / dx[0])), static_cast<int>(std::round((startingP[1] - extent.bounds[0][1]) / dx[1])) , static_cast<int>(std::round((startingP[2] - extent.bounds[0][2]) / dx[2])) };
 	if (boxid[0] < 0 || boxid[1] < 0 || boxid[2] < 0 || boxid[0] >= Nx || boxid[1] >= Ny || boxid[2] >= Nz) return false;
 	char stepX = signs[0] * 2 - 1;
 	char stepY = signs[1] * 2 - 1;

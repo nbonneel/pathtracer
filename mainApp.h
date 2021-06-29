@@ -15,9 +15,10 @@
 #include "chrono.h"
 //#include <Windows.h>
 #include <thread>
-
+#include <chrono>
 #include "Raytracer.h"
 
+#include "fluid.h"
 
 #define EDGES_CHECKBOX 1001
 #define INTERP_CHECKBOX 1002
