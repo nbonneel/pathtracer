@@ -22,7 +22,7 @@ double int_exponential(double y0, double ysol, double beta, double s, double uy)
 	return result;
 }
 
-Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, bool show_lights, bool no_envmap) {
+Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, bool show_lights, bool no_envmap, bool has_had_subsurface_interaction) {
 
 	if (nbrebonds == 0) return Vector(0, 0, 0);
 
@@ -51,6 +51,8 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 		return Vector(r, g, b);
 	}
 	double lum_scale = s.lumiere->get_scale(r.time, is_recording);
+	Vector rayDirection = r.direction;
+	bool is_subsurface = true;
 
 	Vector intensite_pixel(0, 0, 0);
 	if (has_inter) {
@@ -69,13 +71,78 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 		if (sphere_id == 0) {
 			intensite_pixel = show_lights ? (/*s.lumiere->albedo **/Vector(1.,1.,1.)* (s.intensite_lumiere / sqr(lum_scale))) : Vector(0., 0., 0.);
 		} else {
+			
+			double subsProba = sqrt(mat.Ksub.getNorm2());
+			Vector subsW = Vector(1. / (1. - subsProba), 1. / (1. - subsProba), 1. / (1. - subsProba));
+
+			bool sub_interaction = false;
+			if (/*!has_had_subsurface_interaction &&*/ is_subsurface && (engine[threadid]()*invmax < subsProba) ) {
+				sub_interaction = (mat.Ksub.getNorm2()>1E-8);
+				subsW = Vector(1. / (subsProba), 1. / (subsProba), 1. / (subsProba));
+
+				const double diskR = 4;
+				const double sigmasub = 2;
+				/*float r1 = engine[threadid]()*invmax;
+				float sr2 = sqrt(engine[threadid]()*invmax);
+				float x = diskR*sin(2 * M_PI*r1)*sr2;
+				float y = diskR*cos(2 * M_PI*r1)*sr2;*/
+
+				Vector gauss(0, 0, 1000);
+				while (gauss[2] > diskR) {
+					gauss = boxMuller()*sigmasub;
+				}
+				double gaussval = (1. / (sigmasub*sigmasub * 2 * M_PI))*exp(-(gauss[2] * gauss[2]) / (2 * sigmasub*sigmasub));
+				Vector Tg = getTangent(N);
+				Vector Tg2 = cross(N, Tg);
+				Vector PtaboveP = P + gauss[0] * Tg + gauss[1] * Tg2 + N * diskR;
+				float r1 = engine[threadid]()*invmax;
+				Vector axis;
+				double tmax;
+				double h = sqrt(diskR*diskR - gauss[2] * gauss[2]);
+				Vector subsOrigin = PtaboveP + (diskR - h)*(-N);
+								
+				if (r1 < 0.5) {
+					axis = -N;
+					tmax = 2 * h;
+				} else {
+					tmax = 2 * gauss[2];
+					if (r1 < 0.75) {
+						axis = Tg;
+					} else
+						axis = Tg2;
+				}
+				MaterialValues subsmat;
+				int subsid, substriid;
+				double subst;
+				Vector localP2;
+
+				subsid = sphere_id;
+				bool subsinter = s.get_random_intersection(Ray(subsOrigin, axis, r.time), localP2, subsid, subst, subsmat, substriid, 0, tmax, false);
+				if (subsinter) {					
+					subsW *= 1. / std::max(gaussval*std::abs(dot(mat.shadingN, subsmat.shadingN)),0.005) *exp(-(P - localP2).getNorm2() / (2.*sigmasub*sigmasub));
+					rayDirection = (localP2 - P).getNormalized();
+					P = localP2 + 0.01*subsmat.shadingN;
+					if (r1 < 0.5) {
+						subsW *= 2;
+					} else
+						subsW *= 4;
+					subsW = subsW*((/*Vector(1.,1.,1.)-*/mat.Ksub/*-mat.Ks*/) / M_PI); // Kd subsurface...
+					mat = subsmat;
+					N = mat.shadingN;
+					tri_id = substriid;					
+
+				}
+
+
+			}
+
 			BRDF* brdf = s.objects[sphere_id]->brdf; 
 			//brdf->setParameters(mat);
 
 			intensite_pixel += mat.Ke*s.envmap_intensity;
 
 			if (s.objects[sphere_id]->miroir) {
-				Vector direction_miroir = r.direction.reflect(N);
+				Vector direction_miroir = rayDirection.reflect(N);
 				Ray rayon_miroir(P + 0.001*N, direction_miroir, r.time);
 
 				//if (uniform(engine) < 0.9)
@@ -88,38 +155,38 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 					Vector normale_pour_transparence(N);
 					Ray new_ray;
 					bool entering = true;
-					if (dot(r.direction, N) > 0) {  // on sort de la sphere
+					if (dot(rayDirection, N) > 0) {  // on sort de la sphere
 						n1 = mat.refr_index;
 						n2 = 1;
 						normale_pour_transparence = -N;
 						entering = false;
 					}
-					double radical = 1 - sqr(n1 / n2)*(1 - sqr(dot(normale_pour_transparence, r.direction)));
+					double radical = 1 - sqr(n1 / n2)*(1 - sqr(dot(normale_pour_transparence, rayDirection)));
 					if (radical > 0) {
-						Vector direction_refracte = (n1 / n2)*(r.direction - dot(r.direction, normale_pour_transparence)*normale_pour_transparence) - normale_pour_transparence * sqrt(radical);
+						Vector direction_refracte = (n1 / n2)*(rayDirection - dot(rayDirection, normale_pour_transparence)*normale_pour_transparence) - normale_pour_transparence * sqrt(radical);
 						Ray rayon_refracte(P - 0.001*normale_pour_transparence, direction_refracte, r.time);
 
 						double R0 = sqr((n1 - n2) / (n1 + n2));
 						double R;
 						if (entering) {
-							R = R0 + (1 - R0)*std::pow(1 + dot(r.direction, N), 5);
+							R = R0 + (1 - R0)*std::pow(1 + dot(rayDirection, N), 5);
 						} else {
 							R = R0 + (1 - R0)*std::pow(1 - dot(direction_refracte, N), 5);
 						}
 
 						if (engine[threadid]()*invmax < R) {
-							new_ray = Ray(P + 0.001*normale_pour_transparence, r.direction.reflect(N), r.time);
+							new_ray = Ray(P + 0.001*normale_pour_transparence, rayDirection.reflect(N), r.time);
 						} else {
 							new_ray = Ray(P - 0.001*normale_pour_transparence, direction_refracte, r.time);
 						}
 					} else {
-						new_ray = Ray(P + 0.001*normale_pour_transparence, r.direction.reflect(N), r.time);
+						new_ray = Ray(P + 0.001*normale_pour_transparence, rayDirection.reflect(N), r.time);
 						//return Vector(0, 0, 0);
 					}
 					intensite_pixel += getColor(new_ray, sampleID, nbrebonds - 1, screenI, screenJ, show_lights, no_envmap);
 				} else {
 
-					//if (dot(N, r.direction) > 0) N = -N;
+					//if (dot(N, rayDirection) > 0) N = -N;
 
 			// contribution de l'eclairage direct
 				/*Ray ray_light(P + 0.01*N, (s.lumiere->O - P).getNormalized(), r.time);
@@ -150,31 +217,36 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 					Vector tr;
 					if (s.objects[sphere_id]->ghost) {
 						Vector offset;   // try to be robust here since we don't do nbrebonds-1
-						if (dot(N, r.direction) > 0)
+						if (dot(N, rayDirection) > 0)
 							offset = N;
 						else
 							offset = -N;
-						tr = getColor(Ray(P + r.direction*0.001 + offset*0.001, r.direction, r.time), sampleID, nbrebonds, screenI, screenJ, show_lights, no_envmap);
+						tr = getColor(Ray(P + rayDirection *0.001 + offset*0.001, rayDirection, r.time), sampleID, nbrebonds, screenI, screenJ, show_lights, no_envmap);
 					}
 					Ray ray_light(P + 0.01*wi, wi, r.time);
 					double t_light;
 					bool has_inter_light = s.intersection_shadow(ray_light, t_light, sqrt(d_light2), true);
 					bool direct_visible = true;
 					if ((has_inter_light) ) {
-						intensite_pixel += Vector(0, 0, 0);
+						//intensite_pixel += Vector(0, 0, 0);
 						direct_visible = false;
 					} else {
-						//intensite_pixel = (s.intensite_lumiere / (4.*M_PI*d_light2) * std::max(0., dot(N, wi)) * dot(Np, -wi) / dot(axeOP, dir_aleatoire))*(M_PI) * ((1. - s.objects[sphere_id]->ks)*albedo/ (M_PI) + Phong_BRDF(wi, r.direction, N, s.objects[sphere_id]->phong_exponent)*s.objects[sphere_id]->ks * albedo);
-						if (dot(N, wi) < 0) N = -N;
-						//Vector BRDF = albedo / M_PI   * (1. - s.objects[sphere_id]->ks)   + s.objects[sphere_id]->ks*Phong_BRDF(wi, r.direction, N, s.objects[sphere_id]->phong_exponent)*albedo;
-						Vector BRDF = brdf->eval(mat, wi, -r.direction, N);// kd / M_PI + Phong_BRDF(wi, r.direction, N, mat.Ne)*mat.Ks;
+						
+						//if (dot(N, wi) < 0) N = -N; // two sided shading...
+						
+						Vector BRDF;
+						if (sub_interaction) {
+							BRDF = (/*Vector(1., 1., 1.) -*/ mat.Ksub /*- mat.Ks*/) / M_PI;
+						} else {
+							BRDF = brdf->eval(mat, wi, -rayDirection, N);
+						}
 						double J = 1.*dot(Np, -wi) / d_light2;
 						double proba = dot(axeOP, dir_aleatoire) / (M_PI * s.lumiere->R*s.lumiere->R*lum_scale*lum_scale);
 						if (s.objects[sphere_id]->ghost) {
 							intensite_pixel += tr;
 						} else {
 							if (proba > 0) {
-								intensite_pixel += (s.intensite_lumiere / sqr(lum_scale) * std::max(0., dot(N, wi)) * J / proba)  * BRDF;
+								intensite_pixel += subsW*(s.intensite_lumiere / sqr(lum_scale) * std::max(0., dot(N, wi)) * J / proba)  * BRDF;
 							}
 						}
 						
@@ -185,16 +257,24 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 					double proba_globale;
 					Vector direction_aleatoire;
 					if (nbrebonds == nb_bounces && no_envmap) {
-						direction_aleatoire = brdf->sample(mat, -r.direction, N, proba_globale);
+						if (sub_interaction) {
+							direction_aleatoire = random_cos(N);
+							proba_globale = dot(N, direction_aleatoire);
+						} else
+						direction_aleatoire = brdf->sample(mat, -rayDirection, N, proba_globale);
 					}  else {		
 						float tmp;
 						float r1 = modf(randomPerPixel[screenI*W+screenJ][0] + samples2d[sampleID][0], &tmp); // cranley patterson
 						float r2 = modf(randomPerPixel[screenI*W + screenJ][1] + samples2d[sampleID][0], &tmp);
-						direction_aleatoire = brdf->sample(mat, -r.direction, N, proba_globale, r1, r2);
+						if (sub_interaction) {
+							direction_aleatoire = random_cos(mat.shadingN, r1, r2);
+							proba_globale = dot(N, direction_aleatoire) / M_PI;
+						} else
+							direction_aleatoire = brdf->sample(mat, -rayDirection, N, proba_globale, r1, r2);
 					}
 						
 
-					if (dot(direction_aleatoire, N) < 0 || dot(direction_aleatoire, r.direction.reflect(N)) < 0 || proba_globale <= 0) {
+					if (dot(direction_aleatoire, N) < 0 || dot(direction_aleatoire, rayDirection.reflect(N)) < 0 || proba_globale <= 0) {
 						//delete brdf;
 						return intensite_pixel;
 					}
@@ -202,22 +282,29 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 
 					Ray	rayon_aleatoire(P + 0.01*direction_aleatoire, direction_aleatoire, r.time);
 
-					intensite_pixel += getColor(rayon_aleatoire, sampleID, nbrebonds - 1, screenI, screenJ, false, no_envmap)  * ((dot(N, direction_aleatoire) / proba_globale)) *brdf->eval(mat, direction_aleatoire, -r.direction, N);
+					Vector BRDFindirect;
+					if (sub_interaction) {
+						BRDFindirect = mat.Ksub / M_PI;
+					} else {
+						BRDFindirect = brdf->eval(mat, direction_aleatoire, -rayDirection, N);
+					}
 
+					intensite_pixel += subsW*getColor(rayon_aleatoire, sampleID, nbrebonds - 1, screenI, screenJ, false, no_envmap, sub_interaction?true:has_had_subsurface_interaction)  * ((dot(N, direction_aleatoire) / proba_globale)) * BRDFindirect;
+					
 					/*if (s.objects[sphere_id]->ghost) {
 						//if (nbrebonds != nb_bounces)
 						//	return intensite_pixel;
 						if (sample_diffuse)
 							intensite_pixel += tr / 196964.699 / M_PI *getColor(rayon_aleatoire, nbrebonds - 1, screenI, screenJ, false, direct_visible)  / proba_globale;
 						else
-							intensite_pixel += getColor(rayon_aleatoire, nbrebonds - 1, screenI, screenJ, false, true)  * Phong_BRDF(direction_aleatoire, r.direction, N, mat.Ne) / proba_globale *mat.Ks;
+							intensite_pixel += getColor(rayon_aleatoire, nbrebonds - 1, screenI, screenJ, false, true)  * Phong_BRDF(direction_aleatoire, rayDirection, N, mat.Ne) / proba_globale *mat.Ks;
 					} else {
 						if (sample_diffuse)
 							intensite_pixel += getColor(rayon_aleatoire, nbrebonds - 1, screenI, screenJ, false, no_envmap) * ((dot(N, direction_aleatoire) / (M_PI) / proba_globale)) * kd;
 						else
-							intensite_pixel += getColor(rayon_aleatoire, nbrebonds - 1, screenI, screenJ, false, no_envmap)  * ((dot(N, direction_aleatoire) / proba_globale)) *mat.Ks * Phong_BRDF(direction_aleatoire, r.direction, N, mat.Ne);
+							intensite_pixel += getColor(rayon_aleatoire, nbrebonds - 1, screenI, screenJ, false, no_envmap)  * ((dot(N, direction_aleatoire) / proba_globale)) *mat.Ks * Phong_BRDF(direction_aleatoire, rayDirection, N, mat.Ne);
 					}*/
-					//intensite_pixel += getColor(rayon_aleatoire, nbrebonds - 1, false)  * dot(N, direction_aleatoire) * Phong_BRDF(direction_aleatoire, r.direction, N, s.objects[sphere_id]->phong_exponent)*s.objects[sphere_id]->ks * albedo / proba_globale;
+					//intensite_pixel += getColor(rayon_aleatoire, nbrebonds - 1, false)  * dot(N, direction_aleatoire) * Phong_BRDF(direction_aleatoire, rayDirection, N, s.objects[sphere_id]->phong_exponent)*s.objects[sphere_id]->ks * albedo / proba_globale;
 				}
 				//delete brdf;
 		}
@@ -237,7 +324,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 	if (is_uniform_fog) {
 		int_ext = beta * t;
 	} else {
-		int_ext = int_exponential(r.origin[1], s.objects[2]->get_translation(r.time, is_recording)[1], beta, t, r.direction[1]);
+		int_ext = int_exponential(r.origin[1], s.objects[2]->get_translation(r.time, is_recording)[1], beta, t, rayDirection[1]);
 	}
 	double T = exp(-int_ext);
 
@@ -262,11 +349,11 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 	if (is_uniform_fog) {
 		int_ext_partielle = beta * random_t;
 	} else {
-		int_ext_partielle = int_exponential(r.origin[1], s.objects[2]->get_translation(r.time, is_recording)[1], beta, random_t, r.direction[1]);
+		int_ext_partielle = int_exponential(r.origin[1], s.objects[2]->get_translation(r.time, is_recording)[1], beta, random_t, rayDirection[1]);
 	}
 		
 
-	Vector random_P = r.origin + random_t*r.direction;
+	Vector random_P = r.origin + random_t* rayDirection;
 
 	Vector random_dir;
 	double proba_dir;
@@ -275,7 +362,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 	Vector axeOP = (random_P - centerLight).getNormalized();
 	bool is_uniform;
 	if (engine[threadid]()*invmax < p_uniform) {
-		random_dir = random_uniform();				
+		random_dir = random_uniform_sphere();				
 		is_uniform = true;
 	} else {		
 		Vector dir_aleatoire = random_cos(axeOP);
@@ -292,10 +379,10 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 		phase_func = 0.3 / (4.*M_PI);
 		break;
 	case 1:		
-		phase_func = (1 - k*k) / (4.*M_PI*(1 + k*dot(random_dir, -r.direction)));
+		phase_func = (1 - k*k) / (4.*M_PI*(1 + k*dot(random_dir, -rayDirection)));
 		break;
 	case 2:
-		phase_func = 3 / (16 * M_PI)*(1 + sqr(dot(random_dir, r.direction)));
+		phase_func = 3 / (16 * M_PI)*(1 + sqr(dot(random_dir, rayDirection)));
 		break;
 	}
 

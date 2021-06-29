@@ -402,7 +402,11 @@ Vector max(const Vector& a, const Vector& b);
 Vector pow(const Vector& a, const Vector& b);
 Vector random_cos(const Vector &N);
 Vector random_cos(const Vector &N, double r1, double r2);
-Vector random_uniform();
+Vector random_uniform_sphere();
+Vector random_uniform_ball();
+Vector random_uniform_hemiball(const Vector &N);
+Vector getTangent(const Vector& N);
+Vector boxMuller();
 
 Vector rotate_dir(const Vector&v, const Vector &angles);
 Vector inverse_rotate_dir(const Vector&v, const Vector &angles); // performs the rotation by -angle, but in the reversed order 

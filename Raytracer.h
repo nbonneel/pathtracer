@@ -36,7 +36,7 @@ public:
 	void save_scene(const char* filename);
 	void load_scene(const char* filename, const char* replacedNames = NULL);
 
-	Vector getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, bool show_lights = true, bool no_envmap = false);
+	Vector getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, bool show_lights = true, bool no_envmap = false, bool has_had_subsurface_interaction = false);
 
 	int W, H, Wlr, Hlr;
 	int nrays;  

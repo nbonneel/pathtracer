@@ -84,7 +84,14 @@ void Object::set_specularmap(const char* filename, int idx) {
 	//specularmap[idx] = Texture(filename, 1, Vector(0., 0., 0.));
 	specularmap[idx].loadColors(filename);
 }
-
+void Object::add_subsurface(const char* filename) {
+	subsurface.push_back(Texture(filename, 1, Vector(0., 0., 0.)));
+}
+void Object::set_subsurface(const char* filename, int idx) {
+	if (idx >= subsurface.size()) return;
+	//specularmap[idx] = Texture(filename, 1, Vector(0., 0., 0.));
+	subsurface[idx].loadColors(filename);
+}
 void Object::add_transp_map(const char* filename) {
 	transparent_map.push_back(Texture(filename, 5, Vector(1., 1., 1.)));
 }
@@ -146,6 +153,9 @@ void Object::add_col_specular(const Vector& col) {
 //	std::string name = std::string("Color: (") + std::to_string((int)(col[0] * 255)) + std::string(", ") + std::to_string((int)(col[1] * 255)) + std::string(", ") + std::to_string((int)(col[2] * 255)) + std::string(")");
 	specularmap.push_back(Texture("Null", 1, col));
 }
+void Object::add_col_subsurface(const Vector& col) {
+	subsurface.push_back(Texture("Null", 1, col));
+}
 
 void Object::add_col_roughness(const Vector& col) {	
 	//std::string name = std::string("Color: (") + std::to_string((int)(col[0])) + std::string(", ") + std::to_string((int)(col[1])) + std::string(", ") + std::to_string((int)(col[2])) + std::string(")");
@@ -166,7 +176,12 @@ void Object::set_col_specular(const Vector& col, int idx) {
 	//std::string name = std::string("Color: (") + std::to_string((int)(col[0] * 255)) + std::string(", ") + std::to_string((int)(col[1] * 255)) + std::string(", ") + std::to_string((int)(col[2] * 255)) + std::string(")");
 	specularmap[idx].multiplier = col;// = Texture(name.c_str(), 1, col);
 }
+void Object::set_col_subsurface(const Vector& col, int idx) {
+	if (idx >= subsurface.size()) return;
 
+	//std::string name = std::string("Color: (") + std::to_string((int)(col[0] * 255)) + std::string(", ") + std::to_string((int)(col[1] * 255)) + std::string(", ") + std::to_string((int)(col[2] * 255)) + std::string(")");
+	subsurface[idx].multiplier = col;// = Texture(name.c_str(), 1, col);
+}
 
 
 void Object::remove_texture(int id) {
@@ -184,6 +199,9 @@ void Object::remove_normal(int id) {
 void Object::remove_roughness(int id) {
 	roughnessmap.erase(roughnessmap.begin() + id);
 }
+void Object::remove_subsurface(int id) {
+	subsurface.erase(subsurface.begin() + id);
+}
 void Object::swap_roughness(int id1, int id2) {
 	std::swap(roughnessmap[id1], roughnessmap[id2]);
 }
@@ -195,6 +213,9 @@ void Object::swap_normal(int id1, int id2) {
 }
 void Object::swap_specular(int id1, int id2) {
 	std::swap(specularmap[id1], specularmap[id2]);
+}
+void Object::swap_subsurface(int id1, int id2) {
+	std::swap(subsurface[id1], subsurface[id2]);
 }
 void Object::swap_alpha(int id1, int id2) {
 	std::swap(alphamap[id1], alphamap[id2]);
@@ -276,6 +297,49 @@ void Scene::prepare_render() {
 
 
 #endif
+}
+
+// super slow version ; returns a random intersection in tmin tmax. Uses reservoir sampling. If sphere_id!=-1, considers only intersections with this object
+bool Scene::get_random_intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id, double tmin, double tmax, bool avoid_ghosts) const {
+	bool hasinter = false;
+	double startt = tmin;
+	int ninter = 0;
+	for (int i = 0; i < 10; i++) {
+		Ray start(d.origin + startt * d.direction, d.direction, d.time);
+		Vector localP;
+		MaterialValues localmat;
+		double localt;
+		int localid = sphere_id, localtri;
+		bool localhasinter = intersection(start, localP, localid, localt, localmat, localtri, avoid_ghosts, false);
+		if (!localhasinter) return hasinter;		
+		if (localt > tmax - startt) return hasinter;
+		startt += localt + 1E-5;
+		if ((sphere_id != -1) && (localid != sphere_id)) continue;
+		ninter++;
+		hasinter = true;
+		if (ninter == 1) {
+			P = localP;
+			sphere_id = localid;
+			min_t = startt;
+			mat = localmat;
+			triangle_id = localtri;
+
+		} else {
+			int threadid = omp_get_thread_num();
+			float invmax = 1.f / engine[threadid].max();
+			float r1 = engine[threadid]()*invmax;
+			if (r1 < 1.f / ninter) {
+				P = localP;
+				sphere_id = localid;
+				min_t = startt;
+				mat = localmat;
+				triangle_id = localtri;
+			}
+		}
+		
+
+	}
+	return hasinter;
 }
 
 bool Scene::intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id, bool avoid_ghosts, bool isCoherent) const {

@@ -26,6 +26,7 @@
 #define KS_SLIDER 1005
 #define ALBEDO_FILES 1006
 #define SPECULAR_FILES 10061
+#define SUBSURFACE_FILES 10067
 #define NORMAL_FILES 10062
 #define ALPHA_FILES 10063
 #define ROUGHNESS_FILES 10064
@@ -110,13 +111,21 @@
 #define ID_REMOVE_TEXTURE_REFR 432
 #define ID_CHANGE_COLOR_REFR 402
 #define ID_CHANGE_TEXTURE_REFR 412
+#define ID_ALBEDO_DELETE_SUBSURFACE 413
+#define ID_MOVEUP_SUBSURFACE 414
+#define ID_MOVEDOWN_SUBSURFACE 415
+#define ID_DELETE_SUBSURFACE 416
+#define ID_REMOVE_TEXTURE_SUBSURFACE 417
+#define ID_ADDWHITE_SUBSURFACE 418
 
 #define ID_SAVE 30
 #define ID_OPEN 31
 #define ID_CHANGE_COLOR 32
 #define ID_CHANGE_TEXTURE 33
 #define ID_CHANGE_COLOR_SPECULAR 34
+#define ID_CHANGE_COLOR_SUBSURFACE 3400
 #define ID_CHANGE_TEXTURE_SPECULAR 35
+#define ID_CHANGE_TEXTURE_SUBSURFACE 3500
 #define ID_CHANGE_COLOR_NORMAL 36
 #define ID_CHANGE_TEXTURE_NORMAL 37
 #define ID_CHANGE_COLOR_ALPHA 38
@@ -171,6 +180,7 @@ public:
 
 	void OnPopupClick(wxCommandEvent &evt);
 	void OnPopupClickSpecular(wxCommandEvent &evt);
+	void OnPopupClickSubsurface(wxCommandEvent &evt);
 	void OnPopupClickNormal(wxCommandEvent &evt);
 	void OnPopupClickAlpha(wxCommandEvent &evt);
 	void OnPopupClickRoughness(wxCommandEvent &evt);
@@ -178,6 +188,7 @@ public:
 	void OnPopupClickRefrIndex(wxCommandEvent &evt);
 	void OnListRightClick(wxListEvent &evt);
 	void OnListRightClickSpecular(wxListEvent &evt);
+	void OnListRightClickSubsurface(wxListEvent &evt);
 	void OnListRightClickNormal(wxListEvent &evt);
 	void OnListRightClickAlpha(wxListEvent &evt);
 	void OnListRightClickRoughness(wxListEvent &evt);
@@ -246,7 +257,20 @@ private:
 	wxListCtrl *m_pOwner;
 	RaytracerFrame *m_rtFrame;
 };
+class DnDSubsurfaceFile : public wxFileDropTarget
+{
+public:
+	DnDSubsurfaceFile(wxListCtrl* pOwner = NULL, RaytracerFrame *rtFrame = NULL) {
+		m_pOwner = pOwner; m_rtFrame = rtFrame;
+	}
 
+	virtual bool OnDropFiles(wxCoord x, wxCoord y,
+		const wxArrayString& filenames);
+
+private:
+	wxListCtrl *m_pOwner;
+	RaytracerFrame *m_rtFrame;
+};
 class DnDRoughnessFile : public wxFileDropTarget
 {
 public:
@@ -720,7 +744,7 @@ public:
 	wxCheckBox *show_edges, *interp_normals, *transparent, *flipnormals, *isLenticularCheck, *isArrayCheck, *ghost, *initfluid;
 	wxTextCtrl *objectName, *envmapName, *backgroundName;
 	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider, *maxangle_slider, *time_slider;
-	wxListCtrl *m_AlbedoFile, *m_SpecularFile, *m_NormalFile, *m_AlphaFile, *m_RoughnessFile, *m_TranspFile, *m_RefrFile;
+	wxListCtrl *m_AlbedoFile, *m_SpecularFile, *m_NormalFile, *m_AlphaFile, *m_RoughnessFile, *m_TranspFile, *m_RefrFile, *m_SubsurfaceFile;
 	//wxColourPickerCtrl *albedoColorPicker;
 	wxRadioButton *uniformFogRadio, *expFogRadio;
 	wxColourDialog* colPicker;

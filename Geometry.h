@@ -404,6 +404,11 @@ public:
 		} else {
 			mat.Ks = specularmap[idx].getVec(u, v);
 		}
+		if (idx >= subsurface.size()) {
+			mat.Ksub = Vector(0., 0., 0.);
+		} else {
+			mat.Ksub = subsurface[idx].getVec(u, v);
+		}
 		if (idx >= roughnessmap.size()) {
 			mat.Ne = Vector(1., 1., 1.);
 		} else {
@@ -461,6 +466,11 @@ public:
 		for (int i = 0; i < normal_map.size(); i++) {
 			fprintf(f, "texture: %s\n", normal_map[i].filename.c_str());
 			fprintf(f, "multiplier: (%lf, %lf, %lf)\n", normal_map[i].multiplier[0], normal_map[i].multiplier[1], normal_map[i].multiplier[2]);
+		}
+		fprintf(f, "nb_subsurfaces: %u\n", static_cast<unsigned int>(subsurface.size()));
+		for (int i = 0; i < subsurface.size(); i++) {
+			fprintf(f, "texture: %s\n", subsurface[i].filename.c_str());
+			fprintf(f, "multiplier: (%lf, %lf, %lf)\n", subsurface[i].multiplier[0], subsurface[i].multiplier[1], subsurface[i].multiplier[2]);
 		}
 		fprintf(f, "nb_specularmaps: %u\n", static_cast<unsigned int>(specularmap.size()));
 		for (int i = 0; i < specularmap.size(); i++) {
@@ -564,6 +574,19 @@ public:
 			}
 			fscanf(f, "multiplier: (%lf, %lf, %lf)\n", &normal_map[normal_map.size() - 1].multiplier[0], &normal_map[normal_map.size() - 1].multiplier[1], &normal_map[normal_map.size() - 1].multiplier[2]);
 		}
+
+		fscanf(f, "nb_subsurfaces: %u\n", &n);
+		for (int i = 0; i < n; i++) {
+			fscanf(f, "texture: %[^\n]\n", line);
+			if (line[0] == 'C' && line[1] == 'o') {  //Color
+				Vector col;
+				sscanf(line, "Color: (%lf, %lf, %lf)\n", &col[0], &col[1], &col[2]);
+				add_col_subsurface(col / 255.);
+			} else {
+				add_subsurface(line);
+			}
+			fscanf(f, "multiplier: (%lf, %lf, %lf)\n", &subsurface[subsurface.size() - 1].multiplier[0], &subsurface[subsurface.size() - 1].multiplier[1], &subsurface[subsurface.size() - 1].multiplier[2]);
+		}
 		fscanf(f, "nb_specularmaps: %u\n", &n);
 		for (int i = 0; i < n; i++) {
 			fscanf(f, "texture: %[^\n]\n", line);
@@ -627,6 +650,8 @@ public:
 	virtual void set_roughnessmap(const char* filename, int idx);
 	virtual void add_transp_map(const char* filename);
 	virtual void set_transp_map(const char* filename, int idx);
+	virtual void add_subsurface(const char* filename);
+	virtual void set_subsurface(const char* filename, int idx);
 	virtual void set_col_transp(double col, int idx);
 	virtual void add_col_transp(double col);
 	virtual void add_refr_map(const char* filename);
@@ -645,17 +670,21 @@ public:
 	virtual void remove_specular(int id);
 	virtual void remove_alpha(int id);
 	virtual void remove_roughness(int id);
+	virtual void remove_subsurface(int id);
 	virtual void swap_refr(int id1, int id2);
 	virtual void swap_transp(int id1, int id2);
 	virtual void swap_alpha(int id1, int id2);
 	virtual void swap_textures(int id1, int id2);
 	virtual void swap_normal(int id1, int id2);
+	virtual void swap_subsurface(int id1, int id2);
 	virtual void swap_specular(int id1, int id2);
 	virtual void swap_roughness(int id1, int id2);
 	virtual void add_col_texture(const Vector& col);
 	virtual void set_col_texture(const Vector& col, int idx);
 	virtual void add_col_specular(const Vector& col);
 	virtual void set_col_specular(const Vector& col, int idx);
+	virtual void add_col_subsurface(const Vector& col);
+	virtual void set_col_subsurface(const Vector& col, int idx);
 	virtual void add_null_normalmap();
 	virtual void set_null_normalmap(int idx);
 	virtual void add_col_alpha(double col);
@@ -669,7 +698,7 @@ public:
 	bool display_edges, interp_normals, flip_normals, ghost;
 	ObjectType type;
 
-	std::vector<Texture> textures, specularmap, alphamap, roughnessmap, normal_map, transparent_map, refr_index_map;
+	std::vector<Texture> textures, specularmap, alphamap, roughnessmap, normal_map, subsurface, transparent_map, refr_index_map;
 	double trans_matrix[12], inv_trans_matrix[12], rot_matrix[9];
 	BRDF* brdf;
 	Scene* scene;
@@ -1076,6 +1105,8 @@ public:
 
 
 	bool intersection_shadow(const Ray& d, double &min_t, double dist_light, bool avoid_ghosts = false) const;
+
+	bool get_random_intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id, double tmin, double tmax, bool avoid_ghosts = false) const;
 
 	void clear_background() {
 		background.clear();

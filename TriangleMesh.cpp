@@ -486,6 +486,7 @@ void TriMesh::readOBJ(const char* obj, bool load_textures) {
 			add_col_alpha(1.);
 			add_col_refr(1.3);
 			add_col_transp(1.);
+			add_col_subsurface(Vector(0., 0., 0.));
 		}
 
 		std::string filenamemat = extractFilePathWithEndingSlash(std::string(obj)) + std::string(matfile);

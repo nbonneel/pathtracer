@@ -44,12 +44,7 @@ Vector cross(const Vector&a, const Vector& b) {
 	return Vector(a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]);
 }
 
-Vector random_cos(const Vector &N, double r1, double r2) {
-	double sr2 = sqrt(1. - r2);
-
-	Vector direction_aleatoire_repere_local(cos(2. * M_PI*r1)*sr2, sin(2. * M_PI*r1)*sr2, sqrt(r2));
-	/*Vector aleatoire(uniform(engine) - 0.5, uniform(engine) - 0.5, uniform(engine) - 0.5);
-	Vector tangent1 = cross(N, aleatoire); tangent1.normalize();*/
+Vector getTangent(const Vector& N) {
 	Vector tangent1;
 	Vector absN(abs(N[0]), abs(N[1]), abs(N[2]));
 	if (absN[0] <= absN[1] && absN[0] <= absN[2]) {
@@ -59,7 +54,15 @@ Vector random_cos(const Vector &N, double r1, double r2) {
 			tangent1 = Vector(-N[2], 0, N[0]);
 		} else
 			tangent1 = Vector(-N[1], N[0], 0);
-		tangent1.normalize();
+	tangent1.normalize();
+	return tangent1;
+}
+
+Vector random_cos(const Vector &N, double r1, double r2) {
+	double sr2 = sqrt(1. - r2);
+
+	Vector direction_aleatoire_repere_local(cos(2. * M_PI*r1)*sr2, sin(2. * M_PI*r1)*sr2, sqrt(r2));
+	Vector tangent1 = getTangent(N);
 	Vector tangent2 = cross(tangent1, N);
 	return direction_aleatoire_repere_local[2] * N + direction_aleatoire_repere_local[0] * tangent1 + direction_aleatoire_repere_local[1] * tangent2;
 }
@@ -76,7 +79,7 @@ Vector random_cos(const Vector &N) {
 
 
 
-Vector random_uniform() {
+Vector random_uniform_sphere() {
 	int threadid = omp_get_thread_num();
 	float invmax = 1.f/engine[threadid].max();
 	float r1 = engine[threadid]()*invmax; // uniform(engine[threadid]);
@@ -87,6 +90,42 @@ Vector random_uniform() {
 	result[2] = 1 - 2 * r2;
 	return result;
 }
+Vector random_uniform_hemisphere(const Vector& N) {
+	int threadid = omp_get_thread_num();
+	float invmax = 1.f / engine[threadid].max();
+	float r1 = engine[threadid]()*invmax; // uniform(engine[threadid]);
+	float r2 = engine[threadid]()*invmax; // uniform(engine[threadid]);
+	Vector resultlocal;
+	resultlocal[0] = cos(2.*M_PI*r1)*sqrt(1 - r2*r2);
+	resultlocal[1] = sin(2.*M_PI*r1)*sqrt(1 - r2 * r2);
+	resultlocal[2] = r2;
+	Vector tangent1 = getTangent(N);
+	Vector tangent2 = cross(tangent1, N);
+	return resultlocal[2] * N + resultlocal[0] * tangent1 + resultlocal[1] * tangent2;
+}
+Vector random_uniform_ball() {
+	int threadid = omp_get_thread_num();
+	float invmax = 1.f / engine[threadid].max();
+	Vector result = std::pow(engine[threadid]()*invmax, 1./3.)*random_uniform_sphere();
+	return result;
+}
+Vector random_uniform_hemiball(const Vector &N) {
+	int threadid = omp_get_thread_num();
+	float invmax = 1.f / engine[threadid].max();
+	Vector result = std::pow(engine[threadid]()*invmax, 1. / 3.)*random_uniform_hemisphere(N);
+	return result;
+}
+Vector boxMuller() { // returns radius in third component
+	int threadid = omp_get_thread_num();
+	float invmax = 1.f / engine[threadid].max();
+	float r1 = engine[threadid]()*invmax;
+	float r2 = engine[threadid]()*invmax;
+	float s1 = sqrt(-2 * log(r1));
+	float s2 = 2 * M_PI*r2;
+	return Vector(s1*cos(s2), s1*sin(s2), s1);
+}
+
+
 
 Vector rotate_dir(const Vector&v, const Vector &angles) {
 

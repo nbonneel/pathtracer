@@ -12,8 +12,9 @@ public:
 		Ne = Vector(100, 100, 100);
 		Ks = Vector(0., 0., 0.);
 		Ke = Vector(0., 0., 0.);
+		Ksub = Vector(0., 0., 0.);
 	}
-	Vector shadingN, Kd, Ks, Ne, Ke;
+	Vector shadingN, Kd, Ks, Ne, Ke, Ksub;
 	bool transp;
 	double refr_index;
 };

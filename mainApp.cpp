@@ -134,6 +134,21 @@ bool RaytracerApp::OnInit()
 	Connect(NORMAL_FILES, wxEVT_LIST_COL_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickNormal), NULL, frame);
 	Connect(NORMAL_FILES, wxEVT_LIST_ITEM_SELECTED, wxListEventHandler(RaytracerFrame::OnListSelected), NULL, frame);
 
+	m_SubsurfaceFile = new wxListCtrl(panelObject, SUBSURFACE_FILES, wxDefaultPosition, wxSize(-1, 100), wxLC_REPORT);
+	wxListItem itCol6;
+	itCol6.SetId(0);
+	itCol6.SetText("Subsurface scattering Map");
+	itCol6.SetWidth(200);
+	itCol2.SetId(1);
+	itCol2.SetText("Subsurface scattering Color");
+	itCol2.SetWidth(200);
+	m_SubsurfaceFile->InsertColumn(0, itCol6);
+	m_SubsurfaceFile->InsertColumn(1, itCol2);
+	m_SubsurfaceFile->SetDropTarget(new DnDSubsurfaceFile(m_SubsurfaceFile, frame));
+	Connect(SUBSURFACE_FILES, wxEVT_LIST_ITEM_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickSubsurface), NULL, frame);
+	Connect(SUBSURFACE_FILES, wxEVT_LIST_COL_RIGHT_CLICK, wxListEventHandler(RaytracerFrame::OnListRightClickSubsurface), NULL, frame);
+	Connect(SUBSURFACE_FILES, wxEVT_LIST_ITEM_SELECTED, wxListEventHandler(RaytracerFrame::OnListSelected), NULL, frame);
+
 	//albedoColorPicker = new wxColourPickerCtrl(panelObject, ALBEDO_COLORPICKER, wxColour(255,255,255), wxDefaultPosition, wxDefaultSize, wxCLRP_USE_TEXTCTRL | wxCLRP_SHOW_LABEL);
 	//Connect(ALBEDO_COLORPICKER, wxEVT_COLOURPICKER_CHANGED, wxCommandEventHandler(RenderPanel<double>::update_parameters_and_render), NULL, renderPanel);
 
@@ -211,6 +226,7 @@ bool RaytracerApp::OnInit()
 	panelObject_sizer->Add(m_SpecularFile, 0, wxEXPAND);
 	panelObject_sizer->Add(m_RoughnessFile, 0, wxEXPAND);
 	panelObject_sizer->Add(m_NormalFile, 0, wxEXPAND);
+	panelObject_sizer->Add(m_SubsurfaceFile, 0, wxEXPAND);
 	panelObject_sizer->Add(m_AlphaFile, 0, wxEXPAND);
 	panelObject_sizer->Add(m_TranspFile, 0, wxEXPAND);
 	panelObject_sizer->Add(m_RefrFile, 0, wxEXPAND);
@@ -886,6 +902,21 @@ void RenderPanel::update_gui() {
 		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
 			raytracer_app->m_NormalFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
 	}
+
+
+	raytracer_app->m_SubsurfaceFile->DeleteAllItems();
+	for (int i = 0; i < raytracer.s.objects[selected_object]->subsurface.size(); i++) {
+		std::string txt = extractFileName(raytracer.s.objects[selected_object]->subsurface[i].filename);
+		wxListItem item;
+		item.SetId(i);
+		std::string filename = raytracer.s.objects[selected_object]->subsurface[i].filename;
+		long index = raytracer_app->m_SubsurfaceFile->InsertItem(i, item);
+		raytracer_app->m_SubsurfaceFile->SetItem(index, 0, txt, -1);		
+		raytracer_app->m_SubsurfaceFile->SetItem(index, 1, raytracer.s.objects[selected_object]->subsurface[i].multiplier.toColorStr(), -1);
+		if (filename[0] != 'N' && filename[1] != 'u' && !file_exists(filename.c_str()))
+			raytracer_app->m_SubsurfaceFile->SetItemBackgroundColour(index, wxColour(255, 0, 0));
+	}
+
 	if (raytracer.s.objects.size()>1 && dynamic_cast<Sphere*>(raytracer.s.objects[1]))
 		raytracer_app->envmapName->SetLabelText(((Sphere*)raytracer.s.objects[1])->envmapfilename);
 	raytracer_app->backgroundName->SetLabelText(raytracer.s.backgroundfilename);
@@ -962,6 +993,7 @@ void RenderPanel::update_gui() {
 		int id = g->indices[selected_tri].group;
 		raytracer_app->m_AlbedoFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
 		raytracer_app->m_NormalFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+		raytracer_app->m_SubsurfaceFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
 		raytracer_app->m_AlphaFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
 		raytracer_app->m_SpecularFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
 		raytracer_app->m_RoughnessFile->SetItemState(id, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
@@ -971,6 +1003,7 @@ void RenderPanel::update_gui() {
 
 		raytracer_app->m_AlbedoFile->EnsureVisible(id);
 		raytracer_app->m_NormalFile->EnsureVisible(id);
+		raytracer_app->m_SubsurfaceFile->EnsureVisible(id);
 		raytracer_app->m_AlphaFile->EnsureVisible(id);
 		raytracer_app->m_SpecularFile->EnsureVisible(id);
 		raytracer_app->m_RoughnessFile->EnsureVisible(id);
@@ -1381,7 +1414,7 @@ void RaytracerFrame::OnPopupClickSpecular(wxCommandEvent &evt) {
 		render_panel->start_render();
 		break;
 	case ID_REMOVE_TEXTURE_SPECULAR:
-		if (item_id >= render_panel->raytracer_app->m_AlbedoFile->GetItemCount() - 1) return;
+		if (item_id >= render_panel->raytracer_app->m_SpecularFile->GetItemCount() - 1) return;
 		render_panel->stop_render();
 		render_panel->raytracer.s.objects[obj_id]->specularmap[item_id].clear_texture();
 		render_panel->start_render();
@@ -1431,6 +1464,75 @@ void RaytracerFrame::OnPopupClickSpecular(wxCommandEvent &evt) {
 	}
 	render_panel->update_gui();
 }
+
+void RaytracerFrame::OnPopupClickSubsurface(wxCommandEvent &evt) {
+	int obj_id = render_panel->selected_object;
+	if (obj_id < 0) return;
+	if (obj_id >= render_panel->raytracer.s.objects.size()) return;
+	int item_id = reinterpret_cast<size_t>((static_cast<wxMenu *>(evt.GetEventObject())->GetClientData()));
+	int itemIndex = -1;
+	int firstSel = render_panel->raytracer_app->m_SubsurfaceFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+
+	switch (evt.GetId()) {
+	case ID_ALBEDO_DELETE_SUBSURFACE:
+		render_panel->stop_render();
+		while ((itemIndex = render_panel->raytracer_app->m_SubsurfaceFile->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED)) != wxNOT_FOUND) {
+			render_panel->raytracer.s.objects[obj_id]->remove_subsurface(firstSel);
+		}
+		render_panel->start_render();
+		break;
+	case ID_REMOVE_TEXTURE_SUBSURFACE:
+		if (item_id >= render_panel->raytracer_app->m_SubsurfaceFile->GetItemCount() - 1) return;
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->subsurface[item_id].clear_texture();
+		render_panel->start_render();
+		break;
+	case ID_MOVEUP_SUBSURFACE:
+		if (item_id <= 0) return;
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->swap_subsurface(item_id, item_id - 1);
+		render_panel->start_render();
+		break;
+	case ID_MOVEDOWN_SUBSURFACE:
+		if (item_id >= render_panel->raytracer_app->m_SpecularFile->GetItemCount() - 1) return;
+		render_panel->stop_render();
+		render_panel->raytracer.s.objects[obj_id]->swap_subsurface(item_id, item_id + 1);
+		render_panel->start_render();
+		break;
+	case ID_ADDWHITE_SUBSURFACE:
+		if (render_panel->raytracer_app->colPicker->ShowModal() == wxID_OK) {
+			wxColourData retData = render_panel->raytracer_app->colPicker->GetColourData();
+			wxColour col = retData.GetColour();
+			render_panel->stop_render();
+			render_panel->raytracer.s.objects[obj_id]->add_col_subsurface(Vector(col.Red() / 255., col.Green() / 255., col.Blue() / 255.));
+			render_panel->start_render();
+		}
+		break;
+	case ID_CHANGE_COLOR_SUBSURFACE:
+	{
+		if (render_panel->raytracer_app->colPicker->ShowModal() == wxID_OK) {
+			wxColourData retData = render_panel->raytracer_app->colPicker->GetColourData();
+			wxColour col = retData.GetColour();
+			render_panel->stop_render();
+			render_panel->raytracer.s.objects[obj_id]->set_col_subsurface(Vector(col.Red() / 255., col.Green() / 255., col.Blue() / 255.), item_id);
+			render_panel->start_render();
+		}
+		break;
+	}
+	case ID_CHANGE_TEXTURE_SUBSURFACE:
+	{
+		if (render_panel->raytracer_app->texOpenDlg->ShowModal() == wxID_OK) {
+			std::string retData = render_panel->raytracer_app->texOpenDlg->GetPath().ToStdString();
+			render_panel->stop_render();
+			render_panel->raytracer.s.objects[obj_id]->set_subsurface(retData.c_str(), item_id);
+			render_panel->start_render();
+		}
+		break;
+	}
+	}
+	render_panel->update_gui();
+}
+
 void RaytracerFrame::OnPopupClickRoughness(wxCommandEvent &evt) {
 	int obj_id = render_panel->selected_object;
 	if (obj_id < 0) return;
@@ -1901,6 +2003,23 @@ void RaytracerFrame::OnListRightClickSpecular(wxListEvent &evt) {
 	mnu.Connect(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(RaytracerFrame::OnPopupClickSpecular), NULL, this);
 	PopupMenu(&mnu);
 }
+
+void RaytracerFrame::OnListRightClickSubsurface(wxListEvent &evt) {
+	size_t sel = evt.GetItem();
+	void *data = reinterpret_cast<void *>(sel);
+	wxMenu mnu;
+	mnu.SetClientData(data);
+	mnu.Append(ID_MOVEUP_SUBSURFACE, "Move Up");
+	mnu.Append(ID_MOVEDOWN_SUBSURFACE, "Move Down");
+	mnu.Append(ID_ALBEDO_DELETE_SUBSURFACE, "Delete Row");
+	mnu.Append(ID_REMOVE_TEXTURE_SUBSURFACE, "Remove Texture");
+	mnu.Append(ID_ADDWHITE_SUBSURFACE, "Add Color");
+	mnu.Append(ID_CHANGE_COLOR_SUBSURFACE, "Change Color");
+	mnu.Append(ID_CHANGE_TEXTURE_SUBSURFACE, "Change Texture");
+
+	mnu.Connect(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(RaytracerFrame::OnPopupClickSubsurface), NULL, this);
+	PopupMenu(&mnu);
+}
 void RaytracerFrame::OnListRightClickNormal(wxListEvent &evt) {
 	size_t sel = evt.GetItem();
 	void *data = reinterpret_cast<void *>(sel);
@@ -2144,6 +2263,24 @@ bool DnDSpecularFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenam
 
 	return true;
 }
+
+bool DnDSubsurfaceFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames) {
+	size_t nFiles = filenames.GetCount();
+	if (m_rtFrame->render_panel->selected_object < 0) return true;
+	if (m_rtFrame->render_panel->selected_object >= m_rtFrame->render_panel->raytracer.s.objects.size()) return true;
+
+	if (m_pOwner != NULL) {
+		m_rtFrame->render_panel->stop_render();
+		for (size_t n = 0; n < nFiles; n++) {
+			m_rtFrame->render_panel->raytracer.s.objects[m_rtFrame->render_panel->selected_object]->add_subsurface(filenames[n]);
+		}
+		m_rtFrame->render_panel->update_gui();
+		m_rtFrame->render_panel->start_render();
+	}
+
+	return true;
+}
+
 
 bool DnDAlbedoFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 {
