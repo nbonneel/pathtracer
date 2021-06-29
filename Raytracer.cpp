@@ -26,7 +26,8 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 
 	if (nbrebonds == 0) return Vector(0, 0, 0);
 
-	Vector centerLight = s.lumiere->O + s.lumiere->get_translation(r.time, is_recording);
+	Vector centerLight = s.lumiere->apply_transformation(s.lumiere->O);// s.lumiere->O + s.lumiere->get_translation(r.time, is_recording);
+	double radiusLight = s.lumiere->get_scale(r.time, is_recording)*s.lumiere->R;
 
 	Vector P;
 	MaterialValues mat;
@@ -209,7 +210,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 						dir_aleatoire = random_cos(axeOP, samples2d[sampleID][0], samples2d[sampleID][1]);
 					else
 						dir_aleatoire = random_cos(axeOP);
-					Vector point_aleatoire = dir_aleatoire * s.lumiere->R*lum_scale + centerLight;
+					Vector point_aleatoire = dir_aleatoire * radiusLight + centerLight;
 					Vector wi = (point_aleatoire - P); wi.fast_normalize();// .getNormalized();
 					double d_light2 = (point_aleatoire - P).getNorm2();
 					Vector Np = dir_aleatoire;
@@ -241,7 +242,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 							BRDF = brdf->eval(mat, wi, -rayDirection, N);
 						}
 						double J = 1.*dot(Np, -wi) / d_light2;
-						double proba = dot(axeOP, dir_aleatoire) / (M_PI * s.lumiere->R*s.lumiere->R*lum_scale*lum_scale);
+						double proba = dot(axeOP, dir_aleatoire) / (M_PI * radiusLight*radiusLight);
 						if (s.objects[sphere_id]->ghost) {
 							intensite_pixel += tr;
 						} else {
