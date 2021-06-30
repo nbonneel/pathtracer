@@ -596,59 +596,64 @@ Vector extensibleLattice2d(uint32_t id) {
 	return Vector(x, y, 0);
 }
 
+void Raytracer::prepare_render() {
+
+	if (randomPerPixel.size() != W * H) {
+		Wlr = ceil(W / 16.);
+		Hlr = ceil(H / 16.);
+		computed.resize(W*H, false);
+		imagedouble.resize(W*H * 3, 0);
+		imagedouble_lowres.resize(Wlr*Hlr * 3, 0);
+		sample_count.resize(W*H, 0);
+
+		randomPerPixel.resize(W*H);
+		for (int i = 0; i < W*H; i++) {
+			randomPerPixel[i][0] = engine[0]()*invmax;
+			randomPerPixel[i][1] = engine[1]()*invmax;
+		}
+	}
+	if (nrays != last_nrays) {
+		samples2d.resize(nrays);
+		for (int i = 0; i < nrays; i++) {
+			samples2d[i] = extensibleLattice2d(i);
+		}
+		last_nrays = nrays;
+	}
+
+	if (sigma_filter != lastfilter) {
+
+		filter_size = std::ceil(sigma_filter * 2);
+		filter_total_width = 2 * filter_size + 1;
+		filter_integral.resize(filter_total_width*filter_total_width);
+		filter_value.resize(filter_total_width*filter_total_width);
+		for (int i = -filter_size; i <= filter_size; i++) {
+			for (int j = -filter_size; j <= filter_size; j++) {
+				double integ = 0;
+				for (int i2 = -filter_size; i2 <= i; i2++) {
+					for (int j2 = -filter_size; j2 <= j; j2++) {
+						double w = fast_exp(-(i2*i2 + j2 * j2) / (2.*sigma_filter*sigma_filter)) / (sigma_filter*sigma_filter*2.*M_PI);
+						integ += w;
+					}
+				}
+				filter_integral[(i + filter_size)*filter_total_width + (j + filter_size)] = integ;
+				filter_value[(i + filter_size)*filter_total_width + (j + filter_size)] = exp(-(i*i + j * j) / (2.*sigma_filter*sigma_filter)) / (sigma_filter*sigma_filter*2.*M_PI);
+			}
+		}
+		lastfilter = sigma_filter;
+	}
+	s.prepare_render();
+
+	std::fill(computed.begin(), computed.end(), false);
+	std::fill(sample_count.begin(), sample_count.end(), 0);
+	std::fill(imagedouble_lowres.begin(), imagedouble_lowres.end(), 0);
+}
+
 void Raytracer::render_image()
 {
 
 	int fstart = 0;
 	int fend = 1;
-	Wlr = ceil(W / 16.);
-	Hlr = ceil(H / 16. );
-	computed.resize(W*H, false);
-	imagedouble.resize(W*H * 3, 0);  
-	imagedouble_lowres.resize(Wlr*Hlr * 3, 0);
-	sample_count.resize(W*H, 0);
-	
-	std::fill(computed.begin(), computed.end(), false);
-	std::fill(sample_count.begin(), sample_count.end(), 0);
-	std::fill(imagedouble_lowres.begin(), imagedouble_lowres.end(), 0);
 
-	for (int i = 0; i < omp_get_max_threads(); i++) {
-		engine[i] = pcg32(i);
-	}
-	
-	samples2d.resize(nrays);
-	for (int i = 0; i < nrays; i++) {
-		samples2d[i] = extensibleLattice2d(i);
-	}
-	randomPerPixel.resize(W*H);
-	for (int i = 0; i < W*H; i++) {	
-		randomPerPixel[i][0] = engine[0]()*invmax;
-		randomPerPixel[i][1] = engine[1]()*invmax;
-	}
-	//static int nbcalls = 0;
-	std::vector<std::pair<int, int> > permut(64);
-	for (int i = 0; i < 8; i++)
-		for (int j = 0; j < 8; j++)
-			permut[i * 8 + j] = std::make_pair(i, j);
-	//std::random_shuffle(permut.begin(), permut.end());
-
-	int filter_size = std::ceil(sigma_filter * 2);
-	int filter_total_width = 2 * filter_size + 1;
-	filter_integral.resize(filter_total_width*filter_total_width);	
-	filter_value.resize(filter_total_width*filter_total_width);
-	for (int i = -filter_size; i <= filter_size; i++) {
-		for (int j = -filter_size; j <= filter_size; j++) {
-			double integ = 0;
-			for (int i2 = -filter_size; i2 <= i; i2++) {
-				for (int j2 = -filter_size; j2 <= j; j2++) {
-					double w = fast_exp(-(i2*i2+j2*j2) / (2.*sigma_filter*sigma_filter)) / (sigma_filter*sigma_filter*2.*M_PI);
-					integ += w;
-				}
-			}
-			filter_integral[(i + filter_size)*filter_total_width + (j + filter_size)] = integ;
-			filter_value[(i + filter_size)*filter_total_width + (j + filter_size)] = exp(-(i*i + j*j) / (2.*sigma_filter*sigma_filter)) / (sigma_filter*sigma_filter*2.*M_PI);
-		}
-	}
 	double denom2 = 1. / (2.*sigma_filter*sigma_filter);
 
 	/*double test = sum_area_table(&filter_integral[0], filter_total_width, filter_size- filter_size, filter_size+15, filter_size+8, filter_size+11);
@@ -660,7 +665,8 @@ void Raytracer::render_image()
 		}
 	}*/
 
-	s.prepare_render();
+	prepare_render();
+	
 
 	for (int time_step = fstart; time_step < fend; time_step++) {
 
@@ -700,7 +706,7 @@ void Raytracer::render_image()
 							double dx_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
 							double dy_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
 
-							double time = s.current_time + time_step / 60. + engine[threadid]()*invmax / 60.f;
+							double time = s.current_frame + time_step + engine[threadid]()*invmax;
 
 
 
@@ -795,45 +801,8 @@ void Raytracer::render_image()
 
 void Raytracer::render_image_nopreviz() {
 
-	computed.resize(W*H, false);
-	imagedouble.resize(W*H * 3, 0);
-	sample_count.resize(W*H, 0);
-
-	std::fill(computed.begin(), computed.end(), false);
-	std::fill(sample_count.begin(), sample_count.end(), 0);
-
-	for (int i = 0; i < omp_get_max_threads(); i++) {
-		engine[i] = pcg32(i);
-	}
-	samples2d.resize(nrays);
-	for (int i = 0; i < nrays; i++) {
-		samples2d[i] = extensibleLattice2d(i);
-	}
-	randomPerPixel.resize(W*H);
-	for (int i = 0; i < W*H; i++) {
-		randomPerPixel[i][0] = engine[0]()*invmax;
-		randomPerPixel[i][1] = engine[1]()*invmax;
-	}
-	int filter_size = std::ceil(sigma_filter * 2);
-	int filter_total_width = 2 * filter_size + 1;
-	filter_integral.resize(filter_total_width*filter_total_width);
-	filter_value.resize(filter_total_width*filter_total_width);
-	for (int i = -filter_size; i <= filter_size; i++) {
-		for (int j = -filter_size; j <= filter_size; j++) {
-			double integ = 0;
-			for (int i2 = -filter_size; i2 <= i; i2++) {
-				for (int j2 = -filter_size; j2 <= j; j2++) {
-					double w = fast_exp(-(i2*i2 + j2 * j2) / (2.*sigma_filter*sigma_filter)) / (sigma_filter*sigma_filter*2.*M_PI);
-					integ += w;
-				}
-			}
-			filter_integral[(i + filter_size)*filter_total_width + (j + filter_size)] = integ;
-			filter_value[(i + filter_size)*filter_total_width + (j + filter_size)] = exp(-(i*i + j * j) / (2.*sigma_filter*sigma_filter)) / (sigma_filter*sigma_filter*2.*M_PI);
-		}
-	}
+	prepare_render();
 	double denom2 = 1. / (2.*sigma_filter*sigma_filter);
-
-	s.prepare_render();
 
 
 	for (int i = 0; i < s.objects.size(); i++) {
@@ -869,7 +838,7 @@ void Raytracer::render_image_nopreviz() {
 				float dx_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
 				float dy_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
 
-				float time = s.current_time + engine[threadid]()*invmax / 60.f;
+				float time = s.current_frame  + engine[threadid]()*invmax; //current_time // beware, now everything is in number of frames!
 
 				Ray r = cam.generateDirection(i, j, time, dx, dy, dx_aperture, dy_aperture, W, H);
 
