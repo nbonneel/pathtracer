@@ -741,7 +741,7 @@ void Raytracer::render_image()
 
 
 
-							Ray r = cam.generateDirection(i, j, time, dx, dy, dx_aperture, dy_aperture, W, H);
+							Ray r = cam.generateDirection(s.double_frustum_start_t, i, j, time, dx, dy, dx_aperture, dy_aperture, W, H);
 
 							Vector color = getColor(r, k, nb_bounces, i, j);
 
@@ -870,7 +870,7 @@ void Raytracer::render_image_nopreviz() {
 
 				float time = s.current_frame;//  +engine[threadid]()*invmax; //current_time // beware, now everything is in number of frames! ; deactivated motion blur as the behavior is strange when the light radius is changing over time
 
-				Ray r = cam.generateDirection(i, j, time, dx, dy, dx_aperture, dy_aperture, W, H);
+				Ray r = cam.generateDirection(s.double_frustum_start_t, i, j, time, dx, dy, dx_aperture, dy_aperture, W, H);
 
 				Vector color = getColor(r, k, nb_bounces, i, j);				
 				for (int i2 = bmin_i; i2 <= bmax_i; i2++) {

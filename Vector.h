@@ -506,7 +506,7 @@ public:
 	}
 	
 
-	Ray generateDirection(int i, int j, double time, double dx_sensor, double dy_sensor, double dx_aperture, double dy_aperture, int W, int H) {
+	Ray generateDirection(double init_t, int i, int j, double time, double dx_sensor, double dy_sensor, double dx_aperture, double dy_aperture, int W, int H) {
 		double k = W / (2 * tan(fov / 2));
 		Vector camera_right = cross(direction, up);		
 
@@ -537,7 +537,8 @@ public:
 		direction_vec = camera_right * direction_vec[0] + up*direction_vec[1] + direction*direction_vec[2];
 		Vector destination = C1 + focus_distance * direction_vec;
 		Vector new_origin = C1 + dx_aperture*camera_right + dy_aperture*up;
-		return Ray(new_origin, (destination - new_origin).getNormalized(), time);
+		Vector new_direction = (destination - new_origin).getNormalized();
+		return Ray(new_origin + init_t*new_direction, new_direction, time);
 	}
 
 	Vector position, direction, up;

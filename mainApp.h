@@ -77,6 +77,7 @@
 #define NBVIEWSY 1046
 #define MAXSPACINGX 1047
 #define MAXSPACINGY 1048
+#define DOUBLEFRUSTUM 1049
 
 #define ID_ALBEDO_DELETE 10
 #define ID_MOVEUP 11
@@ -652,7 +653,7 @@ public:
 		
 
 		/*if (!wasDragging)*/ {
-			Ray r = raytracer.cam.generateDirection((displayH - (mouse_init_y - 1.))*(double)raytracer.H / displayH, mouse_init_x*(double)raytracer.W / displayW, raytracer.s.current_time, 0, 0, 0, 0, raytracer.W, raytracer.H);
+			Ray r = raytracer.cam.generateDirection(raytracer.s.double_frustum_start_t, (displayH - (mouse_init_y - 1.))*(double)raytracer.H / displayH, mouse_init_x*(double)raytracer.W / displayW, raytracer.s.current_time, 0, 0, 0, 0, raytracer.W, raytracer.H);
 
 			Vector P;
 			int new_selected, new_tri;
@@ -751,7 +752,7 @@ public:
 	wxColourDialog* colPicker;
 	wxFileDialog* texOpenDlg;
 	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays, *nbviews, *nbpixslice, *nbframesctrl, *fluidresX, *fluidresY, *fluidresZ, *fluidnparticles, *fluidsubsteps, *nbviewsX, *nbviewsY;
-	wxSpinCtrlDouble *duration, *fluidparticlesize, *fluidtimestep, *maxspacingX, *maxspacingY;
+	wxSpinCtrlDouble *duration, *fluidparticlesize, *fluidtimestep, *maxspacingX, *maxspacingY, *doubleFrustum;
 	wxSpinCtrlDouble* refractionIndex;
 	wxButton *deleteObject, *launchRender, *addKeyframe, *renderVideo, *colorAnisotropy, *randomColors, *addFluid;
 	wxToggleButton*recordKeyframes;

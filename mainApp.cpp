@@ -420,7 +420,7 @@ bool RaytracerApp::OnInit()
 	nbviewsX = new wxSpinCtrl(panelLenticular, NBVIEWSX, wxString("1"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 1000, 1);
 	Connect(NBVIEWSX, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	nbviewsY = new wxSpinCtrl(panelLenticular, NBVIEWSY, wxString("1"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 1000, 1);
-	Connect(NBVIEWSX, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	Connect(NBVIEWSY, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	nbviewsXY_sizer->Add(nbviewsXY_text, 0, wxEXPAND);
 	nbviewsXY_sizer->Add(nbviewsX, 1, wxEXPAND);
 	nbviewsXY_sizer->Add(nbviewsY, 1, wxEXPAND);
@@ -438,8 +438,17 @@ bool RaytracerApp::OnInit()
 	panelLenticular_sizer->Add(spacing_sizer, 0, wxEXPAND);
 
 
+	wxBoxSizer * doublefrustum_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* doublefrustum_text = new wxStaticText(panelLenticular, 9999 - 1, "double frustum (ray start): ");
+	doubleFrustum = new wxSpinCtrlDouble(panelLenticular, DOUBLEFRUSTUM, wxString("0.0"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, -200, 200, 0.0, 0.1);
+	Connect(DOUBLEFRUSTUM, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	doublefrustum_sizer->Add(doublefrustum_text, 0, wxEXPAND);
+	doublefrustum_sizer->Add(doubleFrustum, 1, wxEXPAND);
+	panelLenticular_sizer->Add(doublefrustum_sizer, 0, wxEXPAND);
+	
+
 	panelLenticular->SetSizer(panelLenticular_sizer);
-	m_bookCtrl->AddPage(panelLenticular, wxT("Lenticular"), false);
+	m_bookCtrl->AddPage(panelLenticular, wxT("Lenticular/Holography"), false);
 
 
 
@@ -695,6 +704,7 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 	raytracer.s.current_frame = raytracer_app->time_slider->GetValue();
 	raytracer.s.current_time = raytracer.s.current_frame / (double)raytracer.s.nbframes*raytracer.s.duration;
 	raytracer.is_recording = raytracer_app->recordKeyframes->GetValue();
+	raytracer.s.double_frustum_start_t = raytracer_app->doubleFrustum->GetValue();
 
 	if (selected_object < 0 || (selected_object >= raytracer.s.objects.size())) {
 		start_render();

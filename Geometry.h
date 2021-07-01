@@ -1019,6 +1019,7 @@ class Scene {
 public:
 	Scene() {
 		backgroundW = 0; backgroundH = 0; current_time = 0; current_frame = 0; duration = 1;
+		double_frustum_start_t = 0;
 
 #ifdef USE_EMBREE
 #if _DEBUG
@@ -1133,6 +1134,7 @@ public:
 	int nbframes, current_frame;
 	double duration, current_time;
 	int fog_type; // 0 : uniform, 1: exponential
+	double double_frustum_start_t;
 
 #ifdef USE_EMBREE
 	RTCDevice embree_device;
