@@ -39,6 +39,15 @@ Vector pow(const Vector& a, const Vector& b) {
 double dot(const Vector&a, const Vector& b) {
 	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
+Vector exp(const Vector& a) {
+	return Vector(exp(a[0]), exp(a[1]), exp(a[2]));
+}
+Vector sqrt(const Vector& a) {
+	return Vector(sqrt(a[0]), sqrt(a[1]), sqrt(a[2]));
+}
+Vector sqr(const Vector& a) {
+	return Vector(a[0]*a[0], a[1]*a[1], a[2]*a[2]);
+}
 
 Vector cross(const Vector&a, const Vector& b) {
 	return Vector(a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]);

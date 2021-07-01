@@ -349,10 +349,22 @@ public:
 		coord[2] += b[2];
 		return *this;
 	}
+	Vector& operator-=(const Vector& b) {
+		coord[0] -= b[0];
+		coord[1] -= b[1];
+		coord[2] -= b[2];
+		return *this;
+	}
 	Vector& operator*=(double b) {
 		coord[0] *= b;
 		coord[1] *= b;
 		coord[2] *= b;
+		return *this;
+	}
+	Vector& operator*=(const Vector &b) {
+		coord[0] *= b[0];
+		coord[1] *= b[1];
+		coord[2] *= b[2];
 		return *this;
 	}
 	Vector& operator/=(double b) {
@@ -400,6 +412,9 @@ static inline Vector operator*(const Matrix<3, 4> &mat, const Vector &b) {
 Vector min(const Vector& a, const Vector& b);
 Vector max(const Vector& a, const Vector& b);
 Vector pow(const Vector& a, const Vector& b);
+Vector exp(const Vector& a);
+Vector sqrt(const Vector& a);
+Vector sqr(const Vector& a);
 Vector random_cos(const Vector &N);
 Vector random_cos(const Vector &N, double r1, double r2);
 Vector random_uniform_sphere();

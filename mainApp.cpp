@@ -3,7 +3,7 @@
 #include <wx/textdlg.h> 
 #include <string>
 
-wxIMPLEMENT_APP(RaytracerApp);
+wxIMPLEMENT_APP_CONSOLE(RaytracerApp);
 
 #include "fluid.h"
 
