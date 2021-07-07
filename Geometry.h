@@ -245,6 +245,10 @@ public:
 	virtual bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const = 0;
 	virtual bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const = 0;
 
+	// uniformly random choice of intersection (see reservoir sampling) between min_t and max_t (may return no intersection if current_nb_intersections>0 even though there are intersections ; they will just not be randomly chosen).
+	// Should NOT change any value if there is no intersection. Should ONLY change current_nb_intersections if there are intersections in the interval but they were not chosen due to randomness.
+	virtual bool reservoir_sampling_intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const = 0;
+
 	virtual Vector get_translation(double frame, bool is_recording) const {
 
 		if (is_recording) return max_translation;
@@ -738,6 +742,77 @@ public:
 		triangle_id = -1;
 		return true;
 	}
+
+	virtual bool reservoir_sampling_intersection(const Ray& r, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const {
+		// norm2(X*t+Y) = R^2
+		Vector X = r.direction - dot(r.direction, d)*d;
+		Vector Y = r.origin - A - dot(r.origin - A, d)*d;
+		double a = X.getNorm2();
+		double b = 2 * dot(X, Y);
+		double c = Y.getNorm2() - R * R;
+		double delta = b * b - 4 * a*c;
+		if (delta < 0) return false;
+		double sdelta = sqrt(delta);
+		double t2 = (-b + sdelta) / (2 * a);
+		if (t2 < min_t) return false;
+		double t1 = (-b - sdelta) / (2 * a);
+		int threadid = omp_get_thread_num();
+		const float invmax = 1.f / engine[threadid].max();
+		bool has_inter = false;
+		double dP;
+
+		if (t1 >= min_t) { // 2 intersections with /infinite/ cylinder
+
+			Vector trialP = r.origin + t1 * r.direction;
+			dP = dot(P - A, d);
+			if (dP >= 0 && dP <= len && t1 < max_t) {
+				current_nb_intersections++;
+				float r1 = engine[threadid]()*invmax;
+				if (r1 < 1. / current_nb_intersections) {
+					t = t1;
+					P = trialP;
+					has_inter = true;
+				}
+			}
+
+			trialP = r.origin + t2 * r.direction;
+			double dP2 = dot(P - A, d);
+			if (dP2 >= 0 && dP2 <= len && t2 < max_t) {
+				current_nb_intersections++;
+				float r1 = engine[threadid]()*invmax;
+				if (r1 < 1. / current_nb_intersections) {
+					t = t2;
+					P = trialP;
+					has_inter = true;
+					dP = dP2;
+				}
+			}
+						  
+		} else { // 1 intersection
+			Vector trialP = r.origin + t2 * r.direction;
+			dP = dot(P - A, d);
+			if (dP >= 0 && dP <= len && t2 < max_t) {
+				current_nb_intersections++;
+				float r1 = engine[threadid]()*invmax;
+				if (r1 < 1. / current_nb_intersections) {
+					t = t2;
+					has_inter = true;
+					P = trialP;
+				}
+				
+			}
+		}
+		if (!has_inter) return false;
+
+
+		Vector proj = A + dP * d;
+		mat = queryMaterial(0, dP / len, 0.5);
+		mat.shadingN = (P - proj); // .getNormalized();
+		if (flip_normals) mat.shadingN = -mat.shadingN;
+		triangle_id = -1;
+		return true;
+	}
+
 	bool intersection_shadow(const Ray& r, double &t, double cur_best_t, double dist_light) const {
 		Vector P;
 		MaterialValues mat;
@@ -892,6 +967,82 @@ public:
 		return true;
 	}
 
+	virtual bool reservoir_sampling_intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const {
+
+		if (has_envmap) { // in our context (used for subsurface scattering), no intersection with an envmap since max_t is finite.
+			return false;
+		}
+
+		double a = d.direction.getNorm2(); // can't suppose unit norm as objects are scaled by scaling ray length
+		double b = dot(d.direction, d.origin - O);
+		double c = (d.origin - O).getNorm2() - R * R;
+
+		double delta = b * b - a * c;
+		if (delta < 0) return false;
+
+		double sqDelta = sqrt(delta);
+		double inva = 1. / a;
+		double t2 = (-b + sqDelta)*inva;
+
+		if (t2 < min_t) return false;
+
+		double t1 = (-b - sqDelta)*inva;
+
+		int threadid = omp_get_thread_num();
+		const float invmax = 1.f / engine[threadid].max();
+
+		bool has_inter = false;
+		if (t1 >= min_t) { // 2 intersections
+
+			if (t1 < max_t) {
+				current_nb_intersections++;
+				float r1 = engine[threadid]()*invmax;
+				if (r1 < 1. / current_nb_intersections) {
+					t = t1;
+					has_inter = true;
+				}
+			}
+			if (t2 < max_t) {
+				current_nb_intersections++;
+				float r1 = engine[threadid]()*invmax;
+				if (r1 < 1. / current_nb_intersections) {
+					t = t2;
+					has_inter = true;
+				}
+			}
+
+		} else { // 1 intersection
+			if (t2 < max_t) {
+				current_nb_intersections++;
+				float r1 = engine[threadid]()*invmax;
+				if (r1 < 1. / current_nb_intersections) {
+					t = t2;
+					has_inter = true;
+				}
+			}
+		}
+
+		if (!has_inter) return false;
+
+		P = d.origin + t * d.direction;
+		Vector N = (P - O);
+
+
+		if (textures.size() != 0 || specularmap.size() != 0 || roughnessmap.size() != 0 || transparent_map.size() != 0 || refr_index_map.size() != 0) {
+			N.fast_normalize();
+			double theta = 1 - acos(N[1]) / M_PI;
+			double phi = (atan2(-N[2], N[0]) + M_PI) / (2.*M_PI);
+			mat = queryMaterial(0, theta, phi);
+		}
+
+		mat.shadingN = N;
+		mat.Ke = Vector(0., 0., 0.);
+
+		if (flip_normals) mat.shadingN = -mat.shadingN;
+		triangle_id = -1;
+		return true;
+	}
+
 	bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const {
 		double a = d.direction.getNorm2();
 		double b = 2 * dot(d.direction, d.origin - O);
@@ -978,6 +1129,32 @@ public:
 		return true;
 	}
 
+	virtual bool reservoir_sampling_intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const {
+		mat.shadingN = vecN;
+		double ddot = dot(d.direction, vecN);
+		if (abs(ddot) < 1E-15) return false;
+		double curt = dot(A - d.origin, vecN) / ddot;
+		if (curt < min_t || curt>= max_t) return false;		
+
+		int threadid = omp_get_thread_num();
+		const float invmax = 1.f / engine[threadid].max();
+		current_nb_intersections++;
+		float r1 = engine[threadid]()*invmax;
+		if (r1 >= 1. / current_nb_intersections) {
+			return false;
+		}
+
+		t = curt;
+		P = d.origin + t * d.direction;
+		triangle_id = -1;
+
+		double u = P[0] * 0.1;
+		double v = P[2] * 0.1;
+		mat = queryMaterial(0, u, v);
+
+		return true;
+	}
+
 	bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const {
 		double ddot = dot(d.direction, vecN);
 		if (abs(ddot) < 1E-15) return false;
@@ -1013,7 +1190,23 @@ public:
 };
 
 
+#ifdef USE_EMBREE
 
+struct MyEmbreeIntersection
+{
+	RTCIntersectContext context;
+	int random_inter_count;
+	RTCHit random_hit;
+	float random_t;
+};
+
+
+/*static thread_local int embree_random_inter_count[64];
+static thread_local RTCHit embree_random_hit[64];
+static thread_local float embree_random_t[64];*/
+
+void random_intersectionFilter(const RTCFilterFunctionNArguments* args);
+#endif
 
 class Scene {
 public:
@@ -1031,12 +1224,18 @@ public:
 		embree_device = rtcNewDevice(config);
 		embree_scene = rtcNewScene(embree_device);
 		//rtcSetSceneFlags(embree_scene, RTC_SCENE_FLAG_DYNAMIC | RTC_SCENE_FLAG_ROBUST);
+		rtcSetSceneFlags(embree_scene, RTC_SCENE_FLAG_CONTEXT_FILTER_FUNCTION);
 		rtcSetSceneBuildQuality(embree_scene, RTC_BUILD_QUALITY_HIGH);
 		for (int i = 0; i < 64; i++) {
 			embree_coherent[i] = { RTC_INTERSECT_CONTEXT_FLAG_COHERENT,    0, {} };
 			embree_incoherent[i] = { RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,  0, {} };
+			embree_random[i].context = { RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,  0, {} };			
 			rtcInitIntersectContext(&embree_coherent[i]);
 			rtcInitIntersectContext(&embree_incoherent[i]);
+			rtcInitIntersectContext(&embree_random[i].context);
+			embree_coherent[i].flags = RTC_INTERSECT_CONTEXT_FLAG_COHERENT;
+			embree_random[i].context.filter = random_intersectionFilter;
+			
 		}
 		embree_bvh_up_to_date = false;
 #endif
@@ -1049,7 +1248,7 @@ public:
 #endif
 	}
 
-	void prepare_render();
+	void prepare_render(bool is_recording);
 
 	void addObject(Object* o);
 
@@ -1141,8 +1340,11 @@ public:
 	RTCScene embree_scene;
 	mutable RTCIntersectContext embree_coherent[64];   //  primary rays
 	mutable RTCIntersectContext embree_incoherent[64]; // secondary/visibility rays
+	mutable MyEmbreeIntersection embree_random[64]; // reservoir sampling of intersections
+	
 	bool embree_bvh_up_to_date;
 	std::vector<int> embree_objects;
 	std::vector<int> embree_to_real_objects;
 #endif
 };
+

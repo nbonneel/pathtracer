@@ -24,7 +24,7 @@ static thread_local std::uniform_real_distribution<float> uniformf(0, 1);*/
 
 static thread_local pcg32  engine[64];
 //static thread_local std::uniform_real_distribution<double> uniform(0, 1);
-static thread_local std::uniform_real_distribution<float> uniformf(0, 1);
+static  std::uniform_real_distribution<float> uniformf(0, 1);
 
 class Vector;
 
@@ -282,8 +282,10 @@ static inline float invSqRoot(float n) {
 	long i = *(long *)&y;
 
 	i = 0x5f3759df - (i >> 1);
+	//i = 0x5f37e75a - (i >> 1);  // arxiv 1603.04483 ; 0x5f37e75a or 0x5f37add5
 	y = *(float *)&i;
 
+	y = y * (threehalfs - ((n * 0.5F) * y * y));
 	y = y * (threehalfs - ((n * 0.5F) * y * y));
 
 	return y;
@@ -533,12 +535,12 @@ public:
 
 		}
 		//direction_vec.normalize();
-		direction_vec.fast_normalize();
+		direction_vec.normalize();
 		direction_vec = camera_right * direction_vec[0] + up*direction_vec[1] + direction*direction_vec[2];
-		Vector destination = C1 + focus_distance * direction_vec;
+		Vector destination = C1 + focus_distance/std::abs(dot(direction_vec, direction)) * direction_vec;
 		Vector new_origin = C1 + dx_aperture*camera_right + dy_aperture*up;
 		Vector new_direction = (destination - new_origin).getNormalized();
-		return Ray(new_origin + init_t*new_direction, new_direction, time);
+		return Ray(new_origin + init_t*new_direction/dot(new_direction, direction), new_direction, time);
 	}
 
 	Vector position, direction, up;

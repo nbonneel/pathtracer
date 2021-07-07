@@ -219,8 +219,9 @@ public:
 	}
 
 
-	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const;
+	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const;	
 	bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const;
+	bool reservoir_sampling_intersection(const Ray& r, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const;
 
 	BBox build_bbox(int i0, int i1);
 	BBox build_centers_bbox(int i0, int i1);

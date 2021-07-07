@@ -14,11 +14,9 @@ public:
 	Raytracer() : invmax(1.f / engine[0].max())
 	{
 		stopped = false; current_nb_rays = 0; curTimePerFrame = 0; is_recording = false;  gamma = 2.2;
-
 		for (int i = 0; i < omp_get_max_threads(); i++) {
 			engine[i] = pcg32(i);
 		}
-		
 	};
 	void loadScene();
 	void prepare_render();

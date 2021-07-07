@@ -271,11 +271,16 @@ void Scene::addObject(Object* o) {
 		rtcCommitScene(embree_scene);
 		embree_bvh_up_to_date = false;
 	}
-	prepare_render();
+	prepare_render(false);
 #endif
 }
 
-void Scene::prepare_render() {
+void Scene::prepare_render(bool is_recording) {
+
+	for (int i = 0; i < objects.size(); i++) {
+		objects[i]->build_matrix(current_frame, is_recording); // time = 0 here
+	}
+
 #ifdef USE_EMBREE
 	if (!embree_bvh_up_to_date) {
 		for (int i = 0; i < objects.size(); i++) {
@@ -299,9 +304,38 @@ void Scene::prepare_render() {
 #endif
 }
 
+
+#ifdef USE_EMBREE
+
+void random_intersectionFilter(const RTCFilterFunctionNArguments* args) {
+	// avoid crashing when debug visualizations are used 
+	if (args->context == nullptr) return;
+
+	assert(args->N == 1);
+	int* valid = args->valid;
+	
+	//ignore inactive rays 
+	if (valid[0] != -1) return;
+
+	int rayid = omp_get_thread_num(); // ((RTCRay*)args->ray)->id;
+	int threadid = rayid;
+	const float invmax = 1.f / engine[rayid].max();
+
+	MyEmbreeIntersection* inter = (MyEmbreeIntersection*)(args->context);
+	inter->random_inter_count++;
+	
+	float r1 = engine[rayid]()*invmax;
+	if (r1 <= 1. / inter->random_inter_count) {
+		inter->random_hit = *(((RTCHit*)args->hit)); //RTCHitN_instID(args->hit, args->N, 0, 0);
+		inter->random_t = ((RTCRay*)args->ray)->tfar;
+	}
+	valid[0] = 0;	
+}
+#endif 
+
 // super slow version ; returns a random intersection in tmin tmax. Uses reservoir sampling. If sphere_id!=-1, considers only intersections with this object
 bool Scene::get_random_intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id, double tmin, double tmax, bool avoid_ghosts) const {
-	bool hasinter = false;
+	/*bool hasinter = false;
 	double startt = tmin;
 	int ninter = 0;
 	for (int i = 0; i < 10; i++) {
@@ -340,6 +374,99 @@ bool Scene::get_random_intersection(const Ray& d, Vector& P, int &sphere_id, dou
 
 	}
 	return hasinter;
+	*/
+
+	bool has_inter = false;
+	min_t = 1E99;
+
+
+	double t;
+	int nb_intersections = 0;
+
+	for (int i = 0; i < objects.size(); i++) {
+		if (sphere_id != -1 && sphere_id != i) continue;
+		if (avoid_ghosts && objects[i]->ghost) continue;
+
+#ifdef USE_EMBREE
+		if (objects[i]->type == OT_TRIMESH) {
+			continue;
+		}
+#endif
+
+		Vector transformed_dir = objects[i]->apply_inverse_rotation_scaling(d.direction);
+		Vector new_origin = objects[i]->apply_inverse_transformation(d.origin);
+		Ray transformed_ray(new_origin, transformed_dir, d.time);
+
+		has_inter = has_inter || objects[i]->reservoir_sampling_intersection(transformed_ray, P, min_t, mat, triangle_id, nb_intersections, tmin, tmax);
+		
+	}
+
+
+#ifdef USE_EMBREE
+	RTCRayHit embree_ray;
+
+	embree_ray =
+	{
+		{
+			(float)d.origin[0],  (float)d.origin[1], (float)d.origin[2],         // origin - Visual Studio bug requires explicitly casting to float
+			(float)tmin,                                              // tnear    
+			(float)d.direction[0], (float)d.direction[1], (float)d.direction[2], // direction
+			0 ,                                             // time
+			(float)tmax,              // tfar
+			avoid_ghosts ? ((~0u) - 1) : (~0u),                    // mask
+			0,                      // ray id 
+			0                       // ray flags
+		},
+
+		{
+			0, 0, 0,                    // intersection normal
+			0, 0,                       // intersection u, v
+			RTC_INVALID_GEOMETRY_ID,    // primitive ID
+			RTC_INVALID_GEOMETRY_ID,    // geometry ID
+			{ RTC_INVALID_GEOMETRY_ID } // instance ID
+		}
+	};
+
+	int threadid = omp_get_thread_num();
+	
+	embree_random[threadid].random_hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
+	embree_random[threadid].random_inter_count = nb_intersections;	
+
+	rtcIntersect1(embree_scene, &embree_random[threadid].context, &embree_ray);
+	embree_ray.hit = embree_random[threadid].random_hit;
+	nb_intersections = embree_random[threadid].random_inter_count;
+	int embreeObjectID = embree_ray.hit.instID[0];
+	has_inter = has_inter || (embreeObjectID != RTC_INVALID_GEOMETRY_ID);
+
+	if (has_inter) {
+
+		if (embreeObjectID != RTC_INVALID_GEOMETRY_ID) {  // embree
+			min_t = embree_random[threadid].random_t;
+			triangle_id = embree_ray.hit.primID;
+			P = d.origin + min_t * d.direction;
+			int systemObjectID = embree_to_real_objects[embreeObjectID];
+			sphere_id = systemObjectID;
+			TriMesh* g = dynamic_cast<TriMesh*>(objects[systemObjectID]);
+			mat = g->getMaterial(triangle_id, 1 - embree_ray.hit.u - embree_ray.hit.v, embree_ray.hit.u, embree_ray.hit.v);
+		} else {
+			P = objects[sphere_id]->apply_transformation(P);
+			mat.shadingN.fast_normalize();
+		}
+		mat.shadingN = objects[sphere_id]->apply_rotation(mat.shadingN);
+	}
+#else
+
+	if (has_inter) {
+		P = objects[sphere_id]->apply_transformation(P);
+		mat.shadingN = objects[sphere_id]->apply_rotation(mat.shadingN);
+	}
+	mat.shadingN.fast_normalize();
+#endif
+
+	
+	
+
+	return has_inter;
 }
 
 bool Scene::intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id, bool avoid_ghosts, bool isCoherent) const {

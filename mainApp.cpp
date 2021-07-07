@@ -2245,14 +2245,6 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 		}		
 		m_pOwner->render_panel->start_render();
 
-#ifdef USE_EMBREE
-		if (has_loaded_obj) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(100) );
-      // crazy, but I need to do that, otherwise the gometries only show after the threads are stopped/relaunched
-			m_pOwner->render_panel->stop_render();
-			m_pOwner->render_panel->start_render();
-		}
-#endif
 	}
 	return true;
 }

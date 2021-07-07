@@ -314,3 +314,111 @@ bool PointSet::intersection_shadow(const Ray& d, double &t, double cur_best_t, d
 
 	return has_inter;
 }
+
+
+bool PointSet::reservoir_sampling_intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const {	
+	bool has_inter = false;
+	double t_box_left, t_box_right;
+	int best_index = -1;
+	bool goleft, goright;
+	Vector localP, localN;
+	double localt;
+
+	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
+	char signs[3];
+	signs[0] = (invd.direction[0] >= 0) ? 1 : 0;
+	signs[1] = (invd.direction[1] >= 0) ? 1 : 0;
+	signs[2] = (invd.direction[2] >= 0) ? 1 : 0;
+
+	if (!bvh.bbox.intersection_invd(invd, signs, t_box_left)) return false;
+	if (t_box_left > max_t) return false;
+
+	int threadid = omp_get_thread_num();
+	const float invmax = 1.f / engine[threadid].max();
+
+	int l[50];
+	double tnear[50];
+	int idx_back = -1;
+
+	l[++idx_back] = 0;
+	tnear[idx_back] = t_box_left;
+
+	while (idx_back >= 0) {
+
+		if (tnear[idx_back] > max_t) {
+			idx_back--;
+			continue;
+		}
+		const int current = l[idx_back--];
+
+		const int fg = bvh.nodes[current].fg;
+		const int fd = bvh.nodes[current].fd;
+
+		if (!bvh.nodes[current].isleaf) {
+			goleft = (bvh.nodes[fg].bbox.intersection_invd(invd, signs, t_box_left) && t_box_left < max_t);
+			goright = (bvh.nodes[fd].bbox.intersection_invd(invd, signs, t_box_right) && t_box_right < max_t);
+
+			if (goleft&&goright) {
+				if (t_box_left < t_box_right) {
+					l[++idx_back] = fd;  tnear[idx_back] = t_box_right;
+					l[++idx_back] = fg;  tnear[idx_back] = t_box_left;
+				} else {
+					l[++idx_back] = fg;  tnear[idx_back] = t_box_left;
+					l[++idx_back] = fd;  tnear[idx_back] = t_box_right;
+				}
+			} else {
+				if (goleft) { l[++idx_back] = fg; tnear[idx_back] = t_box_left; }
+				if (goright) { l[++idx_back] = fd; tnear[idx_back] = t_box_right; }
+			}
+		} else {  // feuille
+
+			for (int i = fg; i < fd; i++) {
+				if (Disk(vertices[i], normals[i], radius[i]).intersection(d, localP, localN, localt)) {
+					//if (localt < t) {
+					if (localt < max_t && localt>= min_t) {
+						current_nb_intersections++;
+						float r1 = engine[threadid]()*invmax;
+						if (r1 < 1. / current_nb_intersections) {
+							has_inter = true;
+							best_index = i;
+							t = localt;
+						}
+					}
+				}
+			}
+		}
+
+	}
+
+	if (has_inter) {
+		int i = best_index;
+		triangle_id = best_index;
+		Disk(vertices[i], normals[i], radius[i]).intersection(d, localP, localN, localt);
+		localN.normalize();
+		P = localP;
+
+		mat = queryMaterial(0, 0, 0);
+		mat.shadingN = localN;
+
+		if (dot(mat.shadingN, d.direction) > 0 && !mat.transp) mat.shadingN = -mat.shadingN;
+		if (flip_normals) mat.shadingN = -mat.shadingN;
+
+		if (colors.size() > i)
+			mat.Kd = colors[i];
+		else
+			mat.Kd = Vector(0.5, 0.5, 0.5);
+		//mat.Kd = Vector(localN[0]*0.5+0.5, localN[1] * 0.5 + 0.5, localN[2] * 0.5 + 0.5);
+		//mat.Kd = Vector(std::abs(localN[0]), std::abs(localN[1]), std::abs(localN[2]));
+		if (display_edges) {
+			double r2 = (localP - vertices[i]).getNorm2();
+			if (r2 > (radius[i] * radius[i] * 0.95*0.95))
+				mat.Kd = Vector(0., 0., 0.);
+		}
+
+
+	}
+
+
+
+	return has_inter;
+}

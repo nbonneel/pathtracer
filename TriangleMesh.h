@@ -97,7 +97,10 @@ public:
 	}
 
 	Vector A, u, v, N;
-	double m11, m12, m22, invdetm;
+	float m11, m12, m22, invdetm;
+	float uvs[3][2];
+	Vector normals[3];
+
 };
 
 Vector TransformH(const Vector &in, float H); // transform hue of a color
@@ -212,9 +215,11 @@ public:
 #ifdef USE_EMBREE
 	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const { return false; };
 	bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const { return false;  };
+	bool reservoir_sampling_intersection(const Ray& r, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const { return false; };
 #else
 	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const;
 	bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const;
+	bool reservoir_sampling_intersection(const Ray& r, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const;
 #endif
 
 	MaterialValues getMaterial(int triId, double alpha, double beta, double gamma) const;
@@ -283,6 +288,7 @@ public:
 		Vector P;
 		return intersection(d, P, t, mat, cur_best_t, tid);
 	}
+	bool reservoir_sampling_intersection(const Ray& r, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const;
 
 	BBox build_bbox(int i0, int i1);
 	BBox build_centers_bbox(int i0, int i1);

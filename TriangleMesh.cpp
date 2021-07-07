@@ -771,7 +771,7 @@ void TriMesh::init(Scene* scene, const char* obj, double scaling, const Vector& 
 
 #ifdef USE_EMBREE
 	embree_scene_for_instance = rtcNewScene(scene->embree_device); // a scene containing a single object, that will be used for instancing with different transforms
-
+	rtcSetSceneFlags(embree_scene_for_instance, RTC_SCENE_FLAG_CONTEXT_FILTER_FUNCTION);
 	RTCGeometry geom = rtcNewGeometry(scene->embree_device, RTC_GEOMETRY_TYPE_TRIANGLE);
 	rtcSetGeometryBuildQuality(geom, RTC_BUILD_QUALITY_HIGH);
 	float *positions = (float*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, 3 * sizeof(float), vertices.size());
@@ -800,6 +800,19 @@ void TriMesh::init(Scene* scene, const char* obj, double scaling, const Vector& 
 	triangleSoup.resize(indices.size());
 	for (int i = 0; i < indices.size(); i++) {
 		triangleSoup[i] = Triangle(vertices[indices[i].vtxi], vertices[indices[i].vtxj], vertices[indices[i].vtxk]);
+		if (normals.size() != 0) {
+			triangleSoup[i].normals[0] = normals[indices[i].ni];
+			triangleSoup[i].normals[1] = normals[indices[i].nj];
+			triangleSoup[i].normals[2] = normals[indices[i].nk];
+		}
+		if (uvs.size() != 0) {
+			triangleSoup[i].uvs[0][0] = uvs[indices[i].uvi][0];
+			triangleSoup[i].uvs[0][1] = uvs[indices[i].uvi][1];
+			triangleSoup[i].uvs[1][0] = uvs[indices[i].uvj][0];
+			triangleSoup[i].uvs[1][1] = uvs[indices[i].uvj][1];
+			triangleSoup[i].uvs[2][0] = uvs[indices[i].uvk][0];
+			triangleSoup[i].uvs[2][1] = uvs[indices[i].uvk][1];
+		}
 	}
 
 	if (isnan(rot_center[0])) {
@@ -897,13 +910,14 @@ MaterialValues TriMesh::getMaterial(int triId, double alpha, double beta, double
 	bool has_uv = false;
 
 	const TriangleIndices &tri = indices[triId];
+	const Triangle &trisoup = triangleSoup[triId];
 
-	if ((uvs.size() != 0) && (tri.group >= 0) && (tri.uvi >= 0) && (tri.uvj >= 0) && (tri.uvk >= 0)) {
-		if (!(tri.uvi >= uvs.size() || tri.uvj >= uvs.size() || tri.uvk >= uvs.size())) {
-			u = (uvs[tri.uvi][0] * alpha + uvs[tri.uvj][0] * beta + uvs[tri.uvk][0] * gamma);
-			v = (uvs[tri.uvi][1] * alpha + uvs[tri.uvj][1] * beta + uvs[tri.uvk][1] * gamma);
-			u = Texture::wrap(u);
-			v = Texture::wrap(v);
+	if ((uvs.size() != 0) && (tri.group >= 0) && (tri.uvi >= 0) /*&& (tri.uvj >= 0) && (tri.uvk >= 0)*/) {
+		if (!(tri.uvi >= uvs.size() /*|| tri.uvj >= uvs.size() || tri.uvk >= uvs.size()*/)) {
+			u = (trisoup.uvs[0][0] * alpha + trisoup.uvs[1][0] * beta + trisoup.uvs[2][0] * gamma);
+			v = (trisoup.uvs[0][1] * alpha + trisoup.uvs[1][1] * beta + trisoup.uvs[2][1] * gamma);
+			//u = Texture::wrap(u);
+			//v = Texture::wrap(v);
 			has_uv = true;
 		}
 	}
@@ -911,11 +925,14 @@ MaterialValues TriMesh::getMaterial(int triId, double alpha, double beta, double
 	MaterialValues mat = queryMaterial(textureId, u, v);
 
 	if (!interp_normals || (indices[triId].ni == -1)) {
-		mat.shadingN = triangleSoup[triId].N.getNormalized();
+		mat.shadingN = trisoup.N;// .getNormalized();
 	} else {
-		mat.shadingN = normals[tri.ni] * alpha + normals[tri.nj] * beta + normals[tri.nk] * gamma;
-		mat.shadingN.normalize();
+		//mat.shadingN = normals[tri.ni] * alpha + normals[tri.nj] * beta + normals[tri.nk] * gamma;
+		mat.shadingN = trisoup.normals[0] * alpha + trisoup.normals[1] * beta + trisoup.normals[2] * gamma;
+		//mat.shadingN.normalize();
 	}
+	//mat.shadingN.fast_normalize();
+	mat.shadingN.normalize();
 	//if (dot(mat.shadingN, d.direction) > 0 && mat.transp) mat.shadingN = -mat.shadingN;  // why did I write that ?
 	if (flip_normals) mat.shadingN = -mat.shadingN;
 
@@ -1281,6 +1298,116 @@ bool TriMesh::intersection_shadow(const Ray& d, double &t, double cur_best_t, do
 
 	return has_inter;
 }
+
+bool TriMesh::reservoir_sampling_intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const {	
+	bool has_inter = false;
+	double t_box_left, t_box_right;
+	int best_index = -1;
+	bool goleft, goright;
+	Vector localP, localN;
+	double localt;
+	double alpha, beta, gamma;
+
+	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
+	char signs[3];
+	signs[0] = (invd.direction[0] >= 0) ? 1 : 0;
+	signs[1] = (invd.direction[1] >= 0) ? 1 : 0;
+	signs[2] = (invd.direction[2] >= 0) ? 1 : 0;
+
+	if (!bvh.bbox.intersection_invd(invd, signs, t_box_left)) return false;
+	if (t_box_left > max_t) return false;
+
+	int threadid = omp_get_thread_num();
+	const float invmax = 1.f / engine[threadid].max();
+
+	int l[50];
+	double tnear[50];
+	int idx_back = -1;
+
+	l[++idx_back] = 0;
+	tnear[idx_back] = t_box_left;
+
+	while (idx_back >= 0) {
+
+		if (tnear[idx_back] > max_t) {
+			idx_back--;
+			continue;
+		}
+		const int current = l[idx_back--];
+
+		const int fg = bvh.nodes[current].fg;
+		const int fd = bvh.nodes[current].fd;
+
+		if (!bvh.nodes[current].isleaf) {
+			if (signs[0] == 1) {
+				goleft = (bvh.nodes[fg].bbox.intersection_invd_positive_x(invd, signs, t_box_left) && t_box_left < max_t);
+				goright = (bvh.nodes[fd].bbox.intersection_invd_positive_x(invd, signs, t_box_right) && t_box_right < max_t);
+			} else {
+				goleft = (bvh.nodes[fg].bbox.intersection_invd_negative_x(invd, signs, t_box_left) && t_box_left < max_t);
+				goright = (bvh.nodes[fd].bbox.intersection_invd_negative_x(invd, signs, t_box_right) && t_box_right < max_t);
+			}
+
+			if (goleft&&goright) {
+				if (t_box_left < t_box_right) {
+					l[++idx_back] = fd;  tnear[idx_back] = t_box_right;
+					l[++idx_back] = fg;  tnear[idx_back] = t_box_left;
+				} else {
+					l[++idx_back] = fg;  tnear[idx_back] = t_box_left;
+					l[++idx_back] = fd;  tnear[idx_back] = t_box_right;
+				}
+			} else {
+				if (goleft) { l[++idx_back] = fg; tnear[idx_back] = t_box_left; }
+				if (goright) { l[++idx_back] = fd; tnear[idx_back] = t_box_right; }
+			}
+		} else {  // feuille
+				  //bool go_in = (bvh.nodes[current].bbox.intersection_invd(invd, signs, t_box_left) && t_box_left < t);
+				  //if (go_in)
+			for (int i = fg; i < fd; i++) {
+				if (triangleSoup[i].intersection(d, localP, localt, alpha, beta, gamma)) {
+					if (localt < max_t && localt >= min_t) {
+						int textureId = indices[i].group;
+						if (uvs.size() > 0 && alphamap.size() > textureId && indices[i].uvi >= 0 && indices[i].uvj >= 0 && indices[i].uvk >= 0) {
+							double u = uvs[indices[i].uvi][0] * alpha + uvs[indices[i].uvj][0] * beta + uvs[indices[i].uvk][0] * gamma;
+							double v = uvs[indices[i].uvi][1] * alpha + uvs[indices[i].uvj][1] * beta + uvs[indices[i].uvk][1] * gamma;
+							u = Texture::wrap(u);
+							v = Texture::wrap(v);
+							if (alphamap[textureId].getValRed(u, v) < 0.5) continue;
+						}
+						current_nb_intersections++;
+						float r1 = engine[threadid]()*invmax;
+						if (r1 < 1. / current_nb_intersections) {
+							has_inter = true;
+							best_index = i;
+							t = localt;
+						}
+					}
+				}
+			}
+		}
+
+	}
+
+	if (has_inter) {
+		int i = best_index;
+		triangle_id = best_index;
+		triangleSoup[i].intersection(d, localP, localt, alpha, beta, gamma);
+		if (isnan(alpha) && isnan(beta) && isnan(gamma)) { alpha = 1; beta = 0; gamma = 0; };
+		if (isnan(alpha)) alpha = 0;
+		if (isnan(beta)) beta = 0;
+		if (isnan(gamma)) gamma = 0;
+		if (isinf(alpha)) alpha = 1;
+		if (isinf(beta)) beta = 1;
+		if (isinf(gamma)) gamma = 1;
+
+		//localN.normalize();
+		P = localP;
+
+		mat = getMaterial(i, alpha, beta, gamma);
+	}
+
+	return has_inter;
+}
+
 #endif
 
 void TriMesh::findQuads(int &nbTriangles, int &nbOthers, int &nbRealEdges) {
@@ -1588,6 +1715,105 @@ bool Yarns::intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat
 		int tid;
 		triangle_id = best_index;
 		cyls[i]->intersection(d, localP, localt, mat, cur_best_t, tid);
+
+
+		//localN.normalize();
+		P = localP;
+	}
+
+	return has_inter;
+}
+
+
+bool Yarns::reservoir_sampling_intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const {	
+	bool has_inter = false;
+	double t_box_left, t_box_right;
+	int best_index = -1;
+	bool goleft, goright;
+	Vector localP, localN;
+	double localt;
+	double alpha, beta, gamma;
+
+	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
+	char signs[3];
+	signs[0] = (invd.direction[0] >= 0) ? 1 : 0;
+	signs[1] = (invd.direction[1] >= 0) ? 1 : 0;
+	signs[2] = (invd.direction[2] >= 0) ? 1 : 0;
+
+	if (!bvh.bbox.intersection_invd(invd, signs, t_box_left)) return false;
+	if (t_box_left > max_t) return false;
+
+	int threadid = omp_get_thread_num();
+	const float invmax = 1.f / engine[threadid].max();
+
+	int l[50];
+	double tnear[50];
+	int idx_back = -1;
+
+	l[++idx_back] = 0;
+	tnear[idx_back] = t_box_left;
+
+	while (idx_back >= 0) {
+
+		if (tnear[idx_back] > max_t) {
+			idx_back--;
+			continue;
+		}
+		const int current = l[idx_back--];
+
+		const int fg = bvh.nodes[current].fg;
+		const int fd = bvh.nodes[current].fd;
+
+		if (!bvh.nodes[current].isleaf) {
+			if (signs[0] == 1) {
+				goleft = (bvh.nodes[fg].bbox.intersection_invd_positive_x(invd, signs, t_box_left) && t_box_left < max_t);
+				goright = (bvh.nodes[fd].bbox.intersection_invd_positive_x(invd, signs, t_box_right) && t_box_right < max_t);
+			} else {
+				goleft = (bvh.nodes[fg].bbox.intersection_invd_negative_x(invd, signs, t_box_left) && t_box_left < max_t);
+				goright = (bvh.nodes[fd].bbox.intersection_invd_negative_x(invd, signs, t_box_right) && t_box_right < max_t);
+			}
+
+			if (goleft&&goright) {
+				if (t_box_left < t_box_right) {
+					l[++idx_back] = fd;  tnear[idx_back] = t_box_right;
+					l[++idx_back] = fg;  tnear[idx_back] = t_box_left;
+				} else {
+					l[++idx_back] = fg;  tnear[idx_back] = t_box_left;
+					l[++idx_back] = fd;  tnear[idx_back] = t_box_right;
+				}
+			} else {
+				if (goleft) { l[++idx_back] = fg; tnear[idx_back] = t_box_left; }
+				if (goright) { l[++idx_back] = fd; tnear[idx_back] = t_box_right; }
+			}
+		} else {  // feuille
+				//bool go_in = (bvh.nodes[current].bbox.intersection_invd(invd, signs, t_box_left) && t_box_left < t);
+				//if (go_in)
+			int tid;
+			for (int i = fg; i < fd; i++) {
+				if (cyls[i]->intersection(d, localP, localt, mat, max_t, tid)) {
+
+					if (localt < max_t && localt >= min_t) {
+						current_nb_intersections++;
+						float r1 = engine[threadid]()*invmax;
+						if (r1 < 1. / current_nb_intersections) {
+							has_inter = true;
+							best_index = i;
+							t = localt;
+						}
+					}
+
+
+				}
+			}
+		}
+
+	}
+
+	if (has_inter) {
+		int i = best_index;
+		int tid;
+		triangle_id = best_index;
+		cyls[i]->intersection(d, localP, localt, mat, max_t, tid);
 
 
 		//localN.normalize();

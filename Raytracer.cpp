@@ -218,31 +218,16 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 					intensite_pixel += getColor(new_ray, sampleID, nbrebonds - 1, screenI, screenJ, show_lights, no_envmap);
 				} else {
 
-					//if (dot(N, rayDirection) > 0) N = -N;
-
-			// contribution de l'eclairage direct
-				/*Ray ray_light(P + 0.01*N, (s.lumiere->O - P).getNormalized(), r.time);
-				Vector P_light, N_light, color_light;
-				int sphere_id_light;
-				double t_light;
-				bool has_inter_light = s.intersection(ray_light, P_light, N_light, sphere_id_light, t_light, color_light);
-				double d_light2 = (s.lumiere->O - P).getNorm2();
-
-				if (has_inter_light && t_light*t_light < d_light2) {
-					intensite_pixel = Vector(0, 0, 0);
-				}
-				else {
-					intensite_pixel = albedo / M_PI * s.intensite_lumiere * std::max(0., dot((s.lumiere->O - P).getNormalized(), N)) / d_light2;
-				}*/
+					//if (dot(N, rayDirection) > 0) N = -N;	
 	
-					Vector axeOP = (P - centerLight).getNormalized();
+					Vector axeOP = (P - centerLight); axeOP.fast_normalize();//.getNormalized();
 					Vector dir_aleatoire;
 					if (nbrebonds == nb_bounces && no_envmap)
 						dir_aleatoire = random_cos(axeOP, samples2d[sampleID][0], samples2d[sampleID][1]);
 					else
 						dir_aleatoire = random_cos(axeOP);
 					Vector point_aleatoire = dir_aleatoire * radiusLight + centerLight;
-					Vector wi = (point_aleatoire - P).getNormalized();
+					Vector wi = (point_aleatoire - P); wi.fast_normalize();// .getNormalized();
 					double d_light2 = (point_aleatoire - P).getNorm2();
 					Vector Np = dir_aleatoire;
 					//Vector kd =  mat.Kd;
@@ -297,7 +282,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 					}  else {		
 						float tmp;
 						float r1 = modf(randomPerPixel[screenI*W+screenJ][0] + samples2d[sampleID][0], &tmp); // cranley patterson
-						float r2 = modf(randomPerPixel[screenI*W + screenJ][1] + samples2d[sampleID][0], &tmp);
+						float r2 = modf(randomPerPixel[screenI*W + screenJ][1] + samples2d[sampleID][1], &tmp);
 						if (sub_interaction) {
 							direction_aleatoire = random_cos(mat.shadingN, r1, r2);
 							proba_globale = dot(N, direction_aleatoire) / M_PI;
@@ -629,6 +614,9 @@ Vector extensibleLattice2d(uint32_t id) {
 
 void Raytracer::prepare_render() {
 
+	for (int i = 0; i < omp_get_max_threads(); i++) {
+		engine[i] = pcg32(i);
+	}
 	if (randomPerPixel.size() != W * H) {
 		Wlr = ceil(W / 16.);
 		Hlr = ceil(H / 16.);
@@ -640,7 +628,7 @@ void Raytracer::prepare_render() {
 		randomPerPixel.resize(W*H);
 		for (int i = 0; i < W*H; i++) {
 			randomPerPixel[i][0] = engine[0]()*invmax;
-			randomPerPixel[i][1] = engine[1]()*invmax;
+			randomPerPixel[i][1] = engine[0]()*invmax;
 		}
 	}
 	if (nrays != last_nrays) {
@@ -672,11 +660,12 @@ void Raytracer::prepare_render() {
 		}
 		lastfilter = sigma_filter;
 	}
-	s.prepare_render();
+	s.prepare_render(is_recording);
 
 	std::fill(computed.begin(), computed.end(), false);
 	std::fill(sample_count.begin(), sample_count.end(), 0);
 	std::fill(imagedouble_lowres.begin(), imagedouble_lowres.end(), 0);
+	std::fill(imagedouble.begin(), imagedouble.end(), 0);
 }
 
 void Raytracer::render_image()
@@ -699,12 +688,6 @@ void Raytracer::render_image()
 	prepare_render();
 	
 
-	for (int time_step = fstart; time_step < fend; time_step++) {
-
-		for (int i = 0; i < s.objects.size(); i++) {
-			s.objects[i]->build_matrix(s.current_frame, is_recording); // time = 0 here
-		}
-
 		for (int k = 0; k < nrays; k++) {
 			current_nb_rays = k;
 			chrono.Start();
@@ -722,14 +705,6 @@ void Raytracer::render_image()
 
 						for (int j = j1; j < W; j += 8) {
 
-							/*double dx =  uniformf(engine[threadid]) - 0.5f;
-							double dy =  uniformf(engine[threadid]) - 0.5f;
-
-							double dx_aperture =  (uniformf(engine[threadid]) - 0.5f) * cam.aperture;
-							double dy_aperture =  (uniformf(engine[threadid]) - 0.5f) * cam.aperture;
-
-							double time = s.current_time + time_step / 60. +uniformf(engine[threadid]) / 60.f;*/
-
 
 							double dx = engine[threadid]()*invmax - 0.5f;  // not perfectly uniform but much faster than std::uniform
 							double dy = engine[threadid]()*invmax - 0.5f;
@@ -737,7 +712,7 @@ void Raytracer::render_image()
 							double dx_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
 							double dy_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
 
-							double time = s.current_frame;// +time_step + engine[threadid]()*invmax;
+							double time = s.current_frame;// + engine[threadid]()*invmax;
 
 
 
@@ -824,7 +799,7 @@ void Raytracer::render_image()
 			os << "exportD" << s.current_frame << ".jpg";
 		}
 		save_image(os.str().c_str(), &image[0], W, H);
-	}
+	
 
 	//std::cout << chrono.GetDiffMs() / (double)1000. << std::endl;
     return;
@@ -835,10 +810,6 @@ void Raytracer::render_image_nopreviz() {
 	prepare_render();
 	double denom2 = 1. / (2.*sigma_filter*sigma_filter);
 
-	for (int i = 0; i < s.objects.size(); i++) {
-		s.objects[i]->build_matrix(s.current_frame, is_recording); // time = 0 here
-	}
-	
 	chrono.Start();
 	int maxthreads = omp_get_max_threads();
 	std::vector<double> imagedoublethreads(W*H * 3* maxthreads, 0);

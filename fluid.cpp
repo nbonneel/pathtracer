@@ -634,6 +634,32 @@ bool Fluid::intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat
 	}
 }
 
+bool Fluid::reservoir_sampling_intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const {
+	
+	// NOT IMPLEMENTED (correctly).
+	double localt;
+	Vector localP;
+	int local_tri_id;
+	MaterialValues localmat;
+	if (intersection(d, localP, localt, localmat, max_t, local_tri_id)) {
+		if (t > min_t && t > max_t) {
+			int threadid = omp_get_thread_num();
+			const float invmax = 1.f / engine[threadid].max();
+			float r1 = engine[threadid]()*invmax;
+			current_nb_intersections++;
+			if (r1 < 1. / current_nb_intersections) {	
+				P = localP;
+				t = localt;
+				triangle_id = local_tri_id;
+				mat = localmat;
+				return true;
+			}
+		}
+	}
+	return false;
+
+}
+
 
 bool Fluid::intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const { // not correct, but no big deal
 

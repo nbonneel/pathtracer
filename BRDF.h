@@ -335,6 +335,7 @@ public:
 		if (file) {
 			filename = std::string(file);
 			if (load_image(file, values, W, H)) {
+#pragma omp parallel for
 				for (int i = 0; i < values.size(); i++) {
 					values[i] /= 255.;
 					values[i] = std::pow(values[i], 2.2); // values are then gamma corrected. 
