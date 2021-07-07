@@ -77,7 +77,8 @@
 #define NBVIEWSY 1046
 #define MAXSPACINGX 1047
 #define MAXSPACINGY 1048
-#define DOUBLEFRUSTUM 1049
+#define DOUBLEFRUSTUM 10490
+#define FILTER_CHECKBOX 10500
 
 #define ID_ALBEDO_DELETE 10
 #define ID_MOVEUP 11
@@ -538,7 +539,7 @@ public:
 	void update_parameters_and_render(wxCommandEvent& event);
 	void update_gui();
 
-	std::vector<double> extrapolated_image;
+	std::vector<float> extrapolated_image;
 	std::vector<bool> computed, computed2;
 
 	void render(wxDC& dc);
@@ -744,6 +745,9 @@ public:
 	wxGauge *progressBar;
 	wxBookCtrlBase *m_bookCtrl;
 	wxCheckBox *show_edges, *interp_normals, *transparent, *flipnormals, *isLenticularCheck, *isArrayCheck, *ghost, *initfluid;
+#if USE_OPENIMAGEDENOISER
+	wxCheckBox *has_denoiser;
+#endif
 	wxTextCtrl *objectName, *envmapName, *backgroundName;
 	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider, *maxangle_slider, *time_slider;
 	wxListCtrl *m_AlbedoFile, *m_SpecularFile, *m_NormalFile, *m_AlphaFile, *m_RoughnessFile, *m_TranspFile, *m_RefrFile, *m_SubsurfaceFile;

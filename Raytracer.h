@@ -6,7 +6,9 @@
 #include "TriangleMesh.h"
 #include "PointSet.h"
 
-
+#ifdef USE_OPENIMAGEDENOISER
+#include <OpenImageDenoise/oidn.hpp>
+#endif
 
 class Raytracer {
 public:
@@ -17,6 +19,13 @@ public:
 		for (int i = 0; i < omp_get_max_threads(); i++) {
 			engine[i] = pcg32(i);
 		}
+		has_denoiser = false;
+		autosave = true;
+#ifdef USE_OPENIMAGEDENOISER
+		device = oidn::newDevice();
+		device.commit();
+		filter = device.newFilter("RT");
+#endif
 	};
 	void loadScene();
 	void prepare_render();
@@ -45,7 +54,7 @@ public:
 	void save_scene(const char* filename);
 	void load_scene(const char* filename, const char* replacedNames = NULL);
 
-	Vector getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, bool show_lights = true, bool no_envmap = false, bool has_had_subsurface_interaction = false);
+	Vector getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, Vector &normalValue, Vector &albedoValue, bool show_lights = true, bool no_envmap = false, bool has_had_subsurface_interaction = false);
 
 	int W, H, Wlr, Hlr;
 	int nrays, last_nrays;  
@@ -61,9 +70,11 @@ public:
 	Scene s;
 
 	bool stopped;
+	bool has_denoiser, autosave;
 	int current_nb_rays;
 	std::vector<unsigned char> image;
-	std::vector<double> imagedouble;
+	std::vector<float> imagedouble;
+	std::vector<float> albedoImage, normalImage, filteredImage;	
 	std::vector<bool> computed;
 	double curTimePerFrame;
 	PerfChrono chrono;
@@ -80,5 +91,10 @@ public:
 
 	std::vector<Vector> samples2d;
 	std::vector<Vector> randomPerPixel;
+
+#ifdef USE_OPENIMAGEDENOISER
+	oidn::DeviceRef device;
+	oidn::FilterRef filter;
+#endif
 };
 

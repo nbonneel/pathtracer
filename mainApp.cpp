@@ -54,7 +54,9 @@ bool RaytracerApp::OnInit()
 
 	m_bookCtrl = new wxNotebook(frame, wxID_ANY, wxDefaultPosition, wxSize(200, 100), 0);
 
-	wxPanel *panelObject = new wxPanel(m_bookCtrl);
+	wxScrolled<wxPanel> *panelObject = new wxScrolled<wxPanel>(m_bookCtrl);	
+	panelObject->EnableScrolling(true, true);
+	panelObject->SetScrollbars(5, 10, 20, 60);
 	wxBoxSizer * panelObject_sizer = new wxBoxSizer(wxVERTICAL);
 	objectName = new wxTextCtrl(panelObject, 1000, "", wxDefaultPosition, wxDefaultSize);
 	show_edges = new wxCheckBox(panelObject, EDGES_CHECKBOX, "Show Edges", wxDefaultPosition, wxDefaultSize);
@@ -268,8 +270,14 @@ bool RaytracerApp::OnInit()
 	wxStaticText* nbrays_text = new wxStaticText(panelRenderer, 9999 - 1, "nb paths per pixel: ");
 	nbrays = new wxSpinCtrl(panelRenderer, NBRAYS, wxString("100"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 10000, 100);
 	Connect(NBRAYS, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+#if USE_OPENIMAGEDENOISER
+	has_denoiser = new wxCheckBox(panelRenderer, FILTER_CHECKBOX, "Denoiser (not temp. consistent)", wxDefaultPosition, wxDefaultSize);
+	has_denoiser->SetToolTip("ONLY for offline rendering (no previz). Beware, not temporally stable.");
+	Connect(FILTER_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+#endif
 	nbrays_sizer->Add(nbrays_text, 0, wxEXPAND);
 	nbrays_sizer->Add(nbrays, 1, wxEXPAND);
+	nbrays_sizer->Add(has_denoiser, 1, wxEXPAND);
 
 	wxBoxSizer * fov_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* fov_text = new wxStaticText(panelRenderer, 9999, "fov (deg): ");
@@ -441,7 +449,7 @@ bool RaytracerApp::OnInit()
 	wxBoxSizer * doublefrustum_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* doublefrustum_text = new wxStaticText(panelLenticular, 9999 - 1, "double frustum (ray start): ");
 	doubleFrustum = new wxSpinCtrlDouble(panelLenticular, DOUBLEFRUSTUM, wxString("0.0"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, -200, 200, 0.0, 0.1);
-	Connect(DOUBLEFRUSTUM, wxEVT_SPINCTRL, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	Connect(DOUBLEFRUSTUM, wxEVT_SPINCTRLDOUBLE, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	doublefrustum_sizer->Add(doublefrustum_text, 0, wxEXPAND);
 	doublefrustum_sizer->Add(doubleFrustum, 1, wxEXPAND);
 	panelLenticular_sizer->Add(doublefrustum_sizer, 0, wxEXPAND);
@@ -705,6 +713,8 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 	raytracer.s.current_time = raytracer.s.current_frame / (double)raytracer.s.nbframes*raytracer.s.duration;
 	raytracer.is_recording = raytracer_app->recordKeyframes->GetValue();
 	raytracer.s.double_frustum_start_t = raytracer_app->doubleFrustum->GetValue();
+
+	raytracer.has_denoiser = raytracer_app->has_denoiser->GetValue();
 
 	if (selected_object < 0 || (selected_object >= raytracer.s.objects.size())) {
 		start_render();

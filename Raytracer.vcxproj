@@ -109,12 +109,12 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>EMBREE_IGNORE_INVALID_RAYS;USE_EMBREE;wxUSE_GUI=1;__WXMSW__;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_OPENIMAGEDENOISER;USE_EMBREE;wxUSE_GUI=1;__WXMSW__;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
       <OpenMPSupport>false</OpenMPSupport>
-      <AdditionalIncludeDirectories>C:\SharedLibs\wxWidgets-3.1.2\include;C:\SharedLibs\wxWidgets-3.1.2\include\msvc</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\SharedLibs\wxWidgets-3.1.2\include;C:\SharedLibs\wxWidgets-3.1.2\include\msvc;.\OpenImageDenoiser\include</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -125,8 +125,8 @@
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <StackReserveSize>10000000</StackReserveSize>
       <StackCommitSize>10000000</StackCommitSize>
-      <AdditionalLibraryDirectories>C:\SharedLibs\wxWidgets-3.1.2\lib\vc_x64_lib;.\libs\Debug</AdditionalLibraryDirectories>
-      <AdditionalDependencies>embree3.lib;wxmsw31ud_core.lib;wxbase31ud.lib;wxtiffd.lib;wxjpegd.lib;wxpngd.lib;wxzlibd.lib;wxregexud.lib;wxexpatd.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\SharedLibs\wxWidgets-3.1.2\lib\vc_x64_lib;.\libs\Debug;.\OpenImageDenoiser\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>OpenImageDenoise.lib;tbb.lib;embree3.lib;wxmsw31ud_core.lib;wxbase31ud.lib;wxtiffd.lib;wxjpegd.lib;wxpngd.lib;wxzlibd.lib;wxregexud.lib;wxexpatd.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -162,12 +162,12 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>USE_EMBREE;wxUSE_GUI=1;__WXMSW__;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_OPENIMAGEDENOISER;USE_EMBREE;wxUSE_GUI=1;__WXMSW__;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalIncludeDirectories>C:\SharedLibs\wxWidgets-3.1.2\include;C:\SharedLibs\wxWidgets-3.1.2\include\msvc</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\SharedLibs\wxWidgets-3.1.2\include;C:\SharedLibs\wxWidgets-3.1.2\include\msvc;.\OpenImageDenoiser\include</AdditionalIncludeDirectories>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <OmitFramePointers>true</OmitFramePointers>
@@ -184,8 +184,8 @@
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <StackReserveSize>10000000</StackReserveSize>
       <StackCommitSize>10000000</StackCommitSize>
-      <AdditionalLibraryDirectories>C:\SharedLibs\wxWidgets-3.1.2\lib\vc_x64_lib;.\libs\Release</AdditionalLibraryDirectories>
-      <AdditionalDependencies>embree3.lib;wxmsw31u_core.lib;wxbase31u.lib;wxtiff.lib;wxjpeg.lib;wxpng.lib;wxzlib.lib;wxregexu.lib;wxexpat.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\SharedLibs\wxWidgets-3.1.2\lib\vc_x64_lib;.\libs\Release;.\OpenImageDenoiser\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>OpenImageDenoise.lib;tbb.lib;embree3.lib;wxmsw31u_core.lib;wxbase31u.lib;wxtiff.lib;wxjpeg.lib;wxpng.lib;wxzlib.lib;wxregexu.lib;wxexpat.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
