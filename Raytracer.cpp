@@ -9,7 +9,7 @@
 #include <string>
 #include "chrono.h"
 #include "Raytracer.h"
-
+#include <list>
 
 
 #undef max
@@ -24,6 +24,521 @@ double int_exponential(double y0, double ysol, double beta, double s, double uy)
 	return result;
 }
 
+
+
+
+
+bool Raytracer::fogContribution(const Ray &r, double t, Vector curWeight, int nbrebonds, bool showLight, bool hadSS, Contrib& newContrib, double &attenuationFactor) {
+
+	Vector rayDirection = r.direction; 
+
+	Vector Lv(0., 0., 0.);
+
+	double p_uniform = 0.5;
+	bool is_uniform_fog = (s.fog_type == 0);
+	double beta = s.fog_density;// is_uniform_fog ? 0.04 : 0.1;
+	bool uniform_sampling_ray = true;
+	int phase = 0; // 0 : uniform, 1: Schlick, 2: Rayleigh
+
+	double int_ext;
+	if (is_uniform_fog) {
+		int_ext = beta * t;
+	} else {
+		int_ext = int_exponential(r.origin[1], s.objects[2]->get_translation(r.time, is_recording)[1], beta, t, rayDirection[1]);
+	}
+	double T = exp(-int_ext);
+
+	int threadid = omp_get_thread_num();
+	double proba_t, random_t;
+	double clamped_t = std::min(1000., t);
+	if (uniform_sampling_ray) {
+		random_t = engine[threadid]()*invmax*clamped_t;
+		proba_t = 1. / clamped_t;
+	} else {
+		double alpha = 5. / clamped_t;
+
+		do {
+			random_t = -log(engine[threadid]()*invmax) / alpha;
+		} while (random_t > clamped_t);
+
+		double normalization = 1. / alpha * (1 - exp(-alpha * clamped_t));
+		proba_t = exp(-alpha * random_t) / normalization;
+	}
+
+	double int_ext_partielle;
+	if (is_uniform_fog) {
+		int_ext_partielle = beta * random_t;
+	} else {
+		int_ext_partielle = int_exponential(r.origin[1], s.objects[2]->get_translation(r.time, is_recording)[1], beta, random_t, rayDirection[1]);
+	}
+
+
+	Vector random_P = r.origin + random_t * rayDirection;
+
+	Vector random_dir;
+	double proba_dir;
+
+	Vector point_aleatoire;
+	Vector axeOP = (random_P - centerLight).getNormalized();
+	bool is_uniform;
+	if (engine[threadid]()*invmax < p_uniform) {
+		random_dir = random_uniform_sphere();
+		is_uniform = true;
+	} else {
+		Vector dir_aleatoire = random_cos(axeOP);
+		point_aleatoire = dir_aleatoire * radiusLight + centerLight;
+		random_dir = (point_aleatoire - random_P).getNormalized();
+		is_uniform = false;
+	}
+
+
+	double phase_func;
+	double k = 0.4;
+	switch (phase) {
+	case 0:
+		phase_func = 0.3 / (4.*M_PI);
+		break;
+	case 1:
+		phase_func = (1 - k * k) / (4.*M_PI*(1 + k * dot(random_dir, -rayDirection)));
+		break;
+	case 2:
+		phase_func = 3 / (16 * M_PI)*(1 + sqr(dot(random_dir, rayDirection)));
+		break;
+	}
+
+	Ray L_ray(random_P, random_dir, r.time);
+	MaterialValues interMat;
+	Vector interP;
+	int interid, intertri;
+	double intert;
+	bool interinter = s.intersection(L_ray, interP, interid, intert, interMat, intertri);
+	const Vector& interN = interMat.shadingN;
+
+	double V;
+	if (is_uniform) {
+		V = 1;
+	} else {
+		double d_light2 = (point_aleatoire - random_P).getNorm2();
+		if (interinter && intert*intert < d_light2*0.99) {
+			V = 0;
+		} else {
+			V = 1;
+		}
+	}
+
+	attenuationFactor = T;
+
+	if (V == 0) {
+		Lv = Vector(0., 0., 0.);
+		return false;
+	} else {
+		double pdf_uniform = 1. / (4.*M_PI);
+		double J = dot(interN, -random_dir) / (interP - random_P).getNorm2();
+		double pdf_light = (interinter && interid == 0) ? (dot((interP - centerLight).getNormalized(), axeOP) / (M_PI * sqr(radiusLight)) / J) : 0.;
+		proba_dir = p_uniform * pdf_uniform + (1 - p_uniform)*pdf_light;
+
+		//Vector L = getColor(L_ray, sampleID, nbrebonds - 1, screenI, screenJ, normalValue, albedoValue);
+
+		double ext;
+		if (is_uniform_fog) {
+			ext = beta;
+		} else {
+			ext = 0.1 * exp(-beta * (random_P[1] - s.objects[2]->get_translation(r.time, is_recording)[1]));
+		}
+		//Lv = L * phase_func * ext * exp(-int_ext_partielle) / (proba_t * proba_dir);
+		Vector newweight = curWeight * (phase_func * ext * exp(-int_ext_partielle) / (proba_t * proba_dir));
+		newContrib = Contrib(newweight, L_ray, nbrebonds - 1, showLight, hadSS);
+		return true;
+	}
+	//return intensite_pixel * T + Lv;
+}
+
+
+
+Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int screenI, int screenJ, Vector &normalValue, Vector &albedoValue, bool no_envmap) {
+
+
+	Sphere* env = dynamic_cast<Sphere*>(s.objects[1]);
+	int threadid = omp_get_thread_num();
+
+	Vector P;
+	MaterialValues mat;
+	int sphere_id, tri_id;
+	double t;
+	Contrib newContrib;
+	double attenuationFactor;
+	bool has_fog = (s.fog_density > 1E-8);
+
+	Vector color(0, 0, 0);
+	//Vector pathWeight(1, 1, 1);
+
+	//Ray currentRay = r;
+	std::list<Contrib> contribs;
+	contribs.push_front(Contrib(Vector(1,1,1), r, nb_bounces, true, false));
+	bool has_dome = dynamic_cast<Sphere*>(s.objects[1]);
+	bool has_backgroundimage = (s.backgroundW > 0) && (s.background.size() == s.backgroundW*s.backgroundH * 3);
+
+
+	/*for (int nbrebonds = nb_bounces; nbrebonds > 0; nbrebonds--) {*/ // finally, not just a linear "tree" due to multiple scattering.
+	while (!contribs.empty())
+	{
+		const Contrib& curContrib = contribs.front();
+		Ray currentRay = curContrib.r;
+		int nbrebonds = curContrib.depth;
+		Vector pathWeight = curContrib.weight;
+		bool has_had_subsurface_interaction = curContrib.has_had_subsurface_interaction;
+		bool show_lights = curContrib.show_lights;
+		contribs.pop_front();
+
+		bool has_inter = s.intersection(currentRay, P, sphere_id, t, mat, tri_id, false, nbrebonds == nb_bounces);
+		Vector N = mat.shadingN;
+		if (has_inter && nbrebonds == nb_bounces) {
+			normalValue = N;
+			albedoValue = mat.Kd;
+		}
+		if (nbrebonds == 0) continue;
+
+		if ((nbrebonds == nb_bounces) && has_backgroundimage && (!has_inter || (has_inter && sphere_id == 1 && has_dome))) {
+			int i = std::min(s.backgroundH - 1, std::max(0, (int)(screenI / (double)H*s.backgroundH)));
+			int j = std::min(s.backgroundW - 1, std::max(0, (int)(screenJ / (double)W*s.backgroundW)));
+			double r = s.background[i*s.backgroundW * 3 + j * 3];
+			double g = s.background[i*s.backgroundW * 3 + j * 3 + 1];
+			double b = s.background[i*s.backgroundW * 3 + j * 3 + 2];
+			color += pathWeight*Vector(r, g, b);
+			continue;
+		}
+
+		Vector rayDirection = currentRay.direction;
+		bool is_subsurface = (mat.Ksub.getNorm2() > 1E-8);
+
+
+		if (has_inter) {
+			if (sphere_id == 1) {
+				if (no_envmap) {
+					if (has_fog) {
+						bool hasContrib = fogContribution(currentRay, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
+						if (hasContrib) contribs.push_back(newContrib);
+					}
+					continue; // we do not break anymore: there can be secondary rays due to multiple scattering still being computed
+				} else {
+					if (env) {
+						if (has_fog) {
+							bool hasContrib = fogContribution(currentRay, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
+							if (hasContrib) contribs.push_back(newContrib);
+							color += attenuationFactor * pathWeight * s.envmap_intensity*mat.Ke;
+						} else {
+							color += pathWeight * s.envmap_intensity*mat.Ke;					
+						}
+						continue;
+					}
+				}
+			}
+			if (sphere_id == 0) {
+				Vector currentContrib = show_lights ? (/*s.lumiere->albedo **/Vector(1., 1., 1.)* lightPower) : Vector(0., 0., 0.);				
+				if (has_fog) {
+					bool hasContrib = fogContribution(currentRay, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
+					if (hasContrib) contribs.push_back(newContrib);
+					color += attenuationFactor * pathWeight * currentContrib;
+				} else {
+					color += pathWeight * currentContrib;		
+				}
+				continue;
+			} else {
+				double subsProba = 0.6;// sqrt(mat.Ksub.getNorm2());
+				if (has_had_subsurface_interaction || !is_subsurface) subsProba = 0;
+				Vector subsW = Vector(1. / (1. - subsProba), 1. / (1. - subsProba), 1. / (1. - subsProba));
+
+				bool sub_interaction = false;
+				if (/*!has_had_subsurface_interaction &&*/ is_subsurface && (engine[threadid]()*invmax < subsProba)) {
+					sub_interaction = true;
+					subsW = Vector(1. / (subsProba), 1. / (subsProba), 1. / (subsProba));
+
+					//const double diskR = 6;
+					const double sigmasub = 1.5;
+					const double diskR = sqrt(12.46) * sigmasub; // sigmasub / sqrt(12.46);
+
+
+					Vector gauss(0, 0, 1000);
+
+					double integ = 1 - exp(-diskR * diskR / (2 * sigmasub*sigmasub));
+					double randR = sigmasub * sqrt(-2 * log(1 - engine[threadid]()*invmax*integ));
+					double randangle = engine[threadid]()*invmax * 2 * M_PI;
+					gauss[0] = randR * sin(randangle);
+					gauss[1] = randR * cos(randangle);
+					gauss[2] = randR;
+					double gaussval = (1. / (sigmasub*sigmasub * 2 * M_PI))*exp(-(gauss[2] * gauss[2]) / (2 * sigmasub*sigmasub));
+					double pdfgauss = gaussval / integ;
+
+					Vector Tg = getTangent(N);
+					Vector Tg2 = cross(N, Tg);
+					Vector PtaboveP = P + gauss[0] * Tg + gauss[1] * Tg2 + N * diskR;
+					float r1 = engine[threadid]()*invmax;
+					Vector axis;
+					double tmax;
+					double h = sqrt(diskR*diskR - gauss[2] * gauss[2]);
+					Vector subsOrigin = PtaboveP + (diskR - h)*(-N);
+					double wAxis;
+					if (r1 < 0.5) {
+						wAxis = 0.5;
+						axis = -N;
+						tmax = 2 * h;
+					} else {
+						wAxis = 0.25;
+						tmax = 2 * gauss[2];
+						if (r1 < 0.75) {
+							axis = Tg;
+						} else
+							axis = Tg2;
+						float r2 = engine[threadid]()*invmax;
+						if (r2 < 0.5) {
+							subsOrigin -= h * N;
+						}
+					}
+
+					MaterialValues subsmat;
+					int subsid, substriid;
+					double subst;
+					Vector localP2;
+
+					subsid = sphere_id;
+					bool subsinter = s.get_random_intersection(Ray(subsOrigin, axis, r.time), localP2, subsid, subst, subsmat, substriid, 0, tmax, false);
+					if (subsinter) {
+						//subsW *= 1. / std::max(gaussval*std::abs(dot(mat.shadingN, subsmat.shadingN)),0.005) *exp(-(P - localP2).getNorm2() / (2.*sigmasub*sigmasub));
+						double chris = exp(-(P - localP2).getNorm2() / (2.*sigmasub*sigmasub));
+						//double dist = (P - localP2).getNorm2();
+						//double chris = (exp(-sqrt(dist) / sigmasub) + exp(-sqrt(dist / (3*sigmasub)))) / (8*M_PI*dist*sigmasub);
+						//double surfA = 1;// sqrt(mat.Ksub.getNorm2());
+						//double sval = 1.9 - surfA + 3.5*sqr(surfA - 0.8);
+						//double chris = 30*surfA * sval*  (exp(-sval * dist / sigmasub) + exp(-sval * dist / (3 * sigmasub))) / (8 * M_PI*sigmasub*dist);
+						double sumpdfs = sqr(0.5*dot(subsmat.shadingN, N)) + sqr(0.25*dot(subsmat.shadingN, Tg)) + sqr(0.25*dot(subsmat.shadingN, Tg2));
+						double pdfdisk = wAxis * std::abs(dot(axis, subsmat.shadingN)) / sumpdfs;
+						//Vector A = sqrt(mat.Ksub * subsmat.Ksub);
+						//Vector sval = Vector(1.9, 1.9, 1.9) - A + 3.5*sqr(A - Vector(0.8, 0.8, 0.8));
+						//Vector chris = sval*A*(exp(-sval * dist / sigmasub) + exp(-sval * dist / (3 * sigmasub))) / (8 * M_PI*sigmasub*dist);
+						subsW *= pdfdisk / std::max(pdfgauss, 0.05) *chris;
+						rayDirection = (localP2 - P).getNormalized();
+						P = localP2 + 0.005*subsmat.shadingN;
+						if (r1 < 0.5) {
+							subsW *= 2;
+						} else
+							subsW *= 4;
+						subsW = subsW * ((/*Vector(1.,1.,1.)-*/mat.Ksub/*-mat.Ks*/) / M_PI); // Kd subsurface...
+						mat = subsmat;
+						N = mat.shadingN;
+						tri_id = substriid;
+
+					}
+
+
+				}
+
+				BRDF* brdf = s.objects[sphere_id]->brdf;
+				//brdf->setParameters(mat);
+
+				color += pathWeight* mat.Ke*s.envmap_intensity;
+
+				if (s.objects[sphere_id]->miroir) {
+					Vector direction_miroir = rayDirection.reflect(N);
+					Ray rayon_miroir(P + 0.001*N, direction_miroir, r.time);
+
+					//if (uniform(engine) < 0.9)
+					//currentContrib += getColor(rayon_miroir, sampleID, nbrebonds - 1, screenI, screenJ, normalValue, albedoValue, show_lights, no_envmap);// / 0.9;
+					//currentRay = rayon_miroir;
+					if (has_fog) {
+						bool hasContrib = fogContribution(currentRay, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
+						if (hasContrib) contribs.push_back(newContrib);
+						contribs.push_back(Contrib(attenuationFactor*pathWeight, rayon_miroir, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
+					} else {
+						contribs.push_back(Contrib(pathWeight, rayon_miroir, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
+					}
+					continue;
+				} else
+					if (mat.transp) {
+						double n1 = 1;
+						double n2 = mat.refr_index;
+						Vector normale_pour_transparence(N);
+						Ray new_ray;
+						bool entering = true;
+						if (dot(rayDirection, N) > 0) {  // on sort de la sphere
+							n1 = mat.refr_index;
+							n2 = 1;
+							normale_pour_transparence = -N;
+							entering = false;
+						}
+						double radical = 1 - sqr(n1 / n2)*(1 - sqr(dot(normale_pour_transparence, rayDirection)));
+						if (radical > 0) {
+							Vector direction_refracte = (n1 / n2)*(rayDirection - dot(rayDirection, normale_pour_transparence)*normale_pour_transparence) - normale_pour_transparence * sqrt(radical);
+							Ray rayon_refracte(P - 0.001*normale_pour_transparence, direction_refracte, r.time);
+
+							double R0 = sqr((n1 - n2) / (n1 + n2));
+							double R;
+							if (entering) {
+								R = R0 + (1 - R0)*std::pow(1 + dot(rayDirection, N), 5);
+							} else {
+								R = R0 + (1 - R0)*std::pow(1 - dot(direction_refracte, N), 5);
+							}
+
+							if (engine[threadid]()*invmax < R) {
+								new_ray = Ray(P + 0.001*normale_pour_transparence, rayDirection.reflect(N), r.time);
+							} else {
+								new_ray = Ray(P - 0.001*normale_pour_transparence, direction_refracte, r.time);
+							}
+						} else {
+							new_ray = Ray(P + 0.001*normale_pour_transparence, rayDirection.reflect(N), r.time);
+							//return Vector(0, 0, 0);
+						}
+						//currentContrib += getColor(new_ray, sampleID, nbrebonds - 1, screenI, screenJ, normalValue, albedoValue, show_lights, no_envmap);
+						//currentRay = new_ray;
+						if (has_fog) {
+							bool hasContrib = fogContribution(currentRay, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
+							if (hasContrib) contribs.push_back(newContrib);
+							contribs.push_back(Contrib(attenuationFactor*pathWeight, new_ray, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
+						} else {
+							contribs.push_back(Contrib(pathWeight, new_ray, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
+						}
+						continue;
+					} else {
+
+						//if (dot(N, rayDirection) > 0) N = -N;	
+
+						Vector axeOP = (P - centerLight); axeOP.fast_normalize();//.getNormalized();
+						Vector dir_aleatoire;
+						if (nbrebonds == nb_bounces && no_envmap)
+							dir_aleatoire = random_cos(axeOP, samples2d[sampleID][0], samples2d[sampleID][1]);
+						else
+							dir_aleatoire = random_cos(axeOP);
+						Vector point_aleatoire = dir_aleatoire * radiusLight + centerLight;
+						Vector wi = (point_aleatoire - P); wi.fast_normalize();// .getNormalized();
+						double d_light2 = (point_aleatoire - P).getNorm2();
+						Vector Np = dir_aleatoire;
+						//Vector kd =  mat.Kd;
+						Vector tr;
+						if (s.objects[sphere_id]->ghost) {
+							Vector offset;   // try to be robust here since we don't do nbrebonds-1
+							if (dot(N, rayDirection) > 0)
+								offset = N;
+							else
+								offset = -N; 
+								//tr = getColor(Ray(P + rayDirection * 0.001 + offset * 0.001, rayDirection, r.time), sampleID, nbrebonds, screenI, screenJ, normalValue, albedoValue, show_lights, no_envmap);
+							currentRay = Ray(P + rayDirection * 0.001 + offset * 0.001, rayDirection, r.time);
+							contribs.push_back(Contrib(pathWeight, currentRay, nbrebonds, show_lights, has_had_subsurface_interaction));
+							continue;
+						}
+						Ray ray_light(P + 0.01*wi, wi, r.time);
+						double t_light;
+						bool isShadowed = s.intersection_shadow(ray_light, t_light, sqrt(d_light2) - 0.01, true);
+						//bool direct_visible = true;
+						Vector currentContrib(0, 0, 0);
+
+						if (!isShadowed) {
+							//if (dot(N, wi) < 0) N = -N; // two sided shading...
+
+							Vector BRDF;
+							if (sub_interaction) {
+								BRDF = (/*Vector(1., 1., 1.) -*/ mat.Ksub /*- mat.Ks*/) / M_PI;
+							} else {
+								BRDF = brdf->eval(mat, wi, -rayDirection, N);
+							}
+							double J = 1.*dot(Np, -wi) / d_light2;
+							double proba = dot(axeOP, dir_aleatoire) / (M_PI * radiusLight*radiusLight);
+							if (s.objects[sphere_id]->ghost) {
+								//currentContrib += tr;
+							} else {
+								if (proba > 0) {
+									currentContrib += subsW * (lightPower* std::max(0., dot(N, wi)) * J / proba)  * BRDF;
+								}
+							}
+
+
+						}
+						if (has_fog) {
+							bool hasContrib = fogContribution(currentRay, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
+							if (hasContrib) contribs.push_back(newContrib);							
+							color += attenuationFactor * pathWeight * currentContrib;
+						} else {
+							color += pathWeight * currentContrib;
+						}
+
+						// ajout de la contribution indirecte
+						double proba_globale;
+						Vector direction_aleatoire;
+						if (nbrebonds == nb_bounces && no_envmap) {
+							if (sub_interaction) {
+								direction_aleatoire = random_cos(N);
+								proba_globale = dot(N, direction_aleatoire);
+							} else
+								direction_aleatoire = brdf->sample(mat, -rayDirection, N, proba_globale);
+						} else {
+							float tmp;
+							float r1 = modf(randomPerPixel[screenI*W + screenJ][0] + samples2d[sampleID][0], &tmp); // cranley patterson
+							float r2 = modf(randomPerPixel[screenI*W + screenJ][1] + samples2d[sampleID][1], &tmp);
+							if (sub_interaction) {
+								direction_aleatoire = random_cos(mat.shadingN, r1, r2);
+								proba_globale = dot(N, direction_aleatoire) / M_PI;
+							} else
+								direction_aleatoire = brdf->sample(mat, -rayDirection, N, proba_globale, r1, r2);
+						}
+
+
+						if (dot(direction_aleatoire, N) < 0 || dot(direction_aleatoire, rayDirection.reflect(N)) < 0 || proba_globale <= 0) {
+							//delete brdf;
+							//return currentContrib;
+							continue;
+						}
+
+
+						Ray	rayon_aleatoire(P + 0.01*direction_aleatoire, direction_aleatoire, r.time);
+
+						Vector BRDFindirect;
+						if (sub_interaction) {
+							BRDFindirect = mat.Ksub / M_PI;
+						} else {
+							BRDFindirect = brdf->eval(mat, direction_aleatoire, -rayDirection, N);
+						}
+
+						//currentContrib += subsW * getColor(rayon_aleatoire, sampleID, nbrebonds - 1, screenI, screenJ, normalValue, albedoValue, false, no_envmap, sub_interaction ? true : has_had_subsurface_interaction)  * ((dot(N, direction_aleatoire) / proba_globale)) * BRDFindirect;
+
+						Vector newpathWeight = pathWeight * subsW * BRDFindirect* ((dot(N, direction_aleatoire) / proba_globale));
+
+						if (has_fog) {					
+							contribs.push_back(Contrib(attenuationFactor*newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction?true:has_had_subsurface_interaction));
+						} else {
+							contribs.push_back(Contrib(newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction ? true : has_had_subsurface_interaction));
+						}
+
+
+						/*if (s.objects[sphere_id]->ghost) {
+							//if (nbrebonds != nb_bounces)
+							//	return intensite_pixel;
+							if (sample_diffuse)
+								intensite_pixel += tr / 196964.699 / M_PI *getColor(rayon_aleatoire, nbrebonds - 1, screenI, screenJ, false, direct_visible)  / proba_globale;
+							else
+								intensite_pixel += getColor(rayon_aleatoire, nbrebonds - 1, screenI, screenJ, false, true)  * Phong_BRDF(direction_aleatoire, rayDirection, N, mat.Ne) / proba_globale *mat.Ks;
+						} else {
+							if (sample_diffuse)
+								intensite_pixel += getColor(rayon_aleatoire, nbrebonds - 1, screenI, screenJ, false, no_envmap) * ((dot(N, direction_aleatoire) / (M_PI) / proba_globale)) * kd;
+							else
+								intensite_pixel += getColor(rayon_aleatoire, nbrebonds - 1, screenI, screenJ, false, no_envmap)  * ((dot(N, direction_aleatoire) / proba_globale)) *mat.Ks * Phong_BRDF(direction_aleatoire, rayDirection, N, mat.Ne);
+						}*/
+						//intensite_pixel += getColor(rayon_aleatoire, nbrebonds - 1, false)  * dot(N, direction_aleatoire) * Phong_BRDF(direction_aleatoire, rayDirection, N, s.objects[sphere_id]->phong_exponent)*s.objects[sphere_id]->ks * albedo / proba_globale;
+					}
+				//delete brdf;
+			}
+			} 
+
+			if (s.fog_density == 0)
+				continue;
+
+			if (!has_inter) break;
+
+
+		}
+
+
+	return color;
+}
+
+#if 0
 Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, Vector &normalValue, Vector &albedoValue, bool show_lights, bool no_envmap, bool has_had_subsurface_interaction) {
 
 	if (nbrebonds == 0) return Vector(0, 0, 0);
@@ -104,12 +619,13 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 				}*/
 				double integ = 1 - exp(-diskR * diskR / (2 * sigmasub*sigmasub));
 				double randR = sigmasub * sqrt(-2 * log(1 - engine[threadid]()*invmax*integ));
-				double gaussval = (1. / (sigmasub*sigmasub * 2 * M_PI))*exp(-(gauss[2] * gauss[2]) / (2 * sigmasub*sigmasub));
-				double pdfgauss = gaussval / integ;
+
 				double randangle = engine[threadid]()*invmax * 2 * M_PI;
 				gauss[0] = randR * sin(randangle);
 				gauss[1] = randR * cos(randangle);
 				gauss[2] = randR;
+				double gaussval = (1. / (sigmasub*sigmasub * 2 * M_PI))*exp(-(gauss[2] * gauss[2]) / (2 * sigmasub*sigmasub));
+				double pdfgauss = gaussval / integ;
 
 				Vector Tg = getTangent(N);
 				Vector Tg2 = cross(N, Tg);
@@ -157,7 +673,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 					//Vector A = sqrt(mat.Ksub * subsmat.Ksub);
 					//Vector sval = Vector(1.9, 1.9, 1.9) - A + 3.5*sqr(A - Vector(0.8, 0.8, 0.8));
 					//Vector chris = sval*A*(exp(-sval * dist / sigmasub) + exp(-sval * dist / (3 * sigmasub))) / (8 * M_PI*sigmasub*dist);
-					subsW *= pdfdisk / std::max(pdfgauss, 0.0005) *chris;
+					subsW *= pdfdisk / std::max(pdfgauss, 0.05) *chris;
 					rayDirection = (localP2 - P).getNormalized();
 					P = localP2 + 0.005*subsmat.shadingN;
 					if (r1 < 0.5) {
@@ -450,6 +966,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebonds, int screen
 
 	return intensite_pixel * T + Lv;
 }
+#endif
 
 void Raytracer::save_scene(const char* filename) {
 	
@@ -618,7 +1135,7 @@ Vector extensibleLattice2d(uint32_t id) {
 	return Vector(x, y, 0);
 }
 
-void Raytracer::prepare_render() {
+void Raytracer::prepare_render(double time) {
 
 	for (int i = 0; i < omp_get_max_threads(); i++) {
 		engine[i] = pcg32(i);
@@ -672,6 +1189,11 @@ void Raytracer::prepare_render() {
 	}
 	s.prepare_render(is_recording);
 
+	centerLight = s.lumiere->apply_transformation(s.lumiere->O);// s.lumiere->O + s.lumiere->get_translation(r.time, is_recording);
+	lum_scale = s.lumiere->get_scale(time, is_recording);
+	radiusLight = lum_scale * s.lumiere->R;
+	lightPower = s.intensite_lumiere / sqr(lum_scale);
+
 	std::fill(computed.begin(), computed.end(), false);
 	std::fill(sample_count.begin(), sample_count.end(), 0);
 	std::fill(imagedouble_lowres.begin(), imagedouble_lowres.end(), 0);
@@ -700,7 +1222,7 @@ void Raytracer::render_image()
 		}
 	}*/
 
-	prepare_render();
+	prepare_render(s.current_frame);
 	
 
 		for (int k = 0; k < nrays; k++) {
@@ -824,7 +1346,7 @@ void Raytracer::render_image()
 
 void Raytracer::render_image_nopreviz() {
 
-	prepare_render();
+	prepare_render(s.current_frame);
 	double denom2 = 1. / (2.*sigma_filter*sigma_filter);
 
 	chrono.Start();

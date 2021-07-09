@@ -695,7 +695,7 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 	raytracer.cam.is_lenticular = raytracer_app->isLenticularCheck->IsChecked();
 	raytracer.sigma_filter = raytracer_app->filter_slider->GetValue() / 10.;
 
-	raytracer.s.fog_density = raytracer_app->fogdensity_slider->GetValue() / 100.;
+	raytracer.s.fog_density = raytracer_app->fogdensity_slider->GetValue() / 1000.;
 
 	raytracer.s.intensite_lumiere = raytracer_app->lightintensity_slider->GetValue() / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
 	raytracer.s.envmap_intensity = raytracer_app->envmapintensity_slider->GetValue() / 100.;
@@ -856,7 +856,7 @@ void RenderPanel::update_gui() {
 	raytracer_app->time_slider->SetMax(raytracer.s.nbframes);
 
 
-	raytracer_app->fogdensity_slider->SetValue(raytracer.s.fog_density*100.);
+	raytracer_app->fogdensity_slider->SetValue(raytracer.s.fog_density*1000.);
 	raytracer_app->uniformFogRadio->SetValue(raytracer.s.fog_type == 0);
 
 	double factor = 1. / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);

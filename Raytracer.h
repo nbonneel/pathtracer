@@ -10,6 +10,16 @@
 #include <OpenImageDenoise/oidn.hpp>
 #endif
 
+class Contrib {
+public:
+	Contrib() {};
+	Contrib(const Vector& w, const Ray& r, int d, bool showlights, bool hadSS) :weight(w), r(r), depth(d), show_lights(showlights), has_had_subsurface_interaction(hadSS) {};
+	Vector weight;
+	Ray r;
+	int depth;
+	bool show_lights, has_had_subsurface_interaction;
+};
+
 class Raytracer {
 public:
 
@@ -28,7 +38,7 @@ public:
 #endif
 	};
 	void loadScene();
-	void prepare_render();
+	void prepare_render(double time);
 	void render_image();
 	void render_image_nopreviz();
 	void clear_image() { 
@@ -54,7 +64,8 @@ public:
 	void save_scene(const char* filename);
 	void load_scene(const char* filename, const char* replacedNames = NULL);
 
-	Vector getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, Vector &normalValue, Vector &albedoValue, bool show_lights = true, bool no_envmap = false, bool has_had_subsurface_interaction = false);
+	Vector getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, Vector &normalValue, Vector &albedoValue, bool no_envmap = false);
+	bool fogContribution(const Ray &r, double t, Vector curWeight, int nbrebonds, bool showLight, bool hadSS, Contrib& newContrib, double &attenuationFactor);
 
 	int W, H, Wlr, Hlr;
 	int nrays, last_nrays;  
@@ -91,6 +102,9 @@ public:
 
 	std::vector<Vector> samples2d;
 	std::vector<Vector> randomPerPixel;
+
+	Vector centerLight;
+	double lum_scale, radiusLight, lightPower;
 
 #ifdef USE_OPENIMAGEDENOISER
 	oidn::DeviceRef device;
