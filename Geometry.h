@@ -1329,7 +1329,7 @@ public:
 	Sphere *lumiere;
 	double intensite_lumiere;
 	double envmap_intensity;
-	double fog_density;
+	double fog_density, fog_absorption, fog_density_decay, fog_absorption_decay;
 	int nbframes, current_frame;
 	double duration, current_time;
 	int fog_type; // 0 : uniform, 1: exponential

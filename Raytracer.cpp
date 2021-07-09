@@ -11,7 +11,6 @@
 #include "Raytracer.h"
 #include <list>
 
-
 #undef max
 #undef min
 
@@ -20,7 +19,22 @@ inline double sqr(double x) { return x*x; }
 
 
 double int_exponential(double y0, double ysol, double beta, double s, double uy) {
-	double 	result = 0.1 * exp((-y0 + ysol)*beta) * (1 - exp(-s*uy*beta)) / (uy*beta);
+	//double 	result =  exp((-y0 + ysol)*beta) * (1 - exp(-s*uy*beta)) / (uy*beta); // not ok
+	//double 	result = (exp(-beta * (y0 - ysol)) - exp(-beta*(y0 - ysol +s*uy)))/(uy*beta);
+	
+	//double 	result = -1.0 / (uy*beta) * (exp(-beta * (y0 + s * uy - ysol)) - exp(-beta * (y0 - ysol))); //ok
+	double 	result;
+	if (abs(uy*beta) < 0.0001) { // I may have issues with smalle values
+		result = exp(-beta * (y0 - ysol)) * (s /*- s * s*uy*beta*0.5*/);
+		//double result2 = (exp(-beta * (y0 - ysol)) - exp(-beta * (y0 + s * uy - ysol))) / (uy*beta); // ok
+		//std::cout << result << " " << result2 << std::endl;
+	} else {
+		result = (exp(-beta * (y0 - ysol)) - exp(-beta * (y0 + s * uy - ysol))) / (uy*beta); // ok
+	}
+	//double 	result2 = exp(-beta * (y0 - ysol)) * (1 - exp(-beta * (s * uy))) / (uy*beta); //not ok
+	//double 	result = (-beta * (y0 - ysol)) + log(1 - exp(-beta * (s * uy))) - log(beta);
+	//result = exp(result)/ (uy);
+	//std::cout << result1 << "  " << result2 << "  " << result << std::endl;
 	return result;
 }
 
@@ -28,52 +42,73 @@ double int_exponential(double y0, double ysol, double beta, double s, double uy)
 
 
 
-bool Raytracer::fogContribution(const Ray &r, double t, Vector curWeight, int nbrebonds, bool showLight, bool hadSS, Contrib& newContrib, double &attenuationFactor) {
-
+bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, double t, Vector curWeight, int nbrebonds, bool showLight, bool hadSS, Contrib& newContrib, double &attenuationFactor) {
+	if (curWeight.getNorm2() < 1E-12) return false;
 	Vector rayDirection = r.direction; 
 
 	Vector Lv(0., 0., 0.);
 
 	double p_uniform = 0.5;
 	bool is_uniform_fog = (s.fog_type == 0);
-	double beta = s.fog_density;// is_uniform_fog ? 0.04 : 0.1;
-	bool uniform_sampling_ray = true;
+	double alpha = s.fog_absorption;
+	double sigmaT = s.fog_absorption_decay;
+	bool uniform_sampling_ray = false;
 	int phase = 0; // 0 : uniform, 1: Schlick, 2: Rayleigh
+	double groundLevel = s.objects[2]->get_translation(r.time, is_recording)[1];
 
 	double int_ext;
 	if (is_uniform_fog) {
-		int_ext = beta * t;
+		int_ext = alpha * t;
 	} else {
-		int_ext = int_exponential(r.origin[1], s.objects[2]->get_translation(r.time, is_recording)[1], beta, t, rayDirection[1]);
+		int_ext = alpha*int_exponential(r.origin[1], groundLevel, sigmaT, t, rayDirection[1]);
 	}
 	double T = exp(-int_ext);
 
 	int threadid = omp_get_thread_num();
 	double proba_t, random_t;
 	double clamped_t = std::min(1000., t);
-	if (uniform_sampling_ray) {
-		random_t = engine[threadid]()*invmax*clamped_t;
-		proba_t = 1. / clamped_t;
+	
+	double a = dot(sampleLightPos - r.origin, r.direction);
+	if (a > 0) {
+		// http://library.imageworks.com/pdfs/imageworks-library-importance-sampling-of-area-lights-in-participating-media.pdf
+		Vector projP = r.origin + a * r.direction;
+		double D = sqrt((sampleLightPos - projP).getNorm2());
+		double thetaA = -atan2(a, D);		
+		double b = t - a;
+		double thetaB = atan2(b, D); // can be negative. should be ok.
+		Vector farP = r.origin + t * r.direction;		
+		double x = engine[threadid]()*invmax;
+		random_t = D * tan((1 - x)*thetaA + x * thetaB);
+		proba_t = D / ((thetaB - thetaA)*(D*D + random_t * random_t));
+		random_t += a;
+
 	} else {
-		double alpha = 5. / clamped_t;
+		if (uniform_sampling_ray) {
+			random_t = engine[threadid]()*invmax*clamped_t;
+			proba_t = 1. / clamped_t;
+		} else {
+			double alpha = 5. / clamped_t;
 
-		do {
-			random_t = -log(engine[threadid]()*invmax) / alpha;
-		} while (random_t > clamped_t);
+			do {
+				random_t = -log(engine[threadid]()*invmax) / alpha;
+			} while (random_t > clamped_t);
 
-		double normalization = 1. / alpha * (1 - exp(-alpha * clamped_t));
-		proba_t = exp(-alpha * random_t) / normalization;
+			double normalization = 1. / alpha * (1 - exp(-alpha * clamped_t));
+			proba_t = exp(-alpha * random_t) / normalization;
+		}
 	}
+	
 
 	double int_ext_partielle;
 	if (is_uniform_fog) {
-		int_ext_partielle = beta * random_t;
+		int_ext_partielle = alpha * random_t;
 	} else {
-		int_ext_partielle = int_exponential(r.origin[1], s.objects[2]->get_translation(r.time, is_recording)[1], beta, random_t, rayDirection[1]);
+		int_ext_partielle = alpha * int_exponential(r.origin[1], groundLevel, sigmaT, random_t, rayDirection[1]);
 	}
 
 
 	Vector random_P = r.origin + random_t * rayDirection;
+	if (random_P[1] < groundLevel) return false;
 
 	Vector random_dir;
 	double proba_dir;
@@ -141,12 +176,16 @@ bool Raytracer::fogContribution(const Ray &r, double t, Vector curWeight, int nb
 
 		double ext;
 		if (is_uniform_fog) {
-			ext = beta;
+			ext = s.fog_density;
 		} else {
-			ext = 0.1 * exp(-beta * (random_P[1] - s.objects[2]->get_translation(r.time, is_recording)[1]));
+			//ext = 0.1 * exp(-beta * (random_P[1] - s.objects[2]->get_translation(r.time, is_recording)[1]));
+			ext = s.fog_density * exp(-s.fog_density_decay * (random_P[1] - groundLevel));
 		}
 		//Lv = L * phase_func * ext * exp(-int_ext_partielle) / (proba_t * proba_dir);
 		Vector newweight = curWeight * (phase_func * ext * exp(-int_ext_partielle) / (proba_t * proba_dir));
+		if (isnan(newweight[0])) {
+			std::cout << "nan" << std::endl;
+		}
 		newContrib = Contrib(newweight, L_ray, nbrebonds - 1, showLight, hadSS);
 		return true;
 	}
@@ -216,14 +255,14 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 			if (sphere_id == 1) {
 				if (no_envmap) {
 					if (has_fog) {
-						bool hasContrib = fogContribution(currentRay, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
+						bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
 						if (hasContrib) contribs.push_back(newContrib);
 					}
 					continue; // we do not break anymore: there can be secondary rays due to multiple scattering still being computed
 				} else {
 					if (env) {
 						if (has_fog) {
-							bool hasContrib = fogContribution(currentRay, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
+							bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
 							if (hasContrib) contribs.push_back(newContrib);
 							color += attenuationFactor * pathWeight * s.envmap_intensity*mat.Ke;
 						} else {
@@ -236,7 +275,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 			if (sphere_id == 0) {
 				Vector currentContrib = show_lights ? (/*s.lumiere->albedo **/Vector(1., 1., 1.)* lightPower) : Vector(0., 0., 0.);				
 				if (has_fog) {
-					bool hasContrib = fogContribution(currentRay, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
+					bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
 					if (hasContrib) contribs.push_back(newContrib);
 					color += attenuationFactor * pathWeight * currentContrib;
 				} else {
@@ -345,7 +384,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 					//currentContrib += getColor(rayon_miroir, sampleID, nbrebonds - 1, screenI, screenJ, normalValue, albedoValue, show_lights, no_envmap);// / 0.9;
 					//currentRay = rayon_miroir;
 					if (has_fog) {
-						bool hasContrib = fogContribution(currentRay, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
+						bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
 						if (hasContrib) contribs.push_back(newContrib);
 						contribs.push_back(Contrib(attenuationFactor*pathWeight, rayon_miroir, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
 					} else {
@@ -390,7 +429,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 						//currentContrib += getColor(new_ray, sampleID, nbrebonds - 1, screenI, screenJ, normalValue, albedoValue, show_lights, no_envmap);
 						//currentRay = new_ray;
 						if (has_fog) {
-							bool hasContrib = fogContribution(currentRay, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
+							bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
 							if (hasContrib) contribs.push_back(newContrib);
 							contribs.push_back(Contrib(attenuationFactor*pathWeight, new_ray, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
 						} else {
@@ -452,7 +491,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 
 						}
 						if (has_fog) {
-							bool hasContrib = fogContribution(currentRay, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
+							bool hasContrib = fogContribution(currentRay, point_aleatoire, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
 							if (hasContrib) contribs.push_back(newContrib);							
 							color += attenuationFactor * pathWeight * currentContrib;
 						} else {

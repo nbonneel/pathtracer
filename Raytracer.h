@@ -65,7 +65,7 @@ public:
 	void load_scene(const char* filename, const char* replacedNames = NULL);
 
 	Vector getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, Vector &normalValue, Vector &albedoValue, bool no_envmap = false);
-	bool fogContribution(const Ray &r, double t, Vector curWeight, int nbrebonds, bool showLight, bool hadSS, Contrib& newContrib, double &attenuationFactor);
+	bool fogContribution(const Ray &r, const Vector& sampleLightPos, double t, Vector curWeight, int nbrebonds, bool showLight, bool hadSS, Contrib& newContrib, double &attenuationFactor);
 
 	int W, H, Wlr, Hlr;
 	int nrays, last_nrays;  

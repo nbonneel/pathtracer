@@ -77,8 +77,12 @@
 #define NBVIEWSY 1046
 #define MAXSPACINGX 1047
 #define MAXSPACINGY 1048
-#define DOUBLEFRUSTUM 10490
-#define FILTER_CHECKBOX 10500
+#define DOUBLEFRUSTUM 1049
+#define FILTER_CHECKBOX 1050
+#define FOGDENSITYDECAY_SLIDER 1051
+#define FOGABSORPTION_SLIDER 1052
+#define FOGABSORPTIONDECAY_SLIDER 1053
+
 
 #define ID_ALBEDO_DELETE 10
 #define ID_MOVEUP 11
@@ -749,10 +753,11 @@ public:
 	wxCheckBox *has_denoiser;
 #endif
 	wxTextCtrl *objectName, *envmapName, *backgroundName;
-	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider, *maxangle_slider, *time_slider;
+	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *fogabsorption_slider, *fogdensitydecay_slider, *fogabsorptiondecay_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider, *maxangle_slider, *time_slider;
 	wxListCtrl *m_AlbedoFile, *m_SpecularFile, *m_NormalFile, *m_AlphaFile, *m_RoughnessFile, *m_TranspFile, *m_RefrFile, *m_SubsurfaceFile;
 	//wxColourPickerCtrl *albedoColorPicker;
 	wxRadioButton *uniformFogRadio, *expFogRadio;
+	wxBoxSizer *fogdensitydecay_sizer, *fogabsorptiondecay_sizer;
 	wxColourDialog* colPicker;
 	wxFileDialog* texOpenDlg;
 	wxSpinCtrl *bounces, *renderwidth, *renderheight, *nbrays, *nbviews, *nbpixslice, *nbframesctrl, *fluidresX, *fluidresY, *fluidresZ, *fluidnparticles, *fluidsubsteps, *nbviewsX, *nbviewsY;

@@ -374,12 +374,37 @@ bool RaytracerApp::OnInit()
 	fogdensity_sizer->Add(fogdensity_text, 0, wxEXPAND);
 	fogdensity_sizer->Add(fogdensity_slider, 1, wxEXPAND);
 
+	wxBoxSizer * fogabsorption_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* fogabsorption_text = new wxStaticText(panelFog, 9999 - 1, "fog absorption : ");
+	fogabsorption_slider = new wxSlider(panelFog, FOGABSORPTION_SLIDER, 0, 0, 100, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL | wxSL_LABELS);
+	Connect(FOGABSORPTION_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	fogabsorption_sizer->Add(fogabsorption_text, 0, wxEXPAND);
+	fogabsorption_sizer->Add(fogabsorption_slider, 1, wxEXPAND);
+
+	fogdensitydecay_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* fogdensitydecay_text = new wxStaticText(panelFog, 9999 - 1, "fog density decay: ");
+	fogdensitydecay_slider = new wxSlider(panelFog, FOGDENSITYDECAY_SLIDER, 0, 0, 100, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL | wxSL_LABELS);
+	Connect(FOGDENSITYDECAY_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	fogdensitydecay_sizer->Add(fogdensitydecay_text, 0, wxEXPAND);
+	fogdensitydecay_sizer->Add(fogdensitydecay_slider, 1, wxEXPAND);
+	
+	fogabsorptiondecay_sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxStaticText* fogabsorptiondecay_text = new wxStaticText(panelFog, 9999 - 1, "fog absorption decay : ");
+	fogabsorptiondecay_slider = new wxSlider(panelFog, FOGABSORPTIONDECAY_SLIDER, 0, 0, 100, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL | wxSL_LABELS);
+	Connect(FOGABSORPTIONDECAY_SLIDER, wxEVT_COMMAND_SLIDER_UPDATED, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	fogabsorptiondecay_sizer->Add(fogabsorptiondecay_text, 0, wxEXPAND);
+	fogabsorptiondecay_sizer->Add(fogabsorptiondecay_slider, 1, wxEXPAND);
+
+
 	uniformFogRadio = new wxRadioButton(panelFog, UNIFORMFOG_RADIO, "Uniform fog", wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
 	expFogRadio = new wxRadioButton(panelFog, EXPFOG_RADIO, "Exponential fog", wxDefaultPosition, wxDefaultSize, 0);
 	Connect(UNIFORMFOG_RADIO, wxEVT_RADIOBUTTON, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 	Connect(UNIFORMFOG_RADIO, wxEVT_RADIOBUTTON, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
 
 	panelFog_sizer->Add(fogdensity_sizer, 0, wxEXPAND);
+	panelFog_sizer->Add(fogabsorption_sizer, 0, wxEXPAND);
+	panelFog_sizer->Add(fogdensitydecay_sizer, 0, wxEXPAND);
+	panelFog_sizer->Add(fogabsorptiondecay_sizer, 0, wxEXPAND);
 	panelFog_sizer->Add(uniformFogRadio, 0, wxEXPAND);
 	panelFog_sizer->Add(expFogRadio, 0, wxEXPAND);
 	panelFog->SetSizer(panelFog_sizer);
@@ -695,7 +720,11 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 	raytracer.cam.is_lenticular = raytracer_app->isLenticularCheck->IsChecked();
 	raytracer.sigma_filter = raytracer_app->filter_slider->GetValue() / 10.;
 
-	raytracer.s.fog_density = raytracer_app->fogdensity_slider->GetValue() / 1000.;
+	raytracer.s.fog_density = raytracer_app->fogdensity_slider->GetValue() / 100.;
+	raytracer.s.fog_absorption = raytracer_app->fogabsorption_slider->GetValue() / 100.;
+	raytracer.s.fog_density_decay = raytracer_app->fogdensitydecay_slider->GetValue() / 100.;
+	raytracer.s.fog_absorption_decay = raytracer_app->fogabsorptiondecay_slider->GetValue() / 100.;
+
 
 	raytracer.s.intensite_lumiere = raytracer_app->lightintensity_slider->GetValue() / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
 	raytracer.s.envmap_intensity = raytracer_app->envmapintensity_slider->GetValue() / 100.;
@@ -856,8 +885,15 @@ void RenderPanel::update_gui() {
 	raytracer_app->time_slider->SetMax(raytracer.s.nbframes);
 
 
-	raytracer_app->fogdensity_slider->SetValue(raytracer.s.fog_density*1000.);
+	raytracer_app->fogdensity_slider->SetValue(raytracer.s.fog_density*100.);
+	raytracer_app->fogabsorption_slider->SetValue(raytracer.s.fog_absorption*100.);
+	raytracer_app->fogdensitydecay_slider->SetValue(raytracer.s.fog_density_decay*100.);
+	raytracer_app->fogabsorptiondecay_slider->SetValue(raytracer.s.fog_absorption_decay*100.);
 	raytracer_app->uniformFogRadio->SetValue(raytracer.s.fog_type == 0);
+
+	//raytracer_app->fogabsorptiondecay_sizer->ShowItems(raytracer.s.fog_type);
+	//raytracer_app->fogdensitydecay_sizer->ShowItems(raytracer.s.fog_type);
+	
 
 	double factor = 1. / 100. * 1000000000 * 4.*M_PI / (4.*M_PI*raytracer.s.lumiere->R*raytracer.s.lumiere->R*M_PI);
 	raytracer_app->lightintensity_slider->SetValue(raytracer.s.intensite_lumiere / factor);
