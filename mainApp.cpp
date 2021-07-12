@@ -409,6 +409,7 @@ bool RaytracerApp::OnInit()
 	choices.Add("Rayleigh");
 	fogPhase = new wxComboBox(panelFog, FOGPHASE_COMBO, "Phase function", wxDefaultPosition, wxDefaultSize, choices);
 	Connect(FOGPHASE_COMBO, wxEVT_COMBOBOX, wxCommandEventHandler(RenderPanel::update_parameters_and_render), NULL, renderPanel);
+	Connect(FOGPHASE_COMBO, wxEVT_COMBOBOX, wxCommandEventHandler(RenderPanel::updateFogOptions), NULL, renderPanel);
 
 	wxBoxSizer * fogphaseaniso_sizer = new wxBoxSizer(wxHORIZONTAL);
 	wxStaticText* fogphaseaniso_text = new wxStaticText(panelFog, 9999 - 1, "phase anisotropy : ");
@@ -426,6 +427,7 @@ bool RaytracerApp::OnInit()
 	panelFog_sizer->Add(fogPhase, 0, wxEXPAND);
 	panelFog_sizer->Add(fogphaseaniso_sizer, 0, wxEXPAND);
 	panelFog->SetSizer(panelFog_sizer);
+
 
 	m_bookCtrl->AddPage(panelFog, wxT("Fog"), false);
 
@@ -633,15 +635,15 @@ bool RaytracerApp::OnInit()
 	sizer->Add(m_bookCtrl, 1, wxEXPAND);
 
 
-
-
 	colPicker = new wxColourDialog(frame);
 	texOpenDlg = new wxFileDialog(frame, _("Open texture file"), "", "", "All files (*.*)|*.*", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
 	render_loop_on = false;
 	frame->Show();
 	activateRenderLoop(true);
-
+	fogdensitydecay_sizer->ShowItems(false);
+	fogabsorptiondecay_sizer->ShowItems(false);
+	fogphaseaniso_slider->Show(false);
     return true;
 }
 
@@ -752,6 +754,9 @@ void RenderPanel::update_parameters_and_render(wxCommandEvent& event) {
 	raytracer.cam.lenticular_max_angle = raytracer_app->maxangle_slider->GetValue()*M_PI / 180;
 	raytracer.cam.lenticular_nb_images = raytracer_app->nbviews->GetValue();
 	raytracer.cam.lenticular_pixel_width = raytracer_app->nbpixslice->GetValue();
+
+	raytracer.cam.maxSpacingX = raytracer_app->maxspacingX->GetValue();
+	raytracer.cam.maxSpacingY = raytracer_app->maxspacingY->GetValue();
 
 	raytracer.s.fog_type = raytracer_app->uniformFogRadio->GetValue() ? 0 : 1;
 	raytracer.nb_bounces = raytracer_app->bounces->GetValue();
@@ -889,6 +894,8 @@ void RenderPanel::render_video(wxCommandEvent& event) {
 void RenderPanel::updateFogOptions(wxCommandEvent& event) {
 	raytracer_app->fogabsorptiondecay_sizer->ShowItems(!raytracer_app->uniformFogRadio->GetValue());
 	raytracer_app->fogdensitydecay_sizer->ShowItems(!raytracer_app->uniformFogRadio->GetValue());
+
+	raytracer_app->fogphaseaniso_slider->Show(raytracer_app->fogPhase->GetSelection()==1);
 }
 
 void RenderPanel::update_gui() {
@@ -907,6 +914,8 @@ void RenderPanel::update_gui() {
 	raytracer_app->nbpixslice->SetValue(raytracer.cam.lenticular_pixel_width);
 	raytracer_app->nbframesctrl->SetValue(raytracer.s.nbframes);
 	raytracer_app->time_slider->SetMax(raytracer.s.nbframes);
+	raytracer_app->maxspacingX->SetValue(raytracer.cam.maxSpacingX);
+	raytracer_app->maxspacingY->SetValue(raytracer.cam.maxSpacingY);
 
 
 	raytracer_app->fogdensity_slider->SetValue(raytracer.s.fog_density*100.);

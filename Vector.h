@@ -548,6 +548,7 @@ public:
 	double focus_distance; // distance mise au point
 	double aperture;       // ouverture, pour depth of field (faible valeur = net partout)
 	double lenticular_max_angle;
+	double maxSpacingX, maxSpacingY;
 	int lenticular_nb_images, lenticular_pixel_width;
 	bool is_lenticular;
 	int current_viewX, current_viewY, nbviewX, nbviewY;

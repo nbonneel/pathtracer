@@ -1016,10 +1016,24 @@ void Raytracer::save_scene(const char* filename) {
 	fprintf(f, "Cam: (%lf, %lf, %lf), (%lf, %lf, %lf), (%lf, %lf, %lf)\n", cam.position[0], cam.position[1], cam.position[2], cam.direction[0], cam.direction[1], cam.direction[2], cam.up[0], cam.up[1], cam.up[2]);
 	fprintf(f, "fov: %lf\n", cam.fov);
 	fprintf(f, "focus: %lf\n", cam.focus_distance);
-	fprintf(f, "aperture: %lf\n", cam.aperture);
+	fprintf(f, "aperture: %lf\n", cam.aperture);			
 	fprintf(f, "sigma_filter: %lf\n", sigma_filter);
 	fprintf(f, "gamma: %lf\n", gamma);
+
+	fprintf(f, "is_lenticular: %u\n", cam.is_lenticular);
+	fprintf(f, "lenticular_nb_images: %u\n", cam.lenticular_nb_images);
+	fprintf(f, "lenticular_max_angle: %lf\n", cam.lenticular_max_angle);
+	fprintf(f, "lenticular_pixel_width: %u\n", cam.lenticular_pixel_width);
+	fprintf(f, "isArray: %u\n", cam.isArray);
+	fprintf(f, "nbviewX: %u\n", cam.nbviewX);
+	fprintf(f, "nbviewY: %u\n", cam.nbviewY);
+	fprintf(f, "maxSpacingX: %lf\n", cam.maxSpacingX);
+	fprintf(f, "maxSpacingY: %lf\n", cam.maxSpacingY);
+
 	fprintf(f, "bounces: %u\n", nb_bounces);
+	fprintf(f, "has_denoiser: %u\n", has_denoiser);
+	
+
 	fprintf(f, "intensite_lum: %le\n", s.intensite_lumiere);
 	fprintf(f, "intensite_envmap: %lf\n", s.envmap_intensity);
 	if (s.backgroundfilename.size()>0)
@@ -1032,7 +1046,16 @@ void Raytracer::save_scene(const char* filename) {
 	}
 
 	fprintf(f, "fog_density: %lf\n", s.fog_density);
+	fprintf(f, "fog_absorption: %lf\n", s.fog_absorption);
+	fprintf(f, "fog_density_decay: %lf\n", s.fog_density_decay);
+	fprintf(f, "fog_absorption_decay: %lf\n", s.fog_absorption_decay);
 	fprintf(f, "fog_type: %u\n", s.fog_type);	
+	fprintf(f, "fog_phase_type: %u\n", s.fog_phase_type);
+
+	fprintf(f, "double_frustum_start_t: %lf\n", s.double_frustum_start_t);
+
+	
+	
 	fclose(f);
 }
 
@@ -1058,14 +1081,35 @@ void Raytracer::load_scene(const char* filename, const char* replacedNames) {
 	fscanf(f, "sigma_filter: %lf\n", &sigma_filter);
 	
 	int nbo;
+	
 	fscanf(f, "%[^\n]\n", line);
-	if (line[0] == 'g') {
-		sscanf(line, "gamma: %lf\n", &gamma);
-		fscanf(f, "bounces: %u\n", &nb_bounces);
+		
+	int read = sscanf(line, "is_lenticular: %u\n", &nbo);
+	if (read > 5) {
+		cam.is_lenticular = nbo;
+		fscanf(f, "lenticular_nb_images: %u\n", &cam.lenticular_nb_images);
+		fscanf(f, "lenticular_max_angle: %lf\n", &cam.lenticular_max_angle);
+		fscanf(f, "lenticular_pixel_width: %u\n", &cam.lenticular_pixel_width);
+		fscanf(f, "isArray: %u\n", &cam.isArray);
+		fscanf(f, "nbviewX: %u\n", &cam.nbviewX);
+		fscanf(f, "nbviewY: %u\n", &cam.nbviewY);
+		fscanf(f, "maxSpacingX: %lf\n", &cam.maxSpacingX);
+		fscanf(f, "maxSpacingY: %lf\n", &cam.maxSpacingY);
+		fscanf(f, "gamma: %lf\n", &gamma);
 	} else {
-		sscanf(line, "bounces: %u\n", &nb_bounces);
+		sscanf(line, "gamma: %lf\n", &gamma);
 	}
-	fscanf(f, "intensite_lum: %le\n", &s.intensite_lumiere);
+
+	fscanf(f, "bounces: %u\n", &nb_bounces);
+
+	fscanf(f, "%[^\n]\n", line);
+	read = sscanf(line, "has_denoiser: %u\n", &nbo);
+	if (read > 5) {
+		has_denoiser = nbo;
+		fscanf(f, "intensite_lum: %le\n", &s.intensite_lumiere);
+	} else {
+		sscanf(line, "intensite_lum: %le\n", &s.intensite_lumiere);
+	}
 	fscanf(f, "intensite_envmap: %lf\n", &s.envmap_intensity);
 
 
@@ -1084,7 +1128,20 @@ void Raytracer::load_scene(const char* filename, const char* replacedNames) {
 	}
 
 	fscanf(f, "fog_density: %lf\n", &s.fog_density);
-	fscanf(f, "fog_type: %u\n", &s.fog_type);
+	fscanf(f, "%[^\n]\n", line);
+	read = sscanf(line, "fog_absorption: %lf\n", &s.fog_absorption);
+	if (read > 5) {
+		fscanf(f, "fog_density_decay: %lf\n", &s.fog_density_decay);
+		fscanf(f, "fog_absorption_decay: %lf\n", &s.fog_absorption_decay);
+		fscanf(f, "fog_type: %u\n", &s.fog_type);
+	} else {
+		sscanf(line, "fog_type: %u\n", &s.fog_type);
+	}
+	
+	fscanf(f, "%[^\n]\n", line);
+	read = sscanf(line, "fog_phase_type: %u\n", &s.fog_phase_type);
+	if (read>5)
+		fscanf(f, "double_frustum_start_t: %lf\n", &s.double_frustum_start_t);
 
 	fclose(f);
 
