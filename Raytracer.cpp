@@ -53,7 +53,7 @@ bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, doub
 	double alpha = s.fog_absorption;
 	double sigmaT = s.fog_absorption_decay;
 	bool uniform_sampling_ray = false;
-	int phase = 0; // 0 : uniform, 1: Schlick, 2: Rayleigh
+	int phase = s.fog_phase_type; // 0 : uniform, 1: Schlick, 2: Rayleigh
 	double groundLevel = s.objects[2]->get_translation(r.time, is_recording)[1];
 
 	double int_ext;
@@ -128,10 +128,10 @@ bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, doub
 
 
 	double phase_func;
-	double k = 0.4;
+	double k = s.phase_aniso;
 	switch (phase) {
 	case 0:
-		phase_func = 0.3 / (4.*M_PI);
+		phase_func = 1. / (4.*M_PI);
 		break;
 	case 1:
 		phase_func = (1 - k * k) / (4.*M_PI*(1 + k * dot(random_dir, -rayDirection)));

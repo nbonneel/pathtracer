@@ -1333,7 +1333,9 @@ public:
 	int nbframes, current_frame;
 	double duration, current_time;
 	int fog_type; // 0 : uniform, 1: exponential
+	int fog_phase_type; // 0 isotropic ; 1 Schlick 2 rayleigh
 	double double_frustum_start_t;
+	double phase_aniso;
 
 #ifdef USE_EMBREE
 	RTCDevice embree_device;

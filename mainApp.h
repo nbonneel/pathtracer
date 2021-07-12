@@ -10,6 +10,7 @@
 #include <wx/spinctrl.h>
 #include <wx/button.h>
 #include <wx/tglbtn.h>
+#include <wx/combobox.h>
 #include <ostream>
 #include <sstream>
 #include "chrono.h"
@@ -37,7 +38,9 @@
 #define ALBEDO_COLORPICKER 1008
 #define FOGDENSITY_SLIDER 1009
 #define UNIFORMFOG_RADIO 1010
-#define EXPFOG_RADIO 1010
+#define EXPFOG_RADIO 10102
+#define FOGPHASE_COMBO 10103
+#define FOGPHASEANISO_SLIDER 10104
 #define ENVMAPINTENSITY_SLIDER 1011
 #define LIGHTINTENSITY_SLIDER 1012
 #define BOUNCES_SPIN 1013
@@ -542,6 +545,7 @@ public:
 	void update_textures_and_render(wxCommandEvent& event);
 	void update_parameters_and_render(wxCommandEvent& event);
 	void update_gui();
+	void updateFogOptions(wxCommandEvent& event);
 
 	std::vector<float> extrapolated_image;
 	std::vector<bool> computed, computed2;
@@ -753,7 +757,7 @@ public:
 	wxCheckBox *has_denoiser;
 #endif
 	wxTextCtrl *objectName, *envmapName, *backgroundName;
-	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *fogabsorption_slider, *fogdensitydecay_slider, *fogabsorptiondecay_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider, *maxangle_slider, *time_slider;
+	wxSlider *fov_slider, *aperture_slider, /**ks_slider,*/ *filter_slider, *fogdensity_slider, *fogabsorption_slider, *fogdensitydecay_slider, *fogabsorptiondecay_slider, *fogphaseaniso_slider, *envmapintensity_slider, *lightintensity_slider, *focus_slider, *maxangle_slider, *time_slider;
 	wxListCtrl *m_AlbedoFile, *m_SpecularFile, *m_NormalFile, *m_AlphaFile, *m_RoughnessFile, *m_TranspFile, *m_RefrFile, *m_SubsurfaceFile;
 	//wxColourPickerCtrl *albedoColorPicker;
 	wxRadioButton *uniformFogRadio, *expFogRadio;
@@ -767,6 +771,7 @@ public:
 	wxToggleButton*recordKeyframes;
 	wxStaticText* infoModel;
 	wxStaticText* infoPerf;
+	wxComboBox* fogPhase;
 	bool render_loop_on;
 
 	void activateRenderLoop(bool on);
