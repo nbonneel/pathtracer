@@ -3,9 +3,25 @@
 #include <wx/textdlg.h> 
 #include <string>
 
+
 wxIMPLEMENT_APP_CONSOLE(RaytracerApp);
 
 #include "fluid.h"
+
+
+#ifdef _WIN32
+#include "direct.h"
+#define PATH_SEP '\\'
+#define GETCWD _getcwd
+#define CHDIR _chdir
+#else
+#include "unistd.h"
+#define PATH_SEP '/'
+#define GETCWD getcwd
+#define CHDIR chdir
+#endif
+
+bool ChangeDirectory(const char* dir) { return CHDIR(dir) == 0; }
 
 bool RaytracerApp::OnInit()
 {
@@ -1270,6 +1286,7 @@ void RaytracerFrame::Open(wxCommandEvent &evt) {
 		return;
 
 	render_panel->stop_render();
+	ChangeDirectory(openFileDialog.GetDirectory());
 	render_panel->raytracer.load_scene(openFileDialog.GetPath());
 	render_panel->update_gui();	
 	render_panel->start_render();
