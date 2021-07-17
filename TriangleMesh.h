@@ -200,6 +200,7 @@ public:
 
 	std::vector<TriangleIndices> indices;
 	std::vector<Triangle> triangleSoup;
+	std::vector<Vector> tangentSoup, bitangentSoup;
 	std::vector<Vector> vertices;
 	std::vector<Vector> normals;
 	std::vector<Vector> uvs; // Vector en 3D mais on n'utilise que 2 composantes

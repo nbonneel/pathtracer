@@ -58,7 +58,7 @@ bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, doub
 
 	double int_ext;
 	if (is_uniform_fog) {
-		int_ext = alpha * t;
+		int_ext = alpha * t *0.05;
 	} else {
 		int_ext = alpha*int_exponential(r.origin[1], groundLevel, sigmaT, t, rayDirection[1]);
 	}
@@ -101,7 +101,7 @@ bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, doub
 
 	double int_ext_partielle;
 	if (is_uniform_fog) {
-		int_ext_partielle = alpha * random_t;
+		int_ext_partielle = alpha * random_t *0.05;
 	} else {
 		int_ext_partielle = alpha * int_exponential(r.origin[1], groundLevel, sigmaT, random_t, rayDirection[1]);
 	}
@@ -176,7 +176,7 @@ bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, doub
 
 		double ext;
 		if (is_uniform_fog) {
-			ext = s.fog_density;
+			ext = s.fog_density*0.05;
 		} else {
 			//ext = 0.1 * exp(-beta * (random_P[1] - s.objects[2]->get_translation(r.time, is_recording)[1]));
 			ext = s.fog_density * exp(-s.fog_density_decay * (random_P[1] - groundLevel));
@@ -194,7 +194,7 @@ bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, doub
 
 
 
-Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int screenI, int screenJ, Vector &normalValue, Vector &albedoValue, bool no_envmap) {
+Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int screenI, int screenJ, Vector &normalValue, Vector &albedoValue, bool no_envmap, bool has_precomputed_rays, int rayID) {
 
 
 	Sphere* env = dynamic_cast<Sphere*>(s.objects[1]);
@@ -212,30 +212,51 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 	//Vector pathWeight(1, 1, 1);
 
 	//Ray currentRay = r;
-	std::list<Contrib> contribs;
-	contribs.push_front(Contrib(Vector(1,1,1), r, nb_bounces, true, false));
+	//std::list<Contrib> contribs;	
+	Contrib* contribs = &contribsArray[threadid][0];
+	int contribIndexStart = 0;
+	int contribIndexEnd = 1;
+	//contribs.push_front(Contrib(Vector(1,1,1), r, nb_bounces, true, false));
+	contribs[contribIndexStart] = Contrib(Vector(1, 1, 1), r, nb_bounces, true, false);
 	bool has_dome = dynamic_cast<Sphere*>(s.objects[1]);
 	bool has_backgroundimage = (s.backgroundW > 0) && (s.background.size() == s.backgroundW*s.backgroundH * 3);
 
 
 	/*for (int nbrebonds = nb_bounces; nbrebonds > 0; nbrebonds--) {*/ // finally, not just a linear "tree" due to multiple scattering.
-	while (!contribs.empty())
+	while (contribIndexStart!= contribIndexEnd)
 	{
-		const Contrib& curContrib = contribs.front();
+		const Contrib& curContrib = contribs[contribIndexStart]; //contribs.front();
 		Ray currentRay = curContrib.r;
-		int nbrebonds = curContrib.depth;
+		int nbrebonds = curContrib.depth;	
 		Vector pathWeight = curContrib.weight;
+		
+
 		bool has_had_subsurface_interaction = curContrib.has_had_subsurface_interaction;
 		bool show_lights = curContrib.show_lights;
-		contribs.pop_front();
+		//contribs.pop_front();
+		contribIndexStart++;
+		if (contribIndexStart >= sizeCircArray) contribIndexStart = 0;
+		//if (contribIndexStart < 0) contribIndexStart = sizeCircArray-1;
 
-		bool has_inter = s.intersection(currentRay, P, sphere_id, t, mat, tri_id, false, nbrebonds == nb_bounces);
+		if (nbrebonds == 0) continue;
+		if (pathWeight.getNorm2() < sqr(0.01)) continue;
+
+		bool has_inter;
+		if (has_precomputed_rays && nbrebonds == nb_bounces) {
+			has_inter = s.firstIntersection_has_inter[threadid][rayID];
+			P = s.firstIntersection_P[threadid][rayID];
+			sphere_id = s.firstIntersection_sphere_id[threadid][rayID];
+			mat = s.firstIntersection_mat[threadid][rayID];
+			tri_id = s.firstIntersection_triangle_id[threadid][rayID];
+		} else {
+			has_inter = s.intersection(currentRay, P, sphere_id, t, mat, tri_id, false, nbrebonds == nb_bounces);
+		}
 		Vector N = mat.shadingN;
 		if (has_inter && nbrebonds == nb_bounces) {
 			normalValue = N;
 			albedoValue = mat.Kd;
 		}
-		if (nbrebonds == 0) continue;
+		
 
 		if ((nbrebonds == nb_bounces) && has_backgroundimage && (!has_inter || (has_inter && sphere_id == 1 && has_dome))) {
 			int i = std::min(s.backgroundH - 1, std::max(0, (int)(screenI / (double)H*s.backgroundH)));
@@ -256,14 +277,22 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 				if (no_envmap) {
 					if (has_fog) {
 						bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
-						if (hasContrib) contribs.push_back(newContrib);
+						if (hasContrib) {
+							//contribs.push_back(newContrib);
+							contribs[contribIndexEnd] = newContrib;
+							contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
+						}
 					}
 					continue; // we do not break anymore: there can be secondary rays due to multiple scattering still being computed
 				} else {
 					if (env) {
 						if (has_fog) {
 							bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
-							if (hasContrib) contribs.push_back(newContrib);
+							if (hasContrib) {
+								//contribs.push_back(newContrib);
+								contribs[contribIndexEnd] = newContrib;
+								contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
+							}
 							color += attenuationFactor * pathWeight * s.envmap_intensity*mat.Ke;
 						} else {
 							color += pathWeight * s.envmap_intensity*mat.Ke;					
@@ -276,7 +305,11 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 				Vector currentContrib = show_lights ? (/*s.lumiere->albedo **/Vector(1., 1., 1.)* lightPower) : Vector(0., 0., 0.);				
 				if (has_fog) {
 					bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
-					if (hasContrib) contribs.push_back(newContrib);
+					if (hasContrib) {
+						//contribs.push_back(newContrib);
+						contribs[contribIndexEnd] = newContrib;
+						contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
+					}
 					color += attenuationFactor * pathWeight * currentContrib;
 				} else {
 					color += pathWeight * currentContrib;		
@@ -385,10 +418,19 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 					//currentRay = rayon_miroir;
 					if (has_fog) {
 						bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
-						if (hasContrib) contribs.push_back(newContrib);
-						contribs.push_back(Contrib(attenuationFactor*pathWeight, rayon_miroir, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
+						if (hasContrib) {
+							//contribs.push_back(newContrib);
+							contribs[contribIndexEnd] = newContrib;
+							contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
+						}
+						contribs[contribIndexEnd] = Contrib(attenuationFactor*pathWeight, rayon_miroir, nbrebonds - 1, show_lights, has_had_subsurface_interaction);
+						contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
+						//contribs.push_back(Contrib(attenuationFactor*pathWeight, rayon_miroir, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
 					} else {
-						contribs.push_back(Contrib(pathWeight, rayon_miroir, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
+						//contribs.push_back(Contrib(pathWeight, rayon_miroir, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
+						contribs[contribIndexEnd] = Contrib(pathWeight, rayon_miroir, nbrebonds - 1, show_lights, has_had_subsurface_interaction);
+						contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
+
 					}
 					continue;
 				} else
@@ -430,10 +472,18 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 						//currentRay = new_ray;
 						if (has_fog) {
 							bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
-							if (hasContrib) contribs.push_back(newContrib);
-							contribs.push_back(Contrib(attenuationFactor*pathWeight, new_ray, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
+							if (hasContrib) {
+								//contribs.push_back(newContrib);
+								contribs[contribIndexEnd] = newContrib;
+								contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
+							}
+							contribs[contribIndexEnd] = Contrib(attenuationFactor*pathWeight, new_ray, nbrebonds - 1, show_lights, has_had_subsurface_interaction);
+							contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
+							//contribs.push_back(Contrib(attenuationFactor*pathWeight, new_ray, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
 						} else {
-							contribs.push_back(Contrib(pathWeight, new_ray, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
+							contribs[contribIndexEnd] = Contrib(pathWeight, new_ray, nbrebonds - 1, show_lights, has_had_subsurface_interaction);
+							contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
+							//contribs.push_back(Contrib(pathWeight, new_ray, nbrebonds - 1, show_lights, has_had_subsurface_interaction));
 						}
 						continue;
 					} else {
@@ -460,7 +510,9 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 								offset = -N; 
 								//tr = getColor(Ray(P + rayDirection * 0.001 + offset * 0.001, rayDirection, r.time), sampleID, nbrebonds, screenI, screenJ, normalValue, albedoValue, show_lights, no_envmap);
 							currentRay = Ray(P + rayDirection * 0.001 + offset * 0.001, rayDirection, r.time);
-							contribs.push_back(Contrib(pathWeight, currentRay, nbrebonds, show_lights, has_had_subsurface_interaction));
+							//contribs.push_back(Contrib(pathWeight, currentRay, nbrebonds, show_lights, has_had_subsurface_interaction));
+							contribs[contribIndexEnd] = Contrib(pathWeight, currentRay, nbrebonds, show_lights, has_had_subsurface_interaction);
+							contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
 							continue;
 						}
 						Ray ray_light(P + 0.01*wi, wi, r.time);
@@ -492,7 +544,11 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 						}
 						if (has_fog) {
 							bool hasContrib = fogContribution(currentRay, point_aleatoire, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
-							if (hasContrib) contribs.push_back(newContrib);							
+							if (hasContrib) {
+								//contribs.push_back(newContrib);
+								contribs[contribIndexEnd] = newContrib;
+								contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
+							}
 							color += attenuationFactor * pathWeight * currentContrib;
 						} else {
 							color += pathWeight * currentContrib;
@@ -540,9 +596,13 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 						Vector newpathWeight = pathWeight * subsW * BRDFindirect* ((dot(N, direction_aleatoire) / proba_globale));
 
 						if (has_fog) {					
-							contribs.push_back(Contrib(attenuationFactor*newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction?true:has_had_subsurface_interaction));
+							//contribs.push_back(Contrib(attenuationFactor*newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction?true:has_had_subsurface_interaction));
+							contribs[contribIndexEnd] = Contrib(attenuationFactor*newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction ? true : has_had_subsurface_interaction);
+							contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
 						} else {
-							contribs.push_back(Contrib(newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction ? true : has_had_subsurface_interaction));
+							contribs[contribIndexEnd] = Contrib(newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction ? true : has_had_subsurface_interaction);
+							contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
+//							contribs.push_back(Contrib(newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction ? true : has_had_subsurface_interaction));
 						}
 
 
@@ -1301,6 +1361,37 @@ void Raytracer::prepare_render(double time) {
 	
 }
 
+void Raytracer::precomputeRayBatch(int i1, int j1, int i2, int j2, int nspp) {  // i1 included to i2 excluded
+	int threadid = omp_get_thread_num();
+	int batchW = j2 - j1;
+	int batchH = i2 - i1;
+	int batchSize = batchW * batchH*nspp;
+
+	// compute the first intersection with the whole set of first rays
+	s.firstIntersection_Ray[threadid].resize(batchSize);
+	s.firstIntersection_dx[threadid].resize(batchSize);
+	s.firstIntersection_dy[threadid].resize(batchSize);
+
+	for (int i = 0; i < batchH; i++) {
+		for (int j = 0; j < batchW; j++) {
+			for (int k = 0; k < nspp; k++) {
+				int rayId = (i*batchW + j)*nspp + k;
+				double dx = engine[threadid]()*invmax - 0.5f;  // not perfectly uniform but much faster than std::uniform
+				double dy = engine[threadid]()*invmax - 0.5f;
+				s.firstIntersection_dx[threadid][rayId] = dx;
+				s.firstIntersection_dy[threadid][rayId] = dy;
+
+				double dx_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
+				double dy_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
+
+				Ray r = cam.generateDirection(s.double_frustum_start_t, i+i1, j+j1, s.current_frame, dx, dy, dx_aperture, dy_aperture, W, H);
+				s.firstIntersection_Ray[threadid][rayId] = r;
+			}
+		}
+	}
+	s.first_intersection_batch(batchSize);
+}
+
 void Raytracer::render_image()
 {
 
@@ -1352,7 +1443,7 @@ void Raytracer::render_image()
 							Ray r = cam.generateDirection(s.double_frustum_start_t, i, j, time, dx, dy, dx_aperture, dy_aperture, W, H);
 
 							Vector normal, albedo;
-							Vector color = getColor(r, k, nb_bounces, i, j, normal, albedo);
+							Vector color = getColor(r, k, nb_bounces, i, j, normal, albedo, false, false);
 
 							int bmin_i = std::max(0, i - filter_size);
 							int bmax_i = std::min(i + filter_size, H - 1);
@@ -1360,7 +1451,9 @@ void Raytracer::render_image()
 							int bmax_j = std::min(j + filter_size, W - 1);
 							double ratio = 1. / sum_area_table(&filter_integral[0], filter_total_width, bmin_i - i + filter_size, bmax_i - i + filter_size, bmin_j - j + filter_size, bmax_j - j + filter_size);
 							double denom1 = ratio / (sigma_filter*sigma_filter*2.*M_PI);
-							
+							//double dx = s.firstIntersection_dx[i*W + j];
+							//double dy = s.firstIntersection_dy[i*W + j];
+
 							for (int i2 = bmin_i; i2 <= bmax_i; i2++) {
 								for (int j2 = bmin_j; j2 <= bmax_j; j2++) {
 									//double w = filter_value[(i2 - i + filter_size)*filter_total_width + j2-j + filter_size] * ratio; 
@@ -1444,10 +1537,14 @@ void Raytracer::render_image_nopreviz() {
 
 	prepare_render(s.current_frame);
 	double denom2 = 1. / (2.*sigma_filter*sigma_filter);
+	const int batchWidth = 4;
+	const int batchHeight = 4;
+	const int nbBatchX = ceil(W / (double)batchWidth);
+	const int nbBatchY = ceil(H / (double)batchHeight);
 
 	chrono.Start();
 	int maxthreads = omp_get_max_threads();
-	std::vector<float> imagedoublethreads(W*H * 3* maxthreads, 0);
+	std::vector<float> imagedoublethreads(W*H * 3 * maxthreads, 0);
 	std::vector<float> samplecountthreads(W*H  * maxthreads, 0);
 	std::vector<float> albedodoublethreads(W*H * 3 * maxthreads, 0);
 	std::vector<float> normaldoublethreads(W*H * 3 * maxthreads, 0);
@@ -1459,60 +1556,77 @@ void Raytracer::render_image_nopreviz() {
 		float* cursamplecount = &samplecountthreads[threadid*W*H];
 		float* curalbedodouble = &albedodoublethreads[threadid*W*H * 3];
 		float* curnormaldouble = &normaldoublethreads[threadid*W*H * 3];
-	#pragma omp for schedule(dynamic, 4)	
-		for (int id = 0; id < W*H; id++) {			
-			int i = id / W;
-			int j = id % W;
 
-			int bmin_i = std::max(0, i - filter_size);
-			int bmax_i = std::min(i + filter_size, H - 1);
-			int bmin_j = std::max(0, j - filter_size);
-			int bmax_j = std::min(j + filter_size, W - 1);
-			double ratio = 1. / sum_area_table(&filter_integral[0], filter_total_width, bmin_i - i + filter_size, bmax_i - i + filter_size, bmin_j - j + filter_size, bmax_j - j + filter_size);
-			double denom1 = ratio / (sigma_filter*sigma_filter*2.*M_PI);
 
-			for (int k = 0; k < nrays; k++) {
+#pragma omp for schedule(dynamic, 1) 
+		for (int batchid = 0; batchid < nbBatchX*nbBatchY; batchid++) {
+			int batchi = batchid / nbBatchX;
+			int batchj = batchid % nbBatchX;
 
-				float dx = engine[threadid]()*invmax - 0.5f;
-				float dy = engine[threadid]()*invmax - 0.5f;
+			precomputeRayBatch(batchi*batchHeight, batchj*batchWidth, std::min(H, batchi*batchHeight + batchHeight), std::min(W, batchj*batchWidth + batchWidth), nrays);
+			int batchW = std::min(W, batchj*batchWidth + batchWidth) - batchj* batchWidth;
+			int batchH = std::min(H, batchi*batchHeight + batchHeight) - batchi* batchHeight;
 
-				float dx_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
-				float dy_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
+			for (int id = 0; id < batchW*batchH; id++) {
 
-				float time = s.current_frame;//  +engine[threadid]()*invmax; //current_time // beware, now everything is in number of frames! ; deactivated motion blur as the behavior is strange when the light radius is changing over time
+				int i = batchi * batchHeight + id / batchW;
+				int j = batchj * batchWidth + id % batchW;
 
-				Ray r = cam.generateDirection(s.double_frustum_start_t, i, j, time, dx, dy, dx_aperture, dy_aperture, W, H);
+				int bmin_i = std::max(0, i - filter_size);
+				int bmax_i = std::min(i + filter_size, H - 1);
+				int bmin_j = std::max(0, j - filter_size);
+				int bmax_j = std::min(j + filter_size, W - 1);
+				double ratio = 1. / sum_area_table(&filter_integral[0], filter_total_width, bmin_i - i + filter_size, bmax_i - i + filter_size, bmin_j - j + filter_size, bmax_j - j + filter_size);
+				double denom1 = ratio / (sigma_filter*sigma_filter*2.*M_PI);
 
-				Vector normal, albedo;
-				Vector color = getColor(r, k, nb_bounces, i, j, normal, albedo);	
+				for (int k = 0; k < nrays; k++) {
 
-				if (has_denoiser) {
-					int idx = ((H - i - 1)*W + j) * 3;
-					curimagedouble[idx + 0] += color[0];
-					curimagedouble[idx + 1] += color[1];
-					curimagedouble[idx + 2] += color[2];
-					//sw += w;
-					cursamplecount[(H - i - 1)*W + j] += 1; // 1. / sqr(filter_total_width);
+					/*float dx = engine[threadid]()*invmax - 0.5f;
+					float dy = engine[threadid]()*invmax - 0.5f;
 
-					curnormaldouble[idx + 0] += normal[0];
-					curnormaldouble[idx + 1] += normal[1];
-					curnormaldouble[idx + 2] += normal[2];
+					float dx_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
+					float dy_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
 
-					curalbedodouble[idx + 0] += albedo[0];
-					curalbedodouble[idx + 1] += albedo[1];
-					curalbedodouble[idx + 2] += albedo[2];
-				} else { // Intel Open Image Denoiser does not support splatting (the result appears unfiltered)
-					for (int i2 = bmin_i; i2 <= bmax_i; i2++) {
-						for (int j2 = bmin_j; j2 <= bmax_j; j2++) {
-							//double w = filter_value[(i2 - i + filter_size)*filter_total_width + j2-j + filter_size] * ratio; 
+					float time = s.current_frame;//  +engine[threadid]()*invmax; //current_time // beware, now everything is in number of frames! ; deactivated motion blur as the behavior is strange when the light radius is changing over time
 
-							int idx = ((H - i2 - 1)*W + j2) * 3;
-							double w = fast_exp(-(sqr(i2 - i - dy) + sqr(j2 - j - dx)) *denom2) *denom1;
-							curimagedouble[idx + 0] += color[0] * w;
-							curimagedouble[idx + 1] += color[1] * w;
-							curimagedouble[idx + 2] += color[2] * w;
-							//sw += w;
-							cursamplecount[(H - i2 - 1)*W + j2] += w; // 1. / sqr(filter_total_width);
+
+					Ray r = cam.generateDirection(s.double_frustum_start_t, i, j, time, dx, dy, dx_aperture, dy_aperture, W, H);*/
+
+					const Ray &r = s.firstIntersection_Ray[threadid][id*nrays+k];
+					double dx = s.firstIntersection_dx[threadid][id*nrays + k];
+					double dy = s.firstIntersection_dy[threadid][id*nrays + k];
+
+					Vector normal, albedo;
+					Vector color = getColor(r, k, nb_bounces, i, j, normal, albedo, false, true, id*nrays + k);
+
+					if (has_denoiser) {
+						int idx = ((H - i - 1)*W + j) * 3;
+						curimagedouble[idx + 0] += color[0];
+						curimagedouble[idx + 1] += color[1];
+						curimagedouble[idx + 2] += color[2];
+						//sw += w;
+						cursamplecount[(H - i - 1)*W + j] += 1; // 1. / sqr(filter_total_width);
+
+						curnormaldouble[idx + 0] += normal[0];
+						curnormaldouble[idx + 1] += normal[1];
+						curnormaldouble[idx + 2] += normal[2];
+
+						curalbedodouble[idx + 0] += albedo[0];
+						curalbedodouble[idx + 1] += albedo[1];
+						curalbedodouble[idx + 2] += albedo[2];
+					} else { // Intel Open Image Denoiser does not support splatting (the result appears unfiltered)
+						for (int i2 = bmin_i; i2 <= bmax_i; i2++) {
+							for (int j2 = bmin_j; j2 <= bmax_j; j2++) {
+								//double w = filter_value[(i2 - i + filter_size)*filter_total_width + j2-j + filter_size] * ratio; 
+
+								int idx = ((H - i2 - 1)*W + j2) * 3;
+								double w = fast_exp(-(sqr(i2 - i - dy) + sqr(j2 - j - dx)) *denom2) *denom1;
+								curimagedouble[idx + 0] += color[0] * w;
+								curimagedouble[idx + 1] += color[1] * w;
+								curimagedouble[idx + 2] += color[2] * w;
+								//sw += w;
+								cursamplecount[(H - i2 - 1)*W + j2] += w; // 1. / sqr(filter_total_width);
+							}
 						}
 					}
 				}

@@ -64,8 +64,9 @@ public:
 	void save_scene(const char* filename);
 	void load_scene(const char* filename, const char* replacedNames = NULL);
 
-	Vector getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, Vector &normalValue, Vector &albedoValue, bool no_envmap = false);
+	Vector getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, Vector &normalValue, Vector &albedoValue, bool no_envmap = false, bool has_precomputed_rays = false, int rayID = 0);
 	bool fogContribution(const Ray &r, const Vector& sampleLightPos, double t, Vector curWeight, int nbrebonds, bool showLight, bool hadSS, Contrib& newContrib, double &attenuationFactor);
+	void precomputeRayBatch(int i1, int j1, int i2, int j2, int nspp);
 
 	int W, H, Wlr, Hlr;
 	int nrays, last_nrays;  
@@ -105,6 +106,9 @@ public:
 
 	Vector centerLight;
 	double lum_scale, radiusLight, lightPower;
+
+	static const int sizeCircArray = 200;
+	Contrib contribsArray[64][sizeCircArray];
 
 #ifdef USE_OPENIMAGEDENOISER
 	oidn::DeviceRef device;

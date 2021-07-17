@@ -676,13 +676,13 @@ void RaytracerApp::activateRenderLoop(bool on)
 }
 
 RaytracerFrame::RaytracerFrame()
-        : wxFrame(NULL, wxID_ANY, wxT("Pathtracer by N.Bonneel"),
+        : wxFrame(NULL, wxID_ANY, wxT("Pathtracer by N.Bonneel"), 
                   wxPoint(10, 100))
 
 {
     // frame icon and status bar
     //SetIcon(wxICON(sample));
-
+	render_panel = NULL;
     CreateStatusBar();
 	programHandling = false;
 

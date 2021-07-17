@@ -7,12 +7,12 @@
 class MaterialValues {
 public:
 	MaterialValues() {
-		shadingN = Vector(0, 1., 0);
-		Kd = Vector(0.5, 0.5, 0.5);
-		Ne = Vector(100, 100, 100);
-		Ks = Vector(0., 0., 0.);
-		Ke = Vector(0., 0., 0.);
-		Ksub = Vector(0., 0., 0.);
+		shadingN[0] = 0;  shadingN[1] = 1; shadingN[2] = 0;
+		Kd[0] = 0.5; Kd[1] = 0.5; Kd[2] = 0.5;
+		Ne[0] = 100; Ne[1] = 100; Ne[2] = 100;
+		Ks[0] = 0.; Ks[1] = 0.; Ks[2] = 0.;
+		Ke[0] = 0.; Ke[1] = 0.; Ke[2] = 0.;
+		Ksub[0] = 0.; Ksub[1] = 0.; Ksub[2] = 0.;				
 	}
 	Vector shadingN, Kd, Ks, Ne, Ke, Ksub;
 	bool transp;
@@ -40,6 +40,7 @@ public:
 
 	static Vector random_Phong(const Vector &R, double phong_exponent, double r1, double r2) {
 		double facteur = sqrt(1 - std::pow(r2, 2. / (phong_exponent + 1)));
+		//double facteur = sqrt(1 - fastPrecisePow(r2, 2. / (phong_exponent + 1)));
 		Vector direction_aleatoire_repere_local(cos(2 * M_PI*r1)*facteur, sin(2 * M_PI*r1)*facteur, std::pow(r2, 1. / (phong_exponent + 1)));
 		//Vector aleatoire(uniform(engine) - 0.5, uniform(engine) - 0.5, uniform(engine) - 0.5);
 		//Vector tangent1 = cross(R, aleatoire); tangent1.normalize();
@@ -88,7 +89,9 @@ public:
 		Vector reflechi = (-wo).reflect(N);
 		double d = dot(reflechi, wi);
 		if (d < 0) return mat.Kd / M_PI;
-		Vector lobe = pow(Vector(d, d, d), mat.Ne) * ((mat.Ne + Vector(2., 2., 2.)) / (2.*M_PI));
+		//Vector lobe = pow(Vector(d, d, d), mat.Ne) * ((mat.Ne + Vector(2., 2., 2.)) / (2.*M_PI));
+		Vector lobe = Vector(pow(d, mat.Ne[0])*(mat.Ne[0]+2.)/M_TWO_PI, pow(d, mat.Ne[1])*(mat.Ne[1] + 2.) / M_TWO_PI, pow(d, mat.Ne[2])*(mat.Ne[2] + 2.) / M_TWO_PI);
+		//Vector lobe = fastPrecisePow(Vector(d, d, d), mat.Ne) * ((mat.Ne + Vector(2., 2., 2.)) / (2.*M_PI));
 		return mat.Kd / M_PI + lobe * mat.Ks;
 	}
 };
@@ -292,6 +295,30 @@ public:
 		} else {
 			return multiplier;
 		}
+		/*if (W > 0) {
+			// no assert on u and v ; assume they are btw 0  and 1
+			float x = u * (W - 1);
+			float y = v * (H - 1);
+			int ix = x;
+			int iy = y;
+			if (x > W - 2 || y > H - 2) {
+				int idx = (iy*W + ix) * 3;
+				return Vector(values[idx]* multiplier[0], values[idx + 1]* multiplier[1], values[idx + 2]* multiplier[2]);
+			} else {
+				float fracx = x - ix;
+				float fracy = y - iy;
+				int idx = (iy*W + ix) * 3;
+				int idxX = idx + 3;
+				int idxY = idx + 3 * W;
+				int idxXY = idxY + 3;
+				return multiplier*Vector((values[idx] * (1 - fracx) + values[idxX] * fracx)*(1 - fracy) + (values[idxY] * (1 - fracx) + values[idxXY] * fracx)*fracy,
+					(values[idx + 1] * (1 - fracx) + values[idxX + 1] * fracx)*(1 - fracy) + (values[idxY + 1] * (1 - fracx) + values[idxXY + 1] * fracx)*fracy,
+					(values[idx + 2] * (1 - fracx) + values[idxX + 2] * fracx)*(1 - fracy) + (values[idxY + 2] * (1 - fracx) + values[idxXY + 2] * fracx)*fracy);
+
+			}
+		} else {
+			return multiplier;
+		}*/
 	}
 	bool getBool(double u, double v) const {
 		if (W > 0) {
@@ -311,13 +338,34 @@ public:
 			int x = u * (W - 1);
 			int y = v * (H - 1);
 			int idx = (y*W + x) * 3;
-			double cr = values[idx];
-			double cg = values[idx + 1];
-			double cb = values[idx + 2];
-			return Vector(cr, cg, cb);
+			return Vector(values[idx], values[idx + 1], values[idx + 2]);
 		} else {
 			return Vector(0., 0., 1.);
 		}
+		/*if (W > 0) {
+			// no assert on u and v ; assume they are btw 0  and 1
+			float x = u * (W - 1);
+			float y = v * (H - 1);
+			int ix = x;
+			int iy = y;
+			if (x > W - 2 || y > H - 2) {
+				int idx = (iy*W + ix) * 3;
+				return Vector(values[idx], values[idx + 1], values[idx + 2]);
+			} else {
+				float fracx = x - ix;
+				float fracy = y - iy;
+				int idx = (iy*W + ix) * 3;
+				int idxX = idx + 3;
+				int idxY = idx + 3 * W;
+				int idxXY = idxY + 3;
+				return Vector((values[idx] * (1 - fracx) + values[idxX] * fracx)*(1 - fracy) + (values[idxY] * (1 - fracx) + values[idxXY] * fracx)*fracy,
+					(values[idx+1] * (1 - fracx) + values[idxX+1] * fracx)*(1 - fracy) + (values[idxY+1] * (1 - fracx) + values[idxXY+1] * fracx)*fracy,
+					(values[idx+2] * (1 - fracx) + values[idxX+2] * fracx)*(1 - fracy) + (values[idxY+2] * (1 - fracx) + values[idxXY+2] * fracx)*fracy);
+
+			}
+		} else {
+			return Vector(0., 0., 1.);
+		}*/
 	}
 	double getValRed(double u, double v) const {
 		if (W > 0) {

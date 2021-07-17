@@ -696,6 +696,18 @@ void TriMesh::setup_tangents() {
 		bitangents[i] = cross(N, tangents[i])*wtangent;
 	}
 
+	tangentSoup.resize(indices.size() * 3);
+	bitangentSoup.resize(indices.size() * 3);
+	for (int i = 0; i < indices.size(); i++) {
+		tangentSoup[i * 3] = tangents[indices[i].vtxi];
+		tangentSoup[i * 3+1] = tangents[indices[i].vtxj];
+		tangentSoup[i * 3+2] = tangents[indices[i].vtxk];
+		bitangentSoup[i * 3] = bitangents[indices[i].vtxi];
+		bitangentSoup[i * 3 + 1] = bitangents[indices[i].vtxj];
+		bitangentSoup[i * 3 + 2] = bitangents[indices[i].vtxk];
+
+	}
+
 }
 
 
@@ -772,6 +784,7 @@ void TriMesh::init(Scene* scene, const char* obj, double scaling, const Vector& 
 #ifdef USE_EMBREE
 	embree_scene_for_instance = rtcNewScene(scene->embree_device); // a scene containing a single object, that will be used for instancing with different transforms
 	rtcSetSceneFlags(embree_scene_for_instance, RTC_SCENE_FLAG_CONTEXT_FILTER_FUNCTION);
+	rtcSetSceneBuildQuality(embree_scene_for_instance, RTC_BUILD_QUALITY_HIGH);
 	RTCGeometry geom = rtcNewGeometry(scene->embree_device, RTC_GEOMETRY_TYPE_TRIANGLE);
 	rtcSetGeometryBuildQuality(geom, RTC_BUILD_QUALITY_HIGH);
 	float *positions = (float*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, 3 * sizeof(float), vertices.size());
@@ -934,23 +947,29 @@ MaterialValues TriMesh::getMaterial(int triId, double alpha, double beta, double
 	//mat.shadingN.fast_normalize();
 	mat.shadingN.normalize();
 	//if (dot(mat.shadingN, d.direction) > 0 && mat.transp) mat.shadingN = -mat.shadingN;  // why did I write that ?
-	if (flip_normals) mat.shadingN = -mat.shadingN;
 
 
 	if ((normal_map.size() != 0) && has_uv && (textureId < normal_map.size())) {
 
-		Vector tangent = (tangents[tri.vtxi] * alpha + tangents[tri.vtxj] * beta + tangents[tri.vtxk] * gamma).getNormalized();
-		Vector bitangent = (bitangents[tri.vtxi] * alpha + bitangents[tri.vtxj] * beta + bitangents[tri.vtxk] * gamma).getNormalized();
+		//Vector tangent = (tangents[tri.vtxi] * alpha + tangents[tri.vtxj] * beta + tangents[tri.vtxk] * gamma).getNormalized();
+		//Vector bitangent = (bitangents[tri.vtxi] * alpha + bitangents[tri.vtxj] * beta + bitangents[tri.vtxk] * gamma).getNormalized();
+		Vector tangent = tangentSoup[triId * 3] * alpha + tangentSoup[triId * 3 + 1] * beta + tangentSoup[triId * 3 + 2] * gamma;
+		//Vector bitangent = bitangentSoup[triId * 3] * alpha + bitangentSoup[triId * 3 + 1] * beta + bitangentSoup[triId * 3 + 2] * gamma;
+		tangent.normalize();
+		//bitangent.normalize();
+		Vector bitangent = cross(mat.shadingN, tangent);
 
 		Vector NsLocal = normal_map[textureId].getNormal(u, v);
 		Vector Ns = NsLocal[0] * tangent + NsLocal[1] * bitangent + NsLocal[2] * mat.shadingN;
 		if (Ns[0] == 0. && Ns[1] == 0 && Ns[2] == 0)
 			Ns = mat.shadingN;
 		Ns.normalize();
-		if (!(isnan(Ns[0]) || isnan(Ns[1]) || isnan(Ns[2])))
+		//if (!(isnan(Ns[0]) || isnan(Ns[1]) || isnan(Ns[2])))
 			mat.shadingN = Ns;
 		//if (dot(mat.shadingN, d.direction) > 0) mat.shadingN = -mat.shadingN; // why did I write that ?
 	}
+
+	if (flip_normals) mat.shadingN = -mat.shadingN;
 
 
 	if (vertexcolors.size() != 0) {

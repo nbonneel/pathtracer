@@ -249,9 +249,11 @@ void Object::add_col_alpha(double col) {
 void Scene::addObject(Object* o) {
 	objects.push_back(o);
 
-#ifdef USE_EMBREE
-	embree_bvh_up_to_date = false;
 	TriMesh* g = dynamic_cast<TriMesh*>(o);
+	castToMesh.push_back(g);
+
+#ifdef USE_EMBREE
+	embree_bvh_up_to_date = false;	
 	if (g) {
 		g->instance_geom = rtcNewGeometry(embree_device, RTC_GEOMETRY_TYPE_INSTANCE);
 		rtcSetGeometryInstancedScene(g->instance_geom, g->embree_scene_for_instance);
@@ -268,6 +270,7 @@ void Scene::addObject(Object* o) {
 		trans[12] = 0; trans[13] = 0; trans[14] = 0; trans[15] = 1; 
 		rtcSetGeometryTransform(g->instance_geom, 0, RTC_FORMAT_FLOAT3X4_ROW_MAJOR, trans);
 		rtcCommitGeometry(g->instance_geom);
+		rtcSetSceneBuildQuality(embree_scene, RTC_BUILD_QUALITY_HIGH);
 		rtcCommitScene(embree_scene);
 		embree_bvh_up_to_date = false;
 	}
@@ -286,7 +289,7 @@ void Scene::prepare_render(bool is_recording) {
 		for (int i = 0; i < objects.size(); i++) {
 
 			if (objects[i]->type == OT_TRIMESH) {
-				TriMesh* g = dynamic_cast<TriMesh*>(objects[i]);
+				TriMesh* g = castToMesh[i]; // dynamic_cast<TriMesh*>(objects[i]);
 				float trans[16];
 				for (int j = 0; j < 12; j++) {
 					trans[j] = g->trans_matrix[j];
@@ -446,7 +449,7 @@ bool Scene::get_random_intersection(const Ray& d, Vector& P, int &sphere_id, dou
 			P = d.origin + min_t * d.direction;
 			int systemObjectID = embree_to_real_objects[embreeObjectID];
 			sphere_id = systemObjectID;
-			TriMesh* g = dynamic_cast<TriMesh*>(objects[systemObjectID]);
+			TriMesh* g = castToMesh[systemObjectID];//  dynamic_cast<TriMesh*>(objects[systemObjectID]);
 			mat = g->getMaterial(triangle_id, 1 - embree_ray.hit.u - embree_ray.hit.v, embree_ray.hit.u, embree_ray.hit.v);
 		} else {
 			P = objects[sphere_id]->apply_transformation(P);
@@ -468,6 +471,121 @@ bool Scene::get_random_intersection(const Ray& d, Vector& P, int &sphere_id, dou
 
 	return has_inter;
 }
+
+void Scene::first_intersection_batch(int batch_size) { // dont forget to set W and H
+
+	int threadid = omp_get_thread_num();
+	firstIntersection_P[threadid].resize(batch_size);
+	firstIntersection_sphere_id[threadid].resize(batch_size);
+	firstIntersection_min_t[threadid].resize(batch_size);
+	firstIntersection_mat[threadid].resize(batch_size);
+	firstIntersection_triangle_id[threadid].resize(batch_size);
+	firstIntersection_has_inter[threadid].resize(batch_size);
+	std::fill(firstIntersection_has_inter[threadid].begin(), firstIntersection_has_inter[threadid].end(), false);
+	std::fill(firstIntersection_min_t[threadid].begin(), firstIntersection_min_t[threadid].end(), 1E9);
+		
+#ifdef USE_EMBREE
+	std::vector<RTCRayHit16> allhits(batch_size / 16);
+
+	for (int id = 0; id < batch_size /16; id++) {
+
+		for (int k = 0; k < 16; k++) {
+			allhits[id].ray.org_x[k] = firstIntersection_Ray[threadid][id * 16 + k].origin[0];
+			allhits[id].ray.org_y[k] = firstIntersection_Ray[threadid][id * 16 + k].origin[1];
+			allhits[id].ray.org_z[k] = firstIntersection_Ray[threadid][id * 16 + k].origin[2];
+
+			allhits[id].ray.tnear[k] = 0;
+
+			allhits[id].ray.dir_x[k] = firstIntersection_Ray[threadid][id * 16 + k].direction[0];
+			allhits[id].ray.dir_y[k] = firstIntersection_Ray[threadid][id * 16 + k].direction[1];
+			allhits[id].ray.dir_z[k] = firstIntersection_Ray[threadid][id * 16 + k].direction[2];
+			
+			allhits[id].ray.time[k] = 0;
+			allhits[id].ray.tfar[k] = 1E8;
+			allhits[id].ray.mask[k] = ~0u;
+			allhits[id].ray.id[k] = id*16+k;
+			allhits[id].ray.flags[k] = 0;
+			allhits[id].hit.primID[k] = RTC_INVALID_GEOMETRY_ID;
+			allhits[id].hit.geomID[k] = RTC_INVALID_GEOMETRY_ID;
+			allhits[id].hit.instID[0][k] = RTC_INVALID_GEOMETRY_ID;
+		}
+	}
+
+	rtcIntersectNM(embree_scene, &embree_coherent[threadid], (RTCRayHitN*)&allhits[0], 16, ceil(batch_size / 16.), sizeof(RTCRayHit16));
+
+	for (int id = 0; id < batch_size / 16; id++) {
+		for (int k = 0; k < 16; k++) {		
+			const RTCRayHit16 &embree_ray = allhits[id];
+				int embreeObjectID = embree_ray.hit.instID[0][k];
+				if (embreeObjectID != RTC_INVALID_GEOMETRY_ID) {  // embree
+					Ray d(Vector(embree_ray.ray.org_x[k], embree_ray.ray.org_y[k], embree_ray.ray.org_z[k]), Vector(embree_ray.ray.dir_x[k], embree_ray.ray.dir_y[k], embree_ray.ray.dir_z[k]), 0);
+					int rayId = embree_ray.ray.id[k];
+					firstIntersection_has_inter[threadid][rayId] = true;
+					firstIntersection_min_t[threadid][rayId] = embree_ray.ray.tfar[k];
+					firstIntersection_triangle_id[threadid][rayId] = embree_ray.hit.primID[k];
+					firstIntersection_P[threadid][rayId] = d.origin + embree_ray.ray.tfar[k] * d.direction;
+					int systemObjectID = embree_to_real_objects[embreeObjectID];
+					firstIntersection_sphere_id[threadid][rayId] = systemObjectID;
+					TriMesh* g = castToMesh[systemObjectID]; // dynamic_cast<TriMesh*>(objects[systemObjectID]);
+					firstIntersection_mat[threadid][rayId] = g->getMaterial(embree_ray.hit.primID[k], 1 - embree_ray.hit.u[k] - embree_ray.hit.v[k], embree_ray.hit.u[k], embree_ray.hit.v[k]);
+				} 
+		}
+	}
+
+
+	for (int id = 0; id < batch_size; id++) {
+		
+		bool found_not_mesh = false;
+		for (int i = 0; i < objects.size(); i++) {
+			if (objects[i]->type == OT_TRIMESH) continue;
+			if (i == 1 && firstIntersection_has_inter[threadid][id]) continue; // we won't do better instesecting the envmap ;)
+
+			const Ray &d = firstIntersection_Ray[threadid][id];
+			Vector transformed_dir = objects[i]->apply_inverse_rotation_scaling(d.direction);
+			Vector new_origin = objects[i]->apply_inverse_transformation(d.origin);
+			Ray transformed_ray(new_origin, transformed_dir, d.time);
+
+			Vector localP;
+			int triangle_id;
+			double min_t;
+			MaterialValues localmat;
+			double t;
+
+			bool local_has_inter = objects[i]->intersection(transformed_ray, localP, t, localmat, firstIntersection_min_t[threadid][id], triangle_id);
+
+			if (local_has_inter) {
+				if (t < firstIntersection_min_t[threadid][id]) {
+					firstIntersection_has_inter[threadid][id] = true;
+					firstIntersection_min_t[threadid][id] = t;
+
+					//P = objects[sphere_id]->apply_transformation(localP);
+					firstIntersection_P[threadid][id] = localP;
+					firstIntersection_sphere_id[threadid][id] = i;
+					firstIntersection_mat[threadid][id] = localmat;
+					found_not_mesh = true;
+					//mat.shadingN = objects[i]->apply_rotation(localmat.shadingN);
+				}
+			}
+		}
+
+		if (found_not_mesh) {
+			firstIntersection_P[threadid][id] = objects[firstIntersection_sphere_id[threadid][id]]->apply_transformation(firstIntersection_P[threadid][id]);
+		}
+
+		firstIntersection_mat[threadid][id].shadingN = objects[firstIntersection_sphere_id[threadid][id]]->apply_rotation(firstIntersection_mat[threadid][id].shadingN);
+		firstIntersection_mat[threadid][id].shadingN.fast_normalize();
+	}
+
+#else
+
+//#pragma omp parallel for schedule(dynamic, 1)
+	for (int id = 0; id < W*H; id++) {
+		firstIntersection_has_inter[threadid][id] = intersection(firstIntersection_Ray[threadid][id], firstIntersection_P[threadid][id], firstIntersection_sphere_id[threadid][id], firstIntersection_min_t[threadid][id], firstIntersection_mat[threadid][id], firstIntersection_triangle_id[threadid][rayId], false, true);
+	}
+
+#endif
+}
+
 
 bool Scene::intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id, bool avoid_ghosts, bool isCoherent) const {
 
@@ -548,7 +666,7 @@ bool Scene::intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t,
 			P = d.origin + min_t * d.direction;
 			int systemObjectID = embree_to_real_objects[embreeObjectID];
 			sphere_id = systemObjectID;
-			TriMesh* g = dynamic_cast<TriMesh*>(objects[systemObjectID]);
+			TriMesh* g = castToMesh[systemObjectID]; // dynamic_cast<TriMesh*>(objects[systemObjectID]);
 			mat = g->getMaterial(triangle_id, 1 - embree_ray.hit.u - embree_ray.hit.v, embree_ray.hit.u, embree_ray.hit.v);			
 		} else {
 			P = objects[sphere_id]->apply_transformation(P);			

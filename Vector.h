@@ -13,6 +13,10 @@
 #undef max
 #endif
 
+#ifndef M_TWO_PI
+#define M_TWO_PI 6.28318530718
+#endif
+
 /*static __declspec(thread) std::default_random_engine engine;
 static __declspec(thread) std::uniform_real_distribution<double> uniform(0, 1);*/
 
@@ -291,6 +295,40 @@ static inline float invSqRoot(float n) {
 	return y;
 }
 
+static inline double fastPow(double a, double b) {
+	union {
+		double d;
+		int x[2];
+	} u = { a };
+	u.x[1] = (int)(b * (u.x[1] - 1072632447) + 1072632447);
+	u.x[0] = 0;
+	return u.d;
+}
+//https://martin.ankerl.com/2012/01/25/optimized-approximative-pow-in-c-and-cpp/
+inline double fastPrecisePow(double a, double b) {
+	// calculate approximation with fraction of the exponent
+	int e = (int)b;
+	union {
+		double d;
+		int x[2];
+	} u = { a };
+	u.x[1] = (int)((b - e) * (u.x[1] - 1072632447) + 1072632447);
+	u.x[0] = 0;
+
+	// exponentiation by squaring with the exponent's integer part
+	// double r = u.d makes everything much slower, not sure why
+	double r = 1.0;
+	while (e) {
+		if (e & 1) {
+			r *= a;
+		}
+		a *= a;
+		e >>= 1;
+	}
+
+	return r * u.d;
+}
+
 class Vector {
 public:
 	explicit Vector(double x = 0, double y = 0, double z = 0) {
@@ -414,6 +452,8 @@ static inline Vector operator*(const Matrix<3, 4> &mat, const Vector &b) {
 Vector min(const Vector& a, const Vector& b);
 Vector max(const Vector& a, const Vector& b);
 Vector pow(const Vector& a, const Vector& b);
+Vector fastPow(const Vector& a, const Vector& b);
+Vector fastPrecisePow(const Vector& a, const Vector& b);
 Vector exp(const Vector& a);
 Vector sqrt(const Vector& a);
 Vector sqr(const Vector& a);

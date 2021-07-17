@@ -34,7 +34,7 @@ class Scene;
 
 class PointSet;
 
-
+class TriMesh;
 
 
 class BBox {
@@ -397,22 +397,30 @@ public:
 		v = Texture::wrap(v);
 		
 		if (idx >= textures.size()) {
-			mat.Kd = Vector(1., 1., 1.);
+			mat.Kd[0] = 1;
+			mat.Kd[1] = 1;
+			mat.Kd[2] = 1;
 		} else {
 			mat.Kd = textures[idx].getVec(u, v);
 		}
 		if (idx >= specularmap.size()) {
-			mat.Ks = Vector(0., 0., 0.);
+			mat.Ks[0] = 0;
+			mat.Ks[1] = 0;
+			mat.Ks[2] = 0;
 		} else {
 			mat.Ks = specularmap[idx].getVec(u, v);
 		}
 		if (idx >= subsurface.size()) {
-			mat.Ksub = Vector(0., 0., 0.);
+			mat.Ksub[0] = 0;
+			mat.Ksub[1] = 0;
+			mat.Ksub[2] = 0;
 		} else {
 			mat.Ksub = subsurface[idx].getVec(u, v);
 		}
 		if (idx >= roughnessmap.size()) {
-			mat.Ne = Vector(1., 1., 1.);
+			mat.Ne[0] = 1;
+			mat.Ne[1] = 1;
+			mat.Ne[2] = 1;
 		} else {
 			mat.Ne = roughnessmap[idx].getVec(u, v);
 		}
@@ -426,7 +434,9 @@ public:
 		} else {
 			mat.refr_index = refr_index_map[idx].getValRed(u, v);
 		}
-		mat.Ke = Vector(0., 0., 0.);
+		mat.Ke[0] = 0;
+		mat.Ke[1] = 0;
+		mat.Ke[2] = 0;
 		return mat;
 	}
 
@@ -1214,6 +1224,16 @@ public:
 		backgroundW = 0; backgroundH = 0; current_time = 0; current_frame = 0; duration = 1;
 		double_frustum_start_t = 0;
 
+		firstIntersection_Ray.resize(omp_get_max_threads());
+		firstIntersection_P.resize(omp_get_max_threads());
+		firstIntersection_sphere_id.resize(omp_get_max_threads()); 
+		firstIntersection_triangle_id.resize(omp_get_max_threads());
+		firstIntersection_min_t.resize(omp_get_max_threads()); 
+		firstIntersection_dx.resize(omp_get_max_threads()); 
+		firstIntersection_dy.resize(omp_get_max_threads());
+		firstIntersection_mat.resize(omp_get_max_threads());
+		firstIntersection_has_inter.resize(omp_get_max_threads());
+
 #ifdef USE_EMBREE
 #if _DEBUG
 		const char * config = "verbose=3";
@@ -1270,6 +1290,7 @@ public:
 			delete objects[i];
 		}
 		objects.clear();
+		castToMesh.clear();
 		lumiere = NULL;
 
 	}
@@ -1293,7 +1314,7 @@ public:
 			}
 		}
 #endif
-
+		castToMesh.erase(castToMesh.begin() + id);
 		delete objects[id];
 		objects.erase(objects.begin() + id);
 	}
@@ -1301,6 +1322,7 @@ public:
 
 	bool intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id, bool avoid_ghosts = false, bool isCoherent = false) const;
 
+	void first_intersection_batch(int batch_size);
 
 	bool intersection_shadow(const Ray& d, double &min_t, double dist_light, bool avoid_ghosts = false) const;
 
@@ -1336,6 +1358,16 @@ public:
 	int fog_phase_type; // 0 isotropic ; 1 Schlick 2 rayleigh
 	double double_frustum_start_t;
 	double phase_aniso;
+
+
+	std::vector< std::vector<Ray> > firstIntersection_Ray;
+	std::vector< std::vector<Vector> > firstIntersection_P;
+	std::vector< std::vector<int> > firstIntersection_sphere_id, firstIntersection_triangle_id;
+	std::vector< std::vector<double> > firstIntersection_min_t, firstIntersection_dx, firstIntersection_dy;
+	std::vector< std::vector<MaterialValues> > firstIntersection_mat;
+	std::vector< std::vector<bool> > firstIntersection_has_inter;
+
+	std::vector<TriMesh*> castToMesh; //horrible hack to avoid dynamic_casts on the fly
 
 #ifdef USE_EMBREE
 	RTCDevice embree_device;

@@ -36,6 +36,12 @@ Vector max(const Vector& a, const Vector& b) {
 Vector pow(const Vector& a, const Vector& b) {
 	return Vector(std::pow(a[0], b[0]), std::pow(a[1], b[1]), std::pow(a[2], b[2]));
 }
+Vector fastPow(const Vector& a, const Vector& b) {
+	return Vector(fastPow(a[0], b[0]), fastPow(a[1], b[1]), fastPow(a[2], b[2]));
+}
+Vector fastPrecisePow(const Vector& a, const Vector& b) {
+	return Vector(fastPrecisePow(a[0], b[0]), fastPrecisePow(a[1], b[1]), fastPrecisePow(a[2], b[2]));
+}
 double dot(const Vector&a, const Vector& b) {
 	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
