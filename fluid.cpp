@@ -500,7 +500,7 @@ bool Fluid::intersection_opaque(const Ray& d, Vector& P, double &t, MaterialValu
 		SimplerSphere(particles[frame][i], radius).intersection(d, localP, localN, localt);
 		P = localP;
 
-		mat = queryMaterial(0, 0, 0);
+		queryMaterial(0, 0, 0, mat);
 		mat.shadingN = localN;
 
 		//if (dot(mat.shadingN, d.direction) > 0 && !mat.transp) mat.shadingN = -mat.shadingN;
@@ -626,7 +626,7 @@ bool Fluid::intersection_transparent(const Ray& d, Vector& P, double &t, Materia
 
 
 bool Fluid::intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const {
-	mat = queryMaterial(0, 0, 0);
+	queryMaterial(0, 0, 0, mat);
 	if (mat.transp) {
 		return intersection_transparent2(d, P, t, mat, cur_best_t, triangle_id);
 	} else {

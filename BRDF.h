@@ -261,7 +261,8 @@ public:
 	}
 
 	static double wrap(double u) {
-		u = fmod(u, 1);
+		//u = fmod(u, 1);
+		u -= (int)u;
 		if (u < 0) u += 1;
 		return u;
 	}

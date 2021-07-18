@@ -390,9 +390,8 @@ public:
 	}
 
 
-	MaterialValues queryMaterial(int idx, double u, double v) const {
+	void queryMaterial(int idx, double u, double v, MaterialValues& mat) const {
 		
-		MaterialValues mat;
 		u = Texture::wrap(u);
 		v = Texture::wrap(v);
 		
@@ -437,7 +436,6 @@ public:
 		mat.Ke[0] = 0;
 		mat.Ke[1] = 0;
 		mat.Ke[2] = 0;
-		return mat;
 	}
 
 	virtual void colorAnisotropy() {
@@ -746,7 +744,7 @@ public:
 		if (dP < 0 || dP > len) return false;
 		
 		Vector proj = A + dP*d;
-		mat = queryMaterial(0, dP/len, 0.5);
+		queryMaterial(0, dP/len, 0.5, mat);
 		mat.shadingN = (P - proj); // .getNormalized();
 		if (flip_normals) mat.shadingN = -mat.shadingN;
 		triangle_id = -1;
@@ -816,7 +814,7 @@ public:
 
 
 		Vector proj = A + dP * d;
-		mat = queryMaterial(0, dP / len, 0.5);
+		queryMaterial(0, dP / len, 0.5, mat);
 		mat.shadingN = (P - proj); // .getNormalized();
 		if (flip_normals) mat.shadingN = -mat.shadingN;
 		triangle_id = -1;
@@ -856,8 +854,8 @@ public:
 		}
 		this->rotation_center = origin;
 		name = "Sphere";
-		//bbox.bounds[0] = O - Vector(R, R, R);
-		//bbox.bounds[1] = O + Vector(R, R, R);
+		bbox.bounds[0] = O - Vector(R, R, R);
+		bbox.bounds[1] = O + Vector(R, R, R);
 	}
 
 	void save_to_file(FILE* f) {
@@ -920,7 +918,7 @@ public:
 			return true;
 		}*/
 		
-		//if (!bbox.intersection(d)) return false;
+		if (!bbox.intersection(d)) return false;
 
 		// resout a*t^2 + b*t + c = 0
 		double a =  d.direction.getNorm2(); // can't suppose unit norm as objects are scaled by scaling ray length
@@ -952,7 +950,7 @@ public:
 			N.fast_normalize();
 			double theta = 1 - acos(N[1]) / M_PI;
 			double phi = (atan2(-N[2], N[0]) + M_PI) / (2.*M_PI);
-			mat = queryMaterial(0, theta, phi);
+			queryMaterial(0, theta, phi, mat);
 			mat.shadingN = -N;
 			int idx = 3*((int)(theta*(envH - 1.))*envW + (int)(phi*(envW - 1.)));
 			if (idx < 0 || idx >= 3*envW * envH) mat.Ke = Vector(0., 0., 0.); else
@@ -966,7 +964,7 @@ public:
 			N.fast_normalize();
 			double theta = 1 - acos(N[1]) / M_PI;
 			double phi = (atan2(-N[2], N[0]) + M_PI) / (2.*M_PI);
-			mat = queryMaterial(0, theta, phi);
+			queryMaterial(0, theta, phi, mat);
 		}
 
 		mat.shadingN = N;
@@ -1042,7 +1040,7 @@ public:
 			N.fast_normalize();
 			double theta = 1 - acos(N[1]) / M_PI;
 			double phi = (atan2(-N[2], N[0]) + M_PI) / (2.*M_PI);
-			mat = queryMaterial(0, theta, phi);
+			queryMaterial(0, theta, phi, mat);
 		}
 
 		mat.shadingN = N;
@@ -1082,7 +1080,7 @@ public:
 	std::vector<unsigned char> envtex;
 	std::string envmapfilename;
 	int envW, envH;
-	//BBox bbox;
+	BBox bbox;
 };
 
 
@@ -1134,7 +1132,7 @@ public:
 
 		double u = P[0]*0.1;
 		double v = P[2]*0.1; 
-		mat = queryMaterial(0, u, v);
+		queryMaterial(0, u, v, mat);
 
 		return true;
 	}
@@ -1160,7 +1158,7 @@ public:
 
 		double u = P[0] * 0.1;
 		double v = P[2] * 0.1;
-		mat = queryMaterial(0, u, v);
+		queryMaterial(0, u, v, mat);
 
 		return true;
 	}
@@ -1324,7 +1322,7 @@ public:
 
 	void first_intersection_batch(int batch_size);
 
-	bool intersection_shadow(const Ray& d, double &min_t, double dist_light, bool avoid_ghosts = false) const;
+	bool intersection_shadow(const Ray& d, double &min_t, double dist_light, bool avoid_ghosts = false, bool isCoherent = false) const;
 
 	bool get_random_intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id, double tmin, double tmax, bool avoid_ghosts = false) const;
 

@@ -196,7 +196,7 @@ bool PointSet::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 		localN.normalize();
 		P = localP;
 
-		mat = queryMaterial(0, 0, 0);
+		queryMaterial(0, 0, 0, mat);
 		mat.shadingN = localN;
 
 		if (dot(mat.shadingN, d.direction) > 0 && !mat.transp) mat.shadingN = -mat.shadingN;
@@ -397,7 +397,7 @@ bool PointSet::reservoir_sampling_intersection(const Ray& d, Vector& P, double &
 		localN.normalize();
 		P = localP;
 
-		mat = queryMaterial(0, 0, 0);
+		queryMaterial(0, 0, 0, mat);
 		mat.shadingN = localN;
 
 		if (dot(mat.shadingN, d.direction) > 0 && !mat.transp) mat.shadingN = -mat.shadingN;

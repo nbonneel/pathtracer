@@ -450,7 +450,7 @@ bool Scene::get_random_intersection(const Ray& d, Vector& P, int &sphere_id, dou
 			int systemObjectID = embree_to_real_objects[embreeObjectID];
 			sphere_id = systemObjectID;
 			TriMesh* g = castToMesh[systemObjectID];//  dynamic_cast<TriMesh*>(objects[systemObjectID]);
-			mat = g->getMaterial(triangle_id, 1 - embree_ray.hit.u - embree_ray.hit.v, embree_ray.hit.u, embree_ray.hit.v);
+			g->getMaterial(triangle_id, 1 - embree_ray.hit.u - embree_ray.hit.v, embree_ray.hit.u, embree_ray.hit.v, mat);
 		} else {
 			P = objects[sphere_id]->apply_transformation(P);
 			mat.shadingN.fast_normalize();
@@ -527,7 +527,7 @@ void Scene::first_intersection_batch(int batch_size) { // dont forget to set W a
 					int systemObjectID = embree_to_real_objects[embreeObjectID];
 					firstIntersection_sphere_id[threadid][rayId] = systemObjectID;
 					TriMesh* g = castToMesh[systemObjectID]; // dynamic_cast<TriMesh*>(objects[systemObjectID]);
-					firstIntersection_mat[threadid][rayId] = g->getMaterial(embree_ray.hit.primID[k], 1 - embree_ray.hit.u[k] - embree_ray.hit.v[k], embree_ray.hit.u[k], embree_ray.hit.v[k]);
+					g->getMaterial(embree_ray.hit.primID[k], 1 - embree_ray.hit.u[k] - embree_ray.hit.v[k], embree_ray.hit.u[k], embree_ray.hit.v[k], firstIntersection_mat[threadid][rayId]);
 				} 
 		}
 	}
@@ -667,7 +667,7 @@ bool Scene::intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t,
 			int systemObjectID = embree_to_real_objects[embreeObjectID];
 			sphere_id = systemObjectID;
 			TriMesh* g = castToMesh[systemObjectID]; // dynamic_cast<TriMesh*>(objects[systemObjectID]);
-			mat = g->getMaterial(triangle_id, 1 - embree_ray.hit.u - embree_ray.hit.v, embree_ray.hit.u, embree_ray.hit.v);			
+			g->getMaterial(triangle_id, 1 - embree_ray.hit.u - embree_ray.hit.v, embree_ray.hit.u, embree_ray.hit.v, mat);			
 		} else {
 			P = objects[sphere_id]->apply_transformation(P);			
 		}
@@ -689,7 +689,7 @@ bool Scene::intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t,
 }
 
 
-bool Scene::intersection_shadow(const Ray& d, double &min_t, double dist_light, bool avoid_ghosts) const {
+bool Scene::intersection_shadow(const Ray& d, double &min_t, double dist_light, bool avoid_ghosts, bool isCoherent) const {
 
 	min_t = 1E99;
 
@@ -708,7 +708,11 @@ bool Scene::intersection_shadow(const Ray& d, double &min_t, double dist_light, 
 			0                       // ray flags
 	};
 
-	rtcOccluded1(embree_scene, &embree_incoherent[omp_get_thread_num()], &embree_ray);  // should adjust embree_incoherent	
+	if (isCoherent)
+		rtcOccluded1(embree_scene, &embree_coherent[omp_get_thread_num()], &embree_ray);  
+	else
+		rtcOccluded1(embree_scene, &embree_incoherent[omp_get_thread_num()], &embree_ray);  
+
 	if (embree_ray.tfar<0) {
 		return true;
 	}	

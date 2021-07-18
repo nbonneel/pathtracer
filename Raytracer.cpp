@@ -517,7 +517,11 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 						}
 						Ray ray_light(P + 0.01*wi, wi, r.time);
 						double t_light;
-						bool isShadowed = s.intersection_shadow(ray_light, t_light, sqrt(d_light2) - 0.01, true);
+						bool isShadowed;
+						if (dot(mat.shadingN, wi) < 0)
+							isShadowed = true;
+						else
+							isShadowed = s.intersection_shadow(ray_light, t_light, sqrt(d_light2) - 0.01, true, nbrebonds == nb_bounces);
 						//bool direct_visible = true;
 						Vector currentContrib(0, 0, 0);
 

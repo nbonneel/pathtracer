@@ -223,7 +223,7 @@ public:
 	bool reservoir_sampling_intersection(const Ray& r, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const;
 #endif
 
-	MaterialValues getMaterial(int triId, double alpha, double beta, double gamma) const;
+	MaterialValues getMaterial(int triId, double alpha, double beta, double gamma, MaterialValues &mat) const;
 
 	BBox build_bbox(int i0, int i1);
 	BBox bbox;

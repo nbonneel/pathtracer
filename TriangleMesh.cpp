@@ -916,7 +916,7 @@ void TriMesh::saveOBJ(const char* obj) {
 }
 
 
-MaterialValues TriMesh::getMaterial(int triId, double alpha, double beta, double gamma) const {
+MaterialValues TriMesh::getMaterial(int triId, double alpha, double beta, double gamma, MaterialValues &mat) const {
 
 	double u = 0, v = 0;
 	int textureId = indices[triId].group;
@@ -935,7 +935,7 @@ MaterialValues TriMesh::getMaterial(int triId, double alpha, double beta, double
 		}
 	}
 
-	MaterialValues mat = queryMaterial(textureId, u, v);
+	queryMaterial(textureId, u, v, mat);
 
 	if (!interp_normals || (indices[triId].ni == -1)) {
 		mat.shadingN = trisoup.N;// .getNormalized();
