@@ -615,6 +615,18 @@ public:
 						raytracer.s.objects[selected_object]->mat_rotation = R * raytracer.s.objects[selected_object]->mat_rotation;
 					}
 				}
+				if (raytracer.s.objects[selected_object]->type == OT_TRIMESH) {
+					stop_render(); // could do like below, but with embree, rebuilding the scene BVH while accessing it could crash (? not tested)
+					start_render();
+				} else {
+					raytracer.s.objects[selected_object]->build_matrix(raytracer.s.current_frame, raytracer.is_recording);
+					raytracer.centerLight = raytracer.s.lumiere->apply_transformation(raytracer.s.lumiere->O);// s.lumiere->O + s.lumiere->get_translation(r.time, is_recording);
+					raytracer.lum_scale = raytracer.s.lumiere->get_scale(raytracer.s.current_frame, raytracer.is_recording);
+					raytracer.radiusLight = raytracer.lum_scale * raytracer.s.lumiere->R;
+
+					raytracer.clear_image(); // faster than stopping threads and relaunching ; not threadsafe, but works ok for previz while moving mouse
+					std::fill(raytracer.sample_count.begin(), raytracer.sample_count.end(), 10);
+				}
 			} else { // camera motion
 				if (left_mouse_down) {
 
@@ -629,9 +641,10 @@ public:
 					raytracer.cam.position += (float)dx*camera_right + (float)dy*raytracer.cam.up;
 
 				}
+
+				raytracer.clear_image(); // faster than stopping threads and relaunching ; not threadsafe, but works ok for previz while moving mouse
+				std::fill(raytracer.sample_count.begin(), raytracer.sample_count.end(), 10);
 			}			
-			stop_render();
-			start_render();
 										
 		} else {
 			if (!event.Dragging()) {
@@ -653,7 +666,10 @@ public:
 			wasDragging = false;
 			return;
 		}	
-		
+		if (wasDragging) {
+			stop_render();
+			start_render();
+		}
 
 		/*if (!wasDragging)*/ {
 			Ray r = raytracer.cam.generateDirection(raytracer.s.double_frustum_start_t, (displayH - (mouse_init_y - 1.))*(float)raytracer.H / displayH, mouse_init_x*(float)raytracer.W / displayW, raytracer.s.current_time, 0, 0, 0, 0, raytracer.W, raytracer.H);

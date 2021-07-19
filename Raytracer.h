@@ -50,7 +50,7 @@ public:
 		computed.resize(W*H, false);
 		std::fill(imagedouble.begin(), imagedouble.end(), 0);
 		std::fill(image.begin(), image.end(), 0);
-		std::fill(computed.begin(), computed.end(), false);
+		std::fill(computed.begin(), computed.end(), false);		
 
 		Wlr = ceil(W / 16.);
 		Hlr = ceil(H / 16.);
