@@ -53,7 +53,7 @@ void TriMesh::readVRML(const char* obj) {
 				if (nread == 3) {
 					Vector vec(f3, f2, f1);
 					if (shuffle_colors) {
-						Vector shuff = vec*vec*255. * 987 + Vector(1234, 4567, 7891);
+						Vector shuff = vec*vec*255.f * 987.f + Vector(1234, 4567, 7891);
 						//Vector shuff = vec*Vector(vec[2], vec[0], vec[1])*255. * 9871 + Vector(1234, 14567, 17891);
 						//Vector shuff = vec*Vector(vec[2], vec[0], vec[1])*256. * 9871 + Vector(1234, 14567, 17891);						
 						//Vector shuff = vec*Vector(vec[2], vec[0], vec[1])*258. * 9871 + Vector(1234, 14567, 17891);
@@ -191,7 +191,7 @@ void TriMesh::load_edge_colors(const char* csvfilename) {
 		float n1 = sqrt(n1x*n1x + n1y*n1y + n1z*n1z);
 		n0x /= n0; n0y /= n0; n0z /= n0;
 		n1x /= n1; n1y /= n1; n1z /= n1;
-		double scalaire = n0x*n1x + n0y*n1y + n0z*n1z;
+		float scalaire = n0x*n1x + n0y*n1y + n0z*n1z;
 
 		//scalaire = dot(&mesh.normals[idNode0], &mesh.normals[idNode1]);
 
@@ -199,11 +199,11 @@ void TriMesh::load_edge_colors(const char* csvfilename) {
 		//float v = (std::min(1.f, std::max(0.f, val0)) + std::min(1.f, std::max(0.f, val1)))*0.5;		
 		val0 = std::min(1.f, std::max(0.f, val0));
 		val1 = std::min(1.f, std::max(0.f, val1));
-		float v = (val0 + val1)*0.5;// sqrt(val0*val1);
+		float v = (val0 + val1)*0.5f;// sqrt(val0*val1);
 
 		int idVertex1 = faces_to_edges[Edge(idFace1, idFace2)].a;
 		int idVertex2 = faces_to_edges[Edge(idFace1, idFace2)].b;
-		edgecolor[idVertex1][idVertex2] = Vector(1., 1, 1)*v + (1. - v)*Vector(1., 0., 0.);
+		edgecolor[idVertex1][idVertex2] = Vector(1.f, 1.f, 1.f)*v + (1.f - v)*Vector(1.f, 0.f, 0.f);
 
 		//vertexcolors[idVertex1] = Vector(1., 1, 1)*v + (1. - v)*Vector(1., 0., 0.);
 		//vertexcolors[idVertex2] = Vector(1., 1, 1)*v + (1. - v)*Vector(1., 0., 0.);
@@ -275,10 +275,10 @@ void TriMesh::readOBJ(const char* obj, bool load_textures) {
 			//sscanf(line, "v %lf %lf %lf\n", &vec[0], &vec[1], &vec[2]);  // dragon, car2
 
 			Vector col;
-			if (sscanf(line, "v %lf %lf %lf %lf %lf %lf\n", &vec[0], &vec[1], &vec[2], &col[0], &col[1], &col[2]) == 6) {
-				col[0] = std::min(1., std::max(0., col[0]));
-				col[1] = std::min(1., std::max(0., col[1]));
-				col[2] = std::min(1., std::max(0., col[2]));
+			if (sscanf(line, "v %f %f %f %f %f %f\n", &vec[0], &vec[1], &vec[2], &col[0], &col[1], &col[2]) == 6) {
+				col[0] = std::min(1.f, std::max(0.f, col[0]));
+				col[1] = std::min(1.f, std::max(0.f, col[1]));
+				col[2] = std::min(1.f, std::max(0.f, col[2]));
 
 				//if (col[1] > 0.6 && col[0]<0.3) { marked_vertices.insert(vertices.size()); }
 				//if ((col-Vector(0.,1,0.)).getNorm2()<(col-Vector(1,1,1)).getNorm2()) { marked_vertices.insert(vertices.size()); }
@@ -292,7 +292,7 @@ void TriMesh::readOBJ(const char* obj, bool load_textures) {
 				//col[2] = 1.;
 				//vertexcolors.push_back(TransformH(col,130));
 			} else {
-				sscanf(line, "v %lf %lf %lf\n", &vec[0], &vec[1], &vec[2]);  // helmet
+				sscanf(line, "v %f %f %f\n", &vec[0], &vec[1], &vec[2]);  // helmet
 																			 //vec[2] = -vec[2]; //car2
 				vertices.push_back(vec);
 			}
@@ -300,7 +300,7 @@ void TriMesh::readOBJ(const char* obj, bool load_textures) {
 		if (line[0] == 'v' && line[1] == 'n') {
 			Vector vec;
 			//sscanf(line, "vn %lf %lf %lf\n", &vec[0], &vec[1], &vec[2]); //dragon, car2
-			sscanf(line, "vn %lf %lf %lf\n", &vec[0], &vec[1], &vec[2]); // helmet
+			sscanf(line, "vn %f %f %f\n", &vec[0], &vec[1], &vec[2]); // helmet
 																		 //sscanf(line, "vn %lf %lf %lf\n", &vec[2], &vec[0], &vec[1]); //car
 																		 //sscanf_s(line, "vn %lf %lf %lf\n", &vec[0], &vec[2], &vec[1]); //girl
 																		 //vec[2] = -vec[2];  //car2
@@ -308,7 +308,7 @@ void TriMesh::readOBJ(const char* obj, bool load_textures) {
 		}
 		if (line[0] == 'v' && line[1] == 't') {
 			Vector vec;
-			sscanf(line, "vt %lf %lf\n", &vec[0], &vec[1]);
+			sscanf(line, "vt %f %f\n", &vec[0], &vec[1]);
 			uvs.push_back(vec);
 		}
 		if (line[0] == 'f') {
@@ -536,20 +536,20 @@ void TriMesh::readOBJ(const char* obj, bool load_textures) {
 
 				if (line[0] == 'K' && line[1] == 'd') {
 					Vector Kd;
-					sscanf(line, "Kd %lf %lf %lf\n", &Kd[0], &Kd[1], &Kd[2]);
+					sscanf(line, "Kd %f %f %f\n", &Kd[0], &Kd[1], &Kd[2]);
 					//set_col_texture(Kd, groupNames[std::string(grp)]);
 					textures[groupNames[std::string(grp)]].multiplier = Kd;
 				}
 				if (line[0] == 'K' && line[1] == 's') {
 					Vector Ks;
-					sscanf(line, "Ks %lf %lf %lf\n", &Ks[0], &Ks[1], &Ks[2]);
+					sscanf(line, "Ks %f %f %f\n", &Ks[0], &Ks[1], &Ks[2]);
 					//set_col_specular(Ks, groupNames[std::string(grp)]);
 					specularmap[groupNames[std::string(grp)]].multiplier = Ks;
 					if (illum == 0 || illum == 1) specularmap[groupNames[std::string(grp)]].multiplier = Vector(0., 0., 0.);
 				}
 				if (line[0] == 'N' && line[1] == 's') {
 					Vector Ns;
-					int ret = sscanf(line, "Ns %lf %lf %lf\n", &Ns[0], &Ns[1], &Ns[2]);
+					int ret = sscanf(line, "Ns %f %f %f\n", &Ns[0], &Ns[1], &Ns[2]);
 					if (ret == 1) Ns = Vector(Ns[0], Ns[0], Ns[0]);
 					//set_col_roughness(Ns, groupNames[std::string(grp)]);
 					roughnessmap[groupNames[std::string(grp)]].multiplier = Ns;
@@ -614,14 +614,14 @@ void TriMesh::setup_tangents() {
 		Vector vB = vertices[c] - vertices[a];
 		Vector sA = uvs[indices[i].uvj] - uvs[indices[i].uvi];
 		Vector sB = uvs[indices[i].uvk] - uvs[indices[i].uvi];
-		double det = (sA[0] * sB[1] - sB[0] * sA[1]);
+		float det = (sA[0] * sB[1] - sB[0] * sA[1]);
 		Vector sdir, tdir;
 		if (det != 0) {
 			sdir = (sB[1] * vA - sA[1] * vB) / det; // tan 1
 			tdir = (sA[0] * vB - sB[0] * vA) / det; // tan 2
 		} else {
-			sdir = vA*0.00001;
-			tdir = vB*0.00001;
+			sdir = vA*0.00001f;
+			tdir = vB*0.00001f;
 		}
 
 		tan1[a] += sdir; tan1[b] += sdir; tan1[c] += sdir;
@@ -692,7 +692,7 @@ void TriMesh::setup_tangents() {
 	for (int i = 0; i < vertices.size(); i++) {
 		Vector N = normals[verticesToNormals[i]].getNormalized();
 		tangents[i] = (tan1[i] - N*dot(tan1[i], N)).getNormalized();
-		double wtangent = (dot(cross(N, tan1[i]), tan2[i]) < 0) ? -1.0 : 1.0;
+		float wtangent = (dot(cross(N, tan1[i]), tan2[i]) < 0) ? -1.0 : 1.0;
 		bitangents[i] = cross(N, tangents[i])*wtangent;
 	}
 
@@ -711,11 +711,11 @@ void TriMesh::setup_tangents() {
 }
 
 
-TriMesh::TriMesh(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool preserve_input, bool center, Vector rot_center) {
+TriMesh::TriMesh(Scene* scene, const char* obj, float scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool preserve_input, bool center, Vector rot_center) {
 	init(scene, obj, scaling, offset, mirror, colors_csv_filename, true, preserve_input, center, rot_center);
 }
 
-void TriMesh::init(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool load_textures, bool preserve_input, bool center, Vector rot_center) {
+void TriMesh::init(Scene* scene, const char* obj, float scaling, const Vector& offset, bool mirror, const char* colors_csv_filename, bool load_textures, bool preserve_input, bool center, Vector rot_center) {
 	display_edges = false;
 	interp_normals = true;
 	miroir = mirror;
@@ -758,8 +758,8 @@ void TriMesh::init(Scene* scene, const char* obj, double scaling, const Vector& 
 	}
 
 	if (!preserve_input && center) {
-		double s = std::max(bb.bounds[1][0] - bb.bounds[0][0], std::max(bb.bounds[1][1] - bb.bounds[0][1], bb.bounds[1][2] - bb.bounds[0][2]));
-		Vector c = (bb.bounds[0] + bb.bounds[1])*0.5;
+		float s = std::max(bb.bounds[1][0] - bb.bounds[0][0], std::max(bb.bounds[1][1] - bb.bounds[0][1], bb.bounds[1][2] - bb.bounds[0][2]));
+		Vector c = (bb.bounds[0] + bb.bounds[1])*0.5f;
 		//rotation_center = Vector(0., 0., 0.);
 		for (int i = 0; i < vertices.size(); i++) {
 			vertices[i][0] = (vertices[i][0] - c[0]) / s * scaling + offset[0];
@@ -829,7 +829,7 @@ void TriMesh::init(Scene* scene, const char* obj, double scaling, const Vector& 
 	}
 
 	if (isnan(rot_center[0])) {
-		rotation_center = (bbox.bounds[0] + bbox.bounds[1])*0.5;
+		rotation_center = (bbox.bounds[0] + bbox.bounds[1])*0.5f;
 	} else {
 		rotation_center = rot_center;
 	}
@@ -881,7 +881,7 @@ void TriMesh::build_bvh(BVH* b, int i0, int i1) {
 	bvh_avg_depth = 0;
 	bvh_nb_nodes = 0;
 	build_bvh_recur(b, 0, i0, i1, 0);
-	bvh_avg_depth /= (double)bvh_nb_nodes;
+	bvh_avg_depth /= (float)bvh_nb_nodes;
 }
 #endif
 
@@ -916,9 +916,9 @@ void TriMesh::saveOBJ(const char* obj) {
 }
 
 
-MaterialValues TriMesh::getMaterial(int triId, double alpha, double beta, double gamma, MaterialValues &mat) const {
+MaterialValues TriMesh::getMaterial(int triId, float alpha, float beta, float gamma, MaterialValues &mat) const {
 
-	double u = 0, v = 0;
+	float u = 0, v = 0;
 	int textureId = indices[triId].group;
 	bool has_uv = false;
 
@@ -1055,8 +1055,8 @@ void TriMesh::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
 	}
 
 
-	double best_split_factor = 0.5;
-	double best_area_bb = 1E50;
+	float best_split_factor = 0.5;
+	float best_area_bb = 1E50;
 #ifdef _DEBUG
 	int max_tests = 1;
 #else
@@ -1065,13 +1065,13 @@ void TriMesh::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
 
 	for (int test_split = 0; test_split < max_tests; test_split++) {
 
-		double cur_split_factor = (test_split + 1) / (double)(max_tests + 1);
-		double split_val = centerBB.bounds[0][split_dim] + diag[split_dim] * cur_split_factor;
+		float cur_split_factor = (test_split + 1) / (float)(max_tests + 1);
+		float split_val = centerBB.bounds[0][split_dim] + diag[split_dim] * cur_split_factor;
 		BBox bb_left(Vector(1E10, 1E10, 1E10), Vector(-1E10, -1E10, -1E10)), bb_right(Vector(1E10, 1E10, 1E10), Vector(-1E10, -1E10, -1E10));
 		int nl = 0, nr = 0;
 
 		for (int i = i0; i < i1; i++) {
-			double center_split_dim = (vertices[indices[i].vtxi][split_dim] + vertices[indices[i].vtxj][split_dim] + vertices[indices[i].vtxk][split_dim]) / 3.;
+			float center_split_dim = (vertices[indices[i].vtxi][split_dim] + vertices[indices[i].vtxj][split_dim] + vertices[indices[i].vtxk][split_dim]) / 3.;
 
 			if (center_split_dim <= split_val) {
 				bb_left.bounds[0] = min(bb_left.bounds[0], vertices[indices[i].vtxi]);
@@ -1091,17 +1091,17 @@ void TriMesh::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
 				nr++;
 			}
 		}
-		double sum_area_bb = bb_left.area()*nl + bb_right.area()*nr;
+		float sum_area_bb = bb_left.area()*nl + bb_right.area()*nr;
 		if (sum_area_bb < best_area_bb) {
 			best_split_factor = cur_split_factor;
 			best_area_bb = sum_area_bb;
 		}
 	}
 
-	double split_val = centerBB.bounds[0][split_dim] + diag[split_dim] * best_split_factor;
+	float split_val = centerBB.bounds[0][split_dim] + diag[split_dim] * best_split_factor;
 	int pivot = i0 - 1;
 	for (int i = i0; i < i1; i++) {
-		double center_split_dim = (vertices[indices[i].vtxi][split_dim] + vertices[indices[i].vtxj][split_dim] + vertices[indices[i].vtxk][split_dim]) / 3.;
+		float center_split_dim = (vertices[indices[i].vtxi][split_dim] + vertices[indices[i].vtxj][split_dim] + vertices[indices[i].vtxk][split_dim]) / 3.;
 
 		if (center_split_dim <= split_val) {
 			pivot++;
@@ -1130,16 +1130,16 @@ void TriMesh::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
 }
 
 
-bool TriMesh::intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const
+bool TriMesh::intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, float cur_best_t, int &triangle_id) const
 {
 	t = cur_best_t;
 	bool has_inter = false;
-	double t_box_left, t_box_right;
+	float t_box_left, t_box_right;
 	int best_index = -1;
 	bool goleft, goright;
 	Vector localP, localN;
-	double localt;
-	double alpha, beta, gamma;
+	float localt;
+	float alpha, beta, gamma;
 
 	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
 	char signs[3];
@@ -1151,7 +1151,7 @@ bool TriMesh::intersection(const Ray& d, Vector& P, double &t, MaterialValues &m
 	if (t_box_left > cur_best_t) return false;
 
 	int l[50];
-	double tnear[50];
+	float tnear[50];
 	int idx_back = -1;
 
 	l[++idx_back] = 0;
@@ -1197,8 +1197,8 @@ bool TriMesh::intersection(const Ray& d, Vector& P, double &t, MaterialValues &m
 					if (localt < t) {
 						int textureId = indices[i].group;
 						if (uvs.size() > 0 && alphamap.size() > textureId && indices[i].uvi >= 0 && indices[i].uvj >= 0 && indices[i].uvk >= 0) {
-							double u = uvs[indices[i].uvi][0] * alpha + uvs[indices[i].uvj][0] * beta + uvs[indices[i].uvk][0] * gamma;
-							double v = uvs[indices[i].uvi][1] * alpha + uvs[indices[i].uvj][1] * beta + uvs[indices[i].uvk][1] * gamma;
+							float u = uvs[indices[i].uvi][0] * alpha + uvs[indices[i].uvj][0] * beta + uvs[indices[i].uvk][0] * gamma;
+							float v = uvs[indices[i].uvi][1] * alpha + uvs[indices[i].uvj][1] * beta + uvs[indices[i].uvk][1] * gamma;
 							u = Texture::wrap(u);
 							v = Texture::wrap(v);
 							if (alphamap[textureId].getValRed(u, v) < 0.5) continue;
@@ -1236,16 +1236,16 @@ bool TriMesh::intersection(const Ray& d, Vector& P, double &t, MaterialValues &m
 
 
 
-bool TriMesh::intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const
+bool TriMesh::intersection_shadow(const Ray& d, float &t, float cur_best_t, float dist_light) const
 {
 	t = cur_best_t;
 	bool has_inter = false;
-	double t_box_left, t_box_right;
+	float t_box_left, t_box_right;
 	int best_index = -1;
 	bool goleft, goright;
 	Vector localP, localN;
-	double localt;
-	double alpha, beta, gamma;
+	float localt;
+	float alpha, beta, gamma;
 
 	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
 	char signs[3];
@@ -1257,7 +1257,7 @@ bool TriMesh::intersection_shadow(const Ray& d, double &t, double cur_best_t, do
 	if (t_box_left > cur_best_t || t_box_left>dist_light) return false;
 
 	int l[50];
-	double tnear[50];
+	float tnear[50];
 	int idx_back = -1;
 
 	l[++idx_back] = 0;
@@ -1297,8 +1297,8 @@ bool TriMesh::intersection_shadow(const Ray& d, double &t, double cur_best_t, do
 					if (localt < t) {
 						int textureId = indices[i].group;
 						if (uvs.size()>0 && alphamap.size() > textureId && indices[i].uvi >= 0 && indices[i].uvj >= 0 && indices[i].uvk >= 0) {
-							double u = uvs[indices[i].uvi][0] * alpha + uvs[indices[i].uvj][0] * beta + uvs[indices[i].uvk][0] * gamma;
-							double v = uvs[indices[i].uvi][1] * alpha + uvs[indices[i].uvj][1] * beta + uvs[indices[i].uvk][1] * gamma;
+							float u = uvs[indices[i].uvi][0] * alpha + uvs[indices[i].uvj][0] * beta + uvs[indices[i].uvk][0] * gamma;
+							float v = uvs[indices[i].uvi][1] * alpha + uvs[indices[i].uvj][1] * beta + uvs[indices[i].uvk][1] * gamma;
 							u = Texture::wrap(u);
 							v = Texture::wrap(v);
 							if (alphamap[textureId].getValRed(u, v) < 0.5) continue;
@@ -1318,14 +1318,14 @@ bool TriMesh::intersection_shadow(const Ray& d, double &t, double cur_best_t, do
 	return has_inter;
 }
 
-bool TriMesh::reservoir_sampling_intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const {	
+bool TriMesh::reservoir_sampling_intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, float min_t, double max_t) const {
 	bool has_inter = false;
-	double t_box_left, t_box_right;
+	float t_box_left, t_box_right;
 	int best_index = -1;
 	bool goleft, goright;
 	Vector localP, localN;
-	double localt;
-	double alpha, beta, gamma;
+	float localt;
+	float alpha, beta, gamma;
 
 	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
 	char signs[3];
@@ -1340,7 +1340,7 @@ bool TriMesh::reservoir_sampling_intersection(const Ray& d, Vector& P, double &t
 	const float invmax = 1.f / engine[threadid].max();
 
 	int l[50];
-	double tnear[50];
+	float tnear[50];
 	int idx_back = -1;
 
 	l[++idx_back] = 0;
@@ -1386,8 +1386,8 @@ bool TriMesh::reservoir_sampling_intersection(const Ray& d, Vector& P, double &t
 					if (localt < max_t && localt >= min_t) {
 						int textureId = indices[i].group;
 						if (uvs.size() > 0 && alphamap.size() > textureId && indices[i].uvi >= 0 && indices[i].uvj >= 0 && indices[i].uvk >= 0) {
-							double u = uvs[indices[i].uvi][0] * alpha + uvs[indices[i].uvj][0] * beta + uvs[indices[i].uvk][0] * gamma;
-							double v = uvs[indices[i].uvi][1] * alpha + uvs[indices[i].uvj][1] * beta + uvs[indices[i].uvk][1] * gamma;
+							float u = uvs[indices[i].uvi][0] * alpha + uvs[indices[i].uvj][0] * beta + uvs[indices[i].uvk][0] * gamma;
+							float v = uvs[indices[i].uvi][1] * alpha + uvs[indices[i].uvj][1] * beta + uvs[indices[i].uvk][1] * gamma;
 							u = Texture::wrap(u);
 							v = Texture::wrap(v);
 							if (alphamap[textureId].getValRed(u, v) < 0.5) continue;
@@ -1519,8 +1519,8 @@ int TriMesh::getNbConnected(int &alsoReturnsNbEdges, int &nonManifoldFaces, int 
 BBox Yarns::build_bbox(int i0, int i1) {
 
 	BBox result;
-	result.bounds[1] = -Vector(1,1,1)*std::numeric_limits<double>::max();
-	result.bounds[0] = Vector(1, 1, 1)*std::numeric_limits<double>::max();
+	result.bounds[1] = -Vector(1,1,1)*std::numeric_limits<float>::max();
+	result.bounds[0] = Vector(1, 1, 1)*std::numeric_limits<float>::max();
 	for (int i = i0; i < i1; i++) { // indice de cylindre
 		for (int k = 0; k < 3; k++) { // indice de dimension
 			result.bounds[0][k] = std::min(result.bounds[0][k], cyls[i]->A[k] - cyls[i]->R);
@@ -1535,10 +1535,10 @@ BBox Yarns::build_bbox(int i0, int i1) {
 BBox Yarns::build_centers_bbox(int i0, int i1) {
 
 	BBox result;
-	result.bounds[1] = (cyls[i0]->A + cyls[i0]->B) / 2.;
-	result.bounds[0] = (cyls[i0]->A + cyls[i0]->B) / 2.;
+	result.bounds[1] = (cyls[i0]->A + cyls[i0]->B) / 2.f;
+	result.bounds[0] = (cyls[i0]->A + cyls[i0]->B) / 2.f;
 	for (int i = i0; i < i1; i++) { // indice de triangle
-		Vector center = (cyls[i]->A + cyls[i]->B) / 2.;
+		Vector center = (cyls[i]->A + cyls[i]->B) / 2.f;
 		for (int k = 0; k < 3; k++) { // indice de dimension	
 			result.bounds[0][k] = std::min(result.bounds[0][k], center[k]);
 			result.bounds[1][k] = std::max(result.bounds[1][k], center[k]);
@@ -1581,8 +1581,8 @@ void Yarns::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
 	}
 
 
-	double best_split_factor = 0.5;
-	double best_area_bb = 1E50;
+	float best_split_factor = 0.5f;
+	float best_area_bb = 1E50;
 #ifdef _DEBUG
 	int max_tests = 1;
 #else
@@ -1591,13 +1591,13 @@ void Yarns::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
 
 	for (int test_split = 0; test_split < max_tests; test_split++) {
 
-		double cur_split_factor = (test_split + 1) / (double)(max_tests + 1);
-		double split_val = centerBB.bounds[0][split_dim] + diag[split_dim] * cur_split_factor;
+		float cur_split_factor = (test_split + 1) / (float)(max_tests + 1);
+		float split_val = centerBB.bounds[0][split_dim] + diag[split_dim] * cur_split_factor;
 		BBox bb_left(Vector(1E10, 1E10, 1E10), Vector(-1E10, -1E10, -1E10)), bb_right(Vector(1E10, 1E10, 1E10), Vector(-1E10, -1E10, -1E10));
 		int nl = 0, nr = 0;
 
 		for (int i = i0; i < i1; i++) {
-			double center_split_dim = (cyls[i]->A[split_dim] + cyls[i]->B[split_dim]) / 2.;
+			float center_split_dim = (cyls[i]->A[split_dim] + cyls[i]->B[split_dim]) / 2.;
 
 			if (center_split_dim <= split_val) {
 				bb_left.bounds[0] = min(bb_left.bounds[0], cyls[i]->A - Vector(cyls[i]->R, cyls[i]->R, cyls[i]->R));
@@ -1616,17 +1616,17 @@ void Yarns::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
 				nr++;
 			}
 		}
-		double sum_area_bb = bb_left.area()*nl + bb_right.area()*nr;
+		float sum_area_bb = bb_left.area()*nl + bb_right.area()*nr;
 		if (sum_area_bb < best_area_bb) {
 			best_split_factor = cur_split_factor;
 			best_area_bb = sum_area_bb;
 		}
 	}
 
-	double split_val = centerBB.bounds[0][split_dim] + diag[split_dim] * best_split_factor;
+	float split_val = centerBB.bounds[0][split_dim] + diag[split_dim] * best_split_factor;
 	int pivot = i0 - 1;
 	for (int i = i0; i < i1; i++) {
-		double center_split_dim = (cyls[i]->A[split_dim] + cyls[i]->B[split_dim]) / 2.;
+		float center_split_dim = (cyls[i]->A[split_dim] + cyls[i]->B[split_dim]) / 2.;
 
 		if (center_split_dim <= split_val) {
 			pivot++;
@@ -1649,16 +1649,16 @@ void Yarns::build_bvh_recur(BVH* b, int node, int i0, int i1, int depth) {
 }
 
 
-bool Yarns::intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const
+bool Yarns::intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, float cur_best_t, int &triangle_id) const
 {
 	t = cur_best_t;
 	bool has_inter = false;
-	double t_box_left, t_box_right;
+	float t_box_left, t_box_right;
 	int best_index = -1;
 	bool goleft, goright;
 	Vector localP, localN;
-	double localt;
-	double alpha, beta, gamma;
+	float localt;
+	float alpha, beta, gamma;
 
 	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
 	char signs[3];
@@ -1670,7 +1670,7 @@ bool Yarns::intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat
 	if (t_box_left > cur_best_t) return false;
 
 	int l[50];
-	double tnear[50];
+	float tnear[50];
 	int idx_back = -1;
 
 	l[++idx_back] = 0;
@@ -1744,14 +1744,14 @@ bool Yarns::intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat
 }
 
 
-bool Yarns::reservoir_sampling_intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const {	
+bool Yarns::reservoir_sampling_intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, float min_t, float max_t) const {
 	bool has_inter = false;
-	double t_box_left, t_box_right;
+	float t_box_left, t_box_right;
 	int best_index = -1;
 	bool goleft, goright;
 	Vector localP, localN;
-	double localt;
-	double alpha, beta, gamma;
+	float localt;
+	float alpha, beta, gamma;
 
 	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
 	char signs[3];
@@ -1766,7 +1766,7 @@ bool Yarns::reservoir_sampling_intersection(const Ray& d, Vector& P, double &t, 
 	const float invmax = 1.f / engine[threadid].max();
 
 	int l[50];
-	double tnear[50];
+	float tnear[50];
 	int idx_back = -1;
 
 	l[++idx_back] = 0;
@@ -1814,7 +1814,7 @@ bool Yarns::reservoir_sampling_intersection(const Ray& d, Vector& P, double &t, 
 					if (localt < max_t && localt >= min_t) {
 						current_nb_intersections++;
 						float r1 = engine[threadid]()*invmax;
-						if (r1 < 1. / current_nb_intersections) {
+						if (r1 < 1.f / current_nb_intersections) {
 							has_inter = true;
 							best_index = i;
 							t = localt;

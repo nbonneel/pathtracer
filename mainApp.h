@@ -214,6 +214,8 @@ public:
 	void ShowMeshInfo(wxCommandEvent &evt);
 	void DeselectAll(wxListCtrl* list);
 
+	void resetSize();
+
 	RenderPanel *render_panel;
 	bool programHandling;
 private:
@@ -523,7 +525,7 @@ public:
 		raytracer.stopped = false;
 		raytracer.render_image_nopreviz();
 		raytracer.stopped = true;
-		double t = perf.GetDiffMs();
+		float t = perf.GetDiffMs();
 		/*FILE* f = fopen("time.txt", "a+");
 		fprintf(f, "%e\n", t);
 		fclose(f);*/
@@ -601,7 +603,7 @@ public:
 				if (middle_mouse_down) {
 					if (selected_object >= 0 && selected_object < raytracer.s.objects.size()) {
 						//raytracer.s.objects[selected_object]->max_rotation += Vector(0., 0., dy*M_PI / 180.*3.);
-						Matrix<3, 3> R = createRotationMatrixZ(dy*M_PI / 180.*3.);
+						Matrix33 R = createRotationMatrixZ(dy*M_PI / 180.*3.);
 
 						raytracer.s.objects[selected_object]->mat_rotation = R * raytracer.s.objects[selected_object]->mat_rotation;
 					}
@@ -609,7 +611,7 @@ public:
 				if (right_mouse_down) {
 					if (selected_object >= 0 && selected_object < raytracer.s.objects.size()) {
 						//raytracer.s.objects[selected_object]->max_rotation += Vector(dy*M_PI / 180.*3., dx*M_PI / 180.*3., 0.);
-						Matrix<3, 3> R = createRotationMatrixX(dy*M_PI / 180.*3.)*createRotationMatrixY(dx*M_PI / 180.*3.);
+						Matrix33 R = createRotationMatrixX(dy*M_PI / 180.*3.)*createRotationMatrixY(dx*M_PI / 180.*3.);
 						raytracer.s.objects[selected_object]->mat_rotation = R * raytracer.s.objects[selected_object]->mat_rotation;
 					}
 				}
@@ -624,7 +626,7 @@ public:
 				}
 				if (right_mouse_down) {
 					Vector camera_right = cross(raytracer.cam.direction, raytracer.cam.up);
-					raytracer.cam.position += dx*camera_right + dy*raytracer.cam.up;
+					raytracer.cam.position += (float)dx*camera_right + (float)dy*raytracer.cam.up;
 
 				}
 			}			
@@ -654,11 +656,11 @@ public:
 		
 
 		/*if (!wasDragging)*/ {
-			Ray r = raytracer.cam.generateDirection(raytracer.s.double_frustum_start_t, (displayH - (mouse_init_y - 1.))*(double)raytracer.H / displayH, mouse_init_x*(double)raytracer.W / displayW, raytracer.s.current_time, 0, 0, 0, 0, raytracer.W, raytracer.H);
+			Ray r = raytracer.cam.generateDirection(raytracer.s.double_frustum_start_t, (displayH - (mouse_init_y - 1.))*(float)raytracer.H / displayH, mouse_init_x*(float)raytracer.W / displayW, raytracer.s.current_time, 0, 0, 0, 0, raytracer.W, raytracer.H);
 
 			Vector P;
 			int new_selected, new_tri;
-			double new_t;
+			float new_t;
 			MaterialValues newmat;
 			bool has_inter = raytracer.s.intersection(r, P, new_selected, new_t, newmat, new_tri);
 			if (has_inter) {
@@ -693,7 +695,7 @@ public:
 				start_render();
 			}
 		} else {
-			double dist =  (event.GetWheelRotation() > 0 ? 1 : -1)*2.;
+			float dist =  (event.GetWheelRotation() > 0 ? 1 : -1)*2.;
 			raytracer.cam.position += dist*raytracer.cam.direction;
 			stop_render();
 			start_render();
@@ -705,7 +707,7 @@ public:
 	bool should_terminate;
 	bool left_mouse_down, right_mouse_down, middle_mouse_down, alt_down, shift_down, wasDragging;
 	int mouse_x, mouse_y, mouse_init_x, mouse_init_y, mouse_prev_x, mouse_prev_y, selected_object, selected_tri;
-	double selected_object_t;
+	float selected_object_t;
 	std::vector<unsigned char> cur_img;
 	int W, H;
 	int displayW, displayH;

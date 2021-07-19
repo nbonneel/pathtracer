@@ -30,9 +30,22 @@ static thread_local pcg32  engine[64];
 //static thread_local std::uniform_real_distribution<double> uniform(0, 1);
 static  std::uniform_real_distribution<float> uniformf(0, 1);
 
-class Vector;
+template<typename T> class VectorT;
+typedef VectorT<double> Vectord;
+typedef VectorT<float> Vectorf;
 
-Vector operator+(const Vector& a, const Vector &b);
+typedef Vectorf Vector;
+
+template<int M, int N, typename T> class Matrix;
+typedef Matrix<3,3,double> Matrix33d;
+typedef Matrix<3, 3, float> Matrix33f;
+
+typedef Matrix33f Matrix33;
+
+template<typename T> inline T sqr(T x) { return x * x; }
+
+
+/*Vector operator+(const Vector& a, const Vector &b);
 Vector operator-(const Vector& a, const Vector &b);
 Vector operator*(double a, const Vector &b);
 Vector operator*(const Vector &b, double a);
@@ -41,14 +54,14 @@ Vector operator/(const Vector& a, double b);
 Vector operator/(const Vector& a, const Vector &b);
 Vector operator-(const Vector& a);
 double dot(const Vector&a, const Vector& b);
-Vector cross(const Vector&a, const Vector& b);
+Vector cross(const Vector&a, const Vector& b);*/
 
 template<typename T>
 class Quaternion
 {
 public:
 	Quaternion() { }
-	Quaternion(double wVal, double xVal, double yVal, double zVal)
+	Quaternion(T wVal, T xVal, T yVal, T zVal)
 	{
 		w = wVal; x = xVal; y = yVal; z = zVal;
 	}
@@ -71,25 +84,25 @@ Quaternion<T> operator*(const Quaternion<T>& q1, const Quaternion<T>& q2) {
 }
 
 
-template<int M, int N>
+template<int M, int N, typename T>
 class Matrix {
 public:
 	Matrix() {
-		memset(values, 0, M*N * sizeof(double));
+		memset(values, 0, M*N * sizeof(T));
 		for (int i = 0; i < N; i++) {
 			values[i*N + i] = 1;
 		}
 	}
-	Matrix<N, M> getTransposed() const {
-		Matrix<N, M> res;
+	Matrix<N, M, T> getTransposed() const {
+		Matrix<N, M, T> res;
 		for (int i=0; i<M; i++)
 			for (int j = 0; j < N; j++) {
 				res[j*M + i] = values[i*N+j];
 			}
 		return res;
 	}
-	void fromQuaternion(Quaternion<double> q) {
-		double w, x, y, z;
+	void fromQuaternion(Quaternion<T> q) {
+		T w, x, y, z;
 		w = q.w; x = q.x; y = q.y; z = q.z;
 
 		values[0] = w*w + x*x - y*y - z*z;
@@ -103,64 +116,64 @@ public:
 		values[8] = w*w - x*x - y*y + z*z;
 	}
 
-	Quaternion<double> toQuaternion() const {
-		double m00 = (*this)(0, 0);
-		double m01 = (*this)(1, 0);
-		double m02 = (*this)(2, 0);
-		double m10 = (*this)(0, 1);
-		double m11 = (*this)(1, 1);
-		double m12 = (*this)(2, 1);
-		double m20 = (*this)(0, 2);
-		double m21 = (*this)(1, 2);
-		double m22 = (*this)(2, 2);
+	Quaternion<T> toQuaternion() const {
+		T m00 = (*this)(0, 0);
+		T m01 = (*this)(1, 0);
+		T m02 = (*this)(2, 0);
+		T m10 = (*this)(0, 1);
+		T m11 = (*this)(1, 1);
+		T m12 = (*this)(2, 1);
+		T m20 = (*this)(0, 2);
+		T m21 = (*this)(1, 2);
+		T m22 = (*this)(2, 2);
 
-		double tr = m00 + m11 + m22;
-		double qw, qx, qy, qz;
+		T tr = m00 + m11 + m22;
+		T qw, qx, qy, qz;
 		if (tr > 0) {
-			double S = sqrt(tr + 1.0) * 2; // S=4*qw 
+			T S = sqrt(tr + 1.0) * 2; // S=4*qw 
 			qw = 0.25 * S;
 			qx = (m21 - m12) / S;
 			qy = (m02 - m20) / S;
 			qz = (m10 - m01) / S;
 		} else if ((m00 > m11)&(m00 > m22)) {
-			double S = sqrt(1.0 + m00 - m11 - m22) * 2; // S=4*qx 
+			T S = sqrt(1.0 + m00 - m11 - m22) * 2; // S=4*qx 
 			qw = (m21 - m12) / S;
 			qx = 0.25 * S;
 			qy = (m01 + m10) / S;
 			qz = (m02 + m20) / S;
 		} else if (m11 > m22) {
-			double S = sqrt(1.0 + m11 - m00 - m22) * 2; // S=4*qy
+			T S = sqrt(1.0 + m11 - m00 - m22) * 2; // S=4*qy
 			qw = (m02 - m20) / S;
 			qx = (m01 + m10) / S;
 			qy = 0.25 * S;
 			qz = (m12 + m21) / S;
 		} else {
-			double S = sqrt(1.0 + m22 - m00 - m11) * 2; // S=4*qz
+			T S = sqrt(1.0 + m22 - m00 - m11) * 2; // S=4*qz
 			qw = (m10 - m01) / S;
 			qx = (m02 + m20) / S;
 			qy = (m12 + m21) / S;
 			qz = 0.25 * S;
 		}
-		return Quaternion<double>(qw, qx, qy, qz);
+		return Quaternion<T>(qw, qx, qy, qz);
 	}
-	double det() const {
+	T det() const {
 		return (*this)(0, 0) * ((*this)(1, 1) * (*this)(2, 2) - (*this)(2, 1) * (*this)(1, 2)) -
 			(*this)(0, 1) * ((*this)(1, 0) * (*this)(2, 2) - (*this)(1, 2) * (*this)(2, 0)) +
 			(*this)(0, 2) * ((*this)(1, 0) * (*this)(2, 1) - (*this)(1, 1) * (*this)(2, 0));
 	}
-	double &operator()(int i, int j) {
+	T &operator()(int i, int j) {
 		return values[i*N + j];
 	}
-	double operator()(int i, int j) const {
+	T operator()(int i, int j) const {
 		return values[i*N + j];
 	}
-	Matrix<3,3> inverse() const {  // ONLY FOR 3x3
+	Matrix<3,3, T> inverse() const {  // ONLY FOR 3x3
 
-		double determinant = det();
+		T determinant = det();
 
-		double invdet = 1 / determinant;
+		T invdet = 1 / determinant;
 
-		Matrix<3,3> minv; // inverse of matrix m
+		Matrix<3,3, T> minv; // inverse of matrix m
 		minv(0, 0) = ((*this)(1, 1) * (*this)(2, 2) - (*this)(2, 1) * (*this)(1, 2)) * invdet;
 		minv(0, 1) = ((*this)(0, 2) * (*this)(2, 1) - (*this)(0, 1) * (*this)(2, 2)) * invdet;
 		minv(0, 2) = ((*this)(0, 1) * (*this)(1, 2) - (*this)(0, 2) * (*this)(1, 1)) * invdet;
@@ -172,24 +185,24 @@ public:
 		minv(2, 2) = ((*this)(0, 0) * (*this)(1, 1) - (*this)(1, 0) * (*this)(0, 1)) * invdet;
 		return minv;
 	}	
-	double operator[](int i) const { return values[i]; }
-	double& operator[](int i)  { return values[i]; }
-	double values[M*N];
+	T operator[](int i) const { return values[i]; }
+	T& operator[](int i)  { return values[i]; }
+	T values[M*N];
 };
 
-template<int M, int N> Matrix<M, N> operator+(const Matrix<M, N>& a, const Matrix<M, N>& b) {
-	Matrix<M, N> result;
+template<int M, int N, typename T> Matrix<M, N, T> operator+(const Matrix<M, N, T>& a, const Matrix<M, N, T>& b) {
+	Matrix<M, N, T> result;
 	for (int i = 0; i < M*N; i++) {
 		result[i] = a[i] + b[i];
 	}
 	return result;
 }
 
-template<int M, int N, int O> Matrix<M, O> operator*(const Matrix<M, N>& a, const Matrix<N, O>& b) {
-	Matrix<M, O> result;	
+template<int M, int N, int O, typename T> Matrix<M, O, T> operator*(const Matrix<M, N, T>& a, const Matrix<N, O, T>& b) {
+	Matrix<M, O, T> result;	
 	for (int i = 0; i < M; i++) {
 		for (int j = 0; j < O; j++) {
-			double s = 0;
+			T s = 0;
 			for (int k = 0; k < N; k++) {
 				s += a[i*N+k]*b[k*O+j];
 			}
@@ -198,8 +211,8 @@ template<int M, int N, int O> Matrix<M, O> operator*(const Matrix<M, N>& a, cons
 	}
 	return result;
 }
-template<int M, int N> Matrix<M, N> operator*(double a, const Matrix<M, N>& b) {
-	Matrix<M, N> result;
+template<int M, int N, typename T> Matrix<M, N, T> operator*(T a, const Matrix<M, N, T>& b) {
+	Matrix<M, N, T> result;
 	for (int i = 0; i < M*N; i++) {
 		result[i] = a*b[i];
 	}
@@ -207,10 +220,10 @@ template<int M, int N> Matrix<M, N> operator*(double a, const Matrix<M, N>& b) {
 }
 
 template<typename T>
-Quaternion<T> Slerp(Quaternion<T> q1, Quaternion<T> q2, double t) {
+Quaternion<T> Slerp(Quaternion<T> q1, Quaternion<T> q2, T t) {
 	T w1, x1, y1, z1, w2, x2, y2, z2, w3, x3, y3, z3;
 	Quaternion<T> q2New;
-	double theta, mult1, mult2;
+	T theta, mult1, mult2;
 
 	w1 = q1.w; x1 = q1.x; y1 = q1.y; z1 = q1.z;
 	w2 = q2.w; x2 = q2.x; y2 = q2.y; z2 = q2.z;
@@ -244,34 +257,34 @@ Quaternion<T> Slerp(Quaternion<T> q1, Quaternion<T> q2, double t) {
 	return Quaternion<T>(w3, x3, y3, z3);
 }
 
-template<int M, int N> Matrix<M, N> Slerp(const Matrix<M, N>& a, const Matrix<M, N>& b, double t) {
+template<int M, int N, typename T> Matrix<M, N, T> Slerp(const Matrix<M, N, T>& a, const Matrix<M, N, T>& b, T t) {
 
-	Quaternion<double> qa = a.toQuaternion();
-	Quaternion<double> qb = b.toQuaternion();
-	Quaternion<double> qm = Slerp(qa, qb, t);
+	Quaternion<T> qa = a.toQuaternion();
+	Quaternion<T> qb = b.toQuaternion();
+	Quaternion<T> qm = Slerp(qa, qb, t);
 
-	Matrix<M, N> result;
+	Matrix<M, N, T> result;
 	result.fromQuaternion(qm);
 	return result;
 }
-static inline Matrix<3, 3> createRotationMatrixX(double angleX) {
-	Matrix<3, 3> R;
+static inline Matrix<3, 3, float> createRotationMatrixX(float angleX) {
+	Matrix<3, 3, float> R;
 	R[0] = cos(angleX);
 	R[1] = -sin(angleX);
 	R[3] = sin(angleX);
 	R[4] = cos(angleX);
 	return R;
 }
-static inline Matrix<3, 3> createRotationMatrixY(double angleY) {
-	Matrix<3, 3> R;
+static inline Matrix<3, 3, float> createRotationMatrixY(float angleY) {
+	Matrix<3, 3, float> R;
 	R[0] = cos(angleY);
 	R[2] = sin(angleY);
 	R[6] = -sin(angleY);
 	R[8] = cos(angleY);
 	return R;
 }
-static inline Matrix<3, 3> createRotationMatrixZ(double angleZ) {
-	Matrix<3, 3> R;
+static inline Matrix<3, 3, float> createRotationMatrixZ(float angleZ) {
+	Matrix<3, 3, float> R;
 	R[4] = cos(angleZ);
 	R[5] = -sin(angleZ);
 	R[7] = sin(angleZ);
@@ -329,47 +342,51 @@ inline double fastPrecisePow(double a, double b) {
 	return r * u.d;
 }
 
-class Vector {
+template<typename T>
+class VectorT {
 public:
-	explicit Vector(double x = 0, double y = 0, double z = 0) {
+	explicit VectorT<T>(T x = 0, T y = 0, T z = 0) {
 		coord[0] = x;
 		coord[1] = y;
 		coord[2] = z;
 	}
-	explicit Vector(const double* x) {
-		memcpy(coord, x, 3 * sizeof(double));
+	explicit VectorT<T>(const double* x) {
+		//memcpy(coord, x, 3 * sizeof(double));
+		coord[0] = (T)x[0];
+		coord[1] = (T)x[1];
+		coord[2] = (T)x[2];
 	}
-	explicit Vector(const float* x) {
-		coord[0] = (double)x[0];
-		coord[1] = (double)x[1];
-		coord[2] = (double)x[2];
+	explicit VectorT<T>(const float* x) {
+		coord[0] = (T)x[0];
+		coord[1] = (T)x[1];
+		coord[2] = (T)x[2];
 	}
-	const double& operator[](int i) const { return coord[i]; }
-	double& operator[](int i) { return coord[i]; }
+	const T& operator[](int i) const { return coord[i]; }
+	T& operator[](int i) { return coord[i]; }
 
-	double getNorm2() const {
+	T getNorm2() const {
 		return coord[0] * coord[0] + coord[1] * coord[1] + coord[2] * coord[2];
 	}
 	void normalize() {
-		double norm = sqrt(getNorm2());
+		T norm = sqrt(getNorm2());
 		coord[0] /= norm;
 		coord[1] /= norm;
 		coord[2] /= norm;
 	}
 	void fast_normalize() {
-		double norm2 = getNorm2();
-		double invnorm = invSqRoot(norm2);  // 1. / sqrt(norm2); // 
+		T norm2 = getNorm2();
+		T invnorm = invSqRoot(norm2);  // 1. / sqrt(norm2); // 
 		coord[0] *= invnorm;
 		coord[1] *= invnorm;
 		coord[2] *= invnorm;
 	}
-	Vector getNormalized() const {
-		Vector result(*this);
+	VectorT<T> getNormalized() const {
+		VectorT<T> result(*this);
 		result.normalize();
 		return result;
 	}
-	Vector reflect(const Vector &N) const {
-		Vector result = *this - 2.*dot(*this, N)*N;
+	VectorT<T> reflect(const VectorT<T> &N) const {
+		VectorT<T> result = *this - T(2.)*dot(*this, N)*N;
 		return result;
 	}
 	std::string toColorStr() {
@@ -383,31 +400,31 @@ public:
 		return os.str();
 	}
 
-	Vector& operator+=(const Vector& b) {
+	VectorT<T>& operator+=(const VectorT<T>& b) {
 		coord[0] += b[0];
 		coord[1] += b[1];
 		coord[2] += b[2];
 		return *this;
 	}
-	Vector& operator-=(const Vector& b) {
+	VectorT<T>& operator-=(const VectorT<T>& b) {
 		coord[0] -= b[0];
 		coord[1] -= b[1];
 		coord[2] -= b[2];
 		return *this;
 	}
-	Vector& operator*=(double b) {
+	VectorT<T>& operator*=(T b) {
 		coord[0] *= b;
 		coord[1] *= b;
 		coord[2] *= b;
 		return *this;
 	}
-	Vector& operator*=(const Vector &b) {
+	VectorT<T>& operator*=(const VectorT<T> &b) {
 		coord[0] *= b[0];
 		coord[1] *= b[1];
 		coord[2] *= b[2];
 		return *this;
 	}
-	Vector& operator/=(double b) {
+	VectorT<T>& operator/=(T b) {
 		coord[0] /= b;
 		coord[1] /= b;
 		coord[2] /= b;
@@ -415,14 +432,15 @@ public:
 	}
 
 private:
-	double coord[3];
+	T coord[3];
 };
 
-static inline  Vector operator*(const Matrix<3, 3> &mat, const Vector &b) {
+template<typename T>
+static inline  VectorT<T> operator*(const Matrix<3, 3, T> &mat, const VectorT<T> &b) {
 
-	Vector res(0, 0, 0);
+	VectorT<T> res(0, 0, 0);
 	for (int i = 0; i < 3; i++) {
-		double v = 0;
+		T v = 0;
 		for (int j = 0; j < 3; j++) {
 			v += mat[i*3 + j] * b[j];
 		}
@@ -431,10 +449,11 @@ static inline  Vector operator*(const Matrix<3, 3> &mat, const Vector &b) {
 	return res;
 }
 
-static inline Vector operator*(const Matrix<3, 4> &mat, const Vector &b) {
-	Vector res(0, 0, 0);
+template<typename T>
+static inline VectorT<T> operator*(const Matrix<3, 4, T> &mat, const VectorT<T> &b) {
+	VectorT<T> res(0, 0, 0);
 	for (int i = 0; i < 3; i++) {
-		double v = 0;
+		T v = 0;
 		for (int j = 0; j < 3; j++) {
 			v += mat[i*4 + j] * b[j];
 		}
@@ -449,7 +468,7 @@ static inline Vector operator*(const Matrix<3, 4> &mat, const Vector &b) {
 
 
 
-Vector min(const Vector& a, const Vector& b);
+/*Vector min(const Vector& a, const Vector& b);
 Vector max(const Vector& a, const Vector& b);
 Vector pow(const Vector& a, const Vector& b);
 Vector fastPow(const Vector& a, const Vector& b);
@@ -466,14 +485,236 @@ Vector getTangent(const Vector& N);
 Vector boxMuller();
 
 Vector rotate_dir(const Vector&v, const Vector &angles);
-Vector inverse_rotate_dir(const Vector&v, const Vector &angles); // performs the rotation by -angle, but in the reversed order 
+Vector inverse_rotate_dir(const Vector&v, const Vector &angles); // performs the rotation by -angle, but in the reversed order */
+
+
+
+template<typename T>
+VectorT<T> operator+(const VectorT<T>& a, const VectorT<T> &b) {
+	return VectorT<T>(a[0] + b[0], a[1] + b[1], a[2] + b[2]);
+}
+template<typename T>
+VectorT<T> operator-(const VectorT<T>& a, const VectorT<T> &b) {
+	return VectorT<T>(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}
+template<typename T>
+VectorT<T> operator*(T a, const VectorT<T> &b) {
+	return VectorT<T>(a*b[0], a*b[1], a*b[2]);
+}
+template<typename T>
+VectorT<T> operator*(const VectorT<T> &b, T a) {
+	return VectorT<T>(a*b[0], a*b[1], a*b[2]);
+}
+template<typename T>
+VectorT<T> operator/(const VectorT<T>& a, T b) {
+	return VectorT<T>(a[0] / b, a[1] / b, a[2] / b);
+}
+template<typename T>
+VectorT<T> operator/(const VectorT<T>& a, const VectorT<T> &b) {
+	return VectorT<T>(a[0] / b[0], a[1] / b[1], a[2] / b[2]);
+}
+template<typename T>
+VectorT<T> operator-(const VectorT<T>& a) {
+	return VectorT<T>(-a[0], -a[1], -a[2]);
+}
+template<typename T>
+VectorT<T> operator*(const VectorT<T> &a, const VectorT<T> &b) {
+	return VectorT<T>(a[0] * b[0], a[1] * b[1], a[2] * b[2]);
+}
+template<typename T, typename T2>
+VectorT<T> min(const VectorT<T>& a, const VectorT<T2>& b) {
+	return VectorT<T>(std::min(a[0], (T)b[0]), std::min(a[1],(T) b[1]), std::min(a[2], (T)b[2]));
+}
+template<typename T, typename T2>
+VectorT<T> max(const VectorT<T>& a, const VectorT<T2>& b) {
+	return VectorT<T>(std::max(a[0], (T)b[0]), std::max(a[1], (T)b[1]), std::max(a[2],(T) b[2]));
+}
+template<typename T>
+VectorT<T> pow(const VectorT<T>& a, const VectorT<T>& b) {
+	return VectorT<T>(std::pow(a[0], b[0]), std::pow(a[1], b[1]), std::pow(a[2], b[2]));
+}
+template<typename T>
+VectorT<T> fastPow(const VectorT<T>& a, const VectorT<T>& b) {
+	return VectorT<T>(fastPow(a[0], b[0]), fastPow(a[1], b[1]), fastPow(a[2], b[2]));
+}
+template<typename T>
+VectorT<T> fastPrecisePow(const VectorT<T>& a, const VectorT<T>& b) {
+	return VectorT<T>(fastPrecisePow(a[0], b[0]), fastPrecisePow(a[1], b[1]), fastPrecisePow(a[2], b[2]));
+}
+template<typename T>
+T dot(const VectorT<T>&a, const VectorT<T>& b) {
+	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+template<typename T>
+VectorT<T> exp(const VectorT<T>& a) {
+	return VectorT<T>(exp(a[0]), exp(a[1]), exp(a[2]));
+}
+template<typename T>
+VectorT<T> sqrt(const VectorT<T>& a) {
+	return VectorT<T>(sqrt(a[0]), sqrt(a[1]), sqrt(a[2]));
+}
+template<typename T>
+VectorT<T> sqr(const VectorT<T>& a) {
+	return VectorT<T>(a[0] * a[0], a[1] * a[1], a[2] * a[2]);
+}
+
+template<typename T>
+VectorT<T> cross(const VectorT<T>&a, const VectorT<T>& b) {
+	return VectorT<T>(a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]);
+}
+
+template<typename T>
+VectorT<T> getTangent(const VectorT<T>& N) {
+	VectorT<T> tangent1;
+	VectorT<T> absN(abs(N[0]), abs(N[1]), abs(N[2]));
+	if (absN[0] <= absN[1] && absN[0] <= absN[2]) {
+		tangent1 = Vector(0, -N[2], N[1]);
+	} else
+		if (absN[1] <= absN[0] && absN[1] <= absN[2]) {
+			tangent1 = Vector(-N[2], 0, N[0]);
+		} else
+			tangent1 = Vector(-N[1], N[0], 0);
+		tangent1.normalize();
+		return tangent1;
+}
+
+template<typename T>
+VectorT<T> random_cos(const VectorT<T> &N, T r1, T r2) {
+	T sr2 = sqrt(T(1) - r2);
+
+	VectorT<T> direction_aleatoire_repere_local(cos(T(2. * M_PI)*r1)*sr2, sin(T(2. * M_PI)*r1)*sr2, sqrt(r2));
+	VectorT<T> tangent1 = getTangent(N);
+	VectorT<T> tangent2 = cross(tangent1, N);
+	return direction_aleatoire_repere_local[2] * N + direction_aleatoire_repere_local[0] * tangent1 + direction_aleatoire_repere_local[1] * tangent2;
+}
+
+template<typename T>
+VectorT<T> random_cos(const VectorT<T> &N) {
+	int threadid = omp_get_thread_num();
+	/*float r1 = uniformf(engine[threadid]);
+	float r2 = uniformf(engine[threadid]);*/
+	const T invmax = T(1) / engine[threadid].max();
+	T r1 = engine[threadid]()*invmax;
+	T r2 = engine[threadid]()*invmax;
+	return random_cos(N, r1, r2);
+}
+
+
+
+template<typename T>
+VectorT<T> random_uniform_sphere() {
+	int threadid = omp_get_thread_num();
+	T invmax = T(1) / engine[threadid].max();
+	T r1 = engine[threadid]()*invmax; // uniform(engine[threadid]);
+	T r2 = engine[threadid]()*invmax; // uniform(engine[threadid]);
+	VectorT<T> result;
+	result[0] = T(2.)*cos(T(2.*M_PI)*r1)*sqrt(r2*(1 - r2));
+	result[1] = T(2.)*sin(T(2.*M_PI)*r1)*sqrt(r2*(1 - r2));
+	result[2] = T(1) - T(2) * r2;
+	return result;
+}
+
+template<typename T>
+VectorT<T> random_uniform_hemisphere(const VectorT<T>& N) {
+	int threadid = omp_get_thread_num();
+	T invmax = T(1) / engine[threadid].max();
+	T r1 = engine[threadid]()*invmax; // uniform(engine[threadid]);
+	T r2 = engine[threadid]()*invmax; // uniform(engine[threadid]);
+	VectorT<T> resultlocal;
+	resultlocal[0] = cos(T(2.*M_PI)*r1)*sqrt(1 - r2 * r2);
+	resultlocal[1] = sin(T(2.*M_PI)*r1)*sqrt(1 - r2 * r2);
+	resultlocal[2] = r2;
+	VectorT<T> tangent1 = getTangent(N);
+	VectorT<T> tangent2 = cross(tangent1, N);
+	return resultlocal[2] * N + resultlocal[0] * tangent1 + resultlocal[1] * tangent2;
+}
+
+template<typename T>
+VectorT<T> random_uniform_ball() {
+	int threadid = omp_get_thread_num();
+	T invmax = T(1) / engine[threadid].max();
+	VectorT<T> result = std::pow(engine[threadid]()*invmax, T(1. / 3.))*random_uniform_sphere();
+	return result;
+}
+template<typename T>
+VectorT<T> random_uniform_hemiball(const VectorT<T> &N) {
+	int threadid = omp_get_thread_num();
+	T invmax = T(1) / engine[threadid].max();
+	VectorT<T> result = std::pow(engine[threadid]()*invmax, T(1. / 3.))*random_uniform_hemisphere(N);
+	return result;
+}
+template<typename T>
+VectorT<T> boxMuller() { // returns radius in third component
+	int threadid = omp_get_thread_num();
+	T invmax = T(1) / engine[threadid].max();
+	T r1 = engine[threadid]()*invmax;
+	T r2 = engine[threadid]()*invmax;
+	T s1 = sqrt(T(-2) * log(r1));
+	T s2 = T(2 * M_PI)*r2;
+	return VectorT<T>(s1*cos(s2), s1*sin(s2), s1);
+}
+
+
+
+template<typename T>
+VectorT<T> rotate_dir(const VectorT<T>&v, const VectorT<T> &angles) {
+
+	VectorT<T> sinangles(sin(angles[0]), sin(angles[1]), sin(angles[2]));
+	VectorT<T> cosangles(cos(angles[0]), cos(angles[1]), cos(angles[2]));
+
+	VectorT<T> v1;
+	v1[0] = v[0];
+	v1[1] = cosangles[0] * v[1] - sinangles[0] * v[2];
+	v1[2] = sinangles[0] * v[1] + cosangles[0] * v[2];
+
+	VectorT<T> v2;
+	v2[0] = sinangles[1] * v1[2] + cosangles[1] * v1[0];
+	v2[1] = v1[1];
+	v2[2] = cosangles[1] * v1[2] - sinangles[1] * v1[0];
+
+	VectorT<T> v3;
+	v3[0] = cosangles[2] * v2[0] - sinangles[2] * v2[1];
+	v3[1] = sinangles[2] * v2[0] + cosangles[2] * v2[1];
+	v3[2] = v2[2];
+
+	return v3;
+}
+
+template<typename T>
+VectorT<T> inverse_rotate_dir(const VectorT<T>&v, const VectorT<T> &angles) {
+
+	VectorT<T> sinangles(sin(-angles[0]), sin(-angles[1]), sin(-angles[2]));
+	VectorT<T> cosangles(cos(-angles[0]), cos(-angles[1]), cos(-angles[2]));
+
+	VectorT<T> v1;
+	v1[0] = cosangles[2] * v[0] - sinangles[2] * v[1];
+	v1[1] = sinangles[2] * v[0] + cosangles[2] * v[1];
+	v1[2] = v[2];
+
+	VectorT<T> v2;
+	v2[0] = sinangles[1] * v1[2] + cosangles[1] * v1[0];
+	v2[1] = v1[1];
+	v2[2] = cosangles[1] * v1[2] - sinangles[1] * v1[0];
+
+	VectorT<T> v3;
+	v3[0] = v2[0];
+	v3[1] = cosangles[0] * v2[1] - sinangles[0] * v2[2];
+	v3[2] = sinangles[0] * v2[1] + cosangles[0] * v2[2];
+
+
+	return v3;
+
+}
+
+Vectorf toVecf(const Vectord& v);
+Vectord toVecd(const Vectorf& v);
 
 class Ray {
 public:
 	Ray() {};
-	Ray(const Vector& o, const Vector& d, double time) : origin(o), direction(d), time(time) {};
+	Ray(const Vector& o, const Vector& d, float time) : origin(o), direction(d), time(time) {};
 	Vector origin, direction;
-	double time;
+	float time;
 };
 
 
@@ -492,13 +733,13 @@ public:
 		nbviewY = 1;
 	};
 
-	void translate(const Vector& translation, double time) {
+	void translate(const Vector& translation, float time) {
 		position = initial_position + time*translation;
 	}
 
-	void rotate(double angle_x, double angle_y, double time) {
-		double cur_angle_x = time*angle_x;
-		double cur_angle_y = time*angle_y;
+	void rotate(float angle_x, float angle_y, float time) {
+		float cur_angle_x = time*angle_x;
+		float cur_angle_y = time*angle_y;
 
 		Vector dirtmp;
 
@@ -523,7 +764,7 @@ public:
 
 	}
 
-	void rotateAroundRight(double angle) {
+	void rotateAroundRight(float angle) {
 
 		Vector dirtmp, uptmp;
 		dirtmp =  sin(angle)*up  + cos(angle)*direction;		
@@ -532,30 +773,30 @@ public:
 		direction = dirtmp;
 		up = uptmp;
 	}
-	void rotateAroundUp(double angle) {
+	void rotateAroundUp(float angle) {
 
 		Vector right = cross(up, direction);
 		direction = -sin(angle)*right + cos(angle)*direction;
 
 	}
 
-	void rotateAroundAxes(double angle_x, double angle_y, double time) {
-		double cur_angle_x = time*angle_x;
-		double cur_angle_y = time*angle_y;
+	void rotateAroundAxes(float angle_x, float angle_y, float time) {
+		float cur_angle_x = time*angle_x;
+		float cur_angle_y = time*angle_y;
 
 		rotateAroundUp(cur_angle_x);
 		rotateAroundRight(cur_angle_y);
 	}
 	
 
-	Ray generateDirection(double init_t, int i, int j, double time, double dx_sensor, double dy_sensor, double dx_aperture, double dy_aperture, int W, int H) {
-		double k = W / (2 * tan(fov / 2));
+	Ray generateDirection(float init_t, int i, int j, float time, float dx_sensor, float dy_sensor, float dx_aperture, float dy_aperture, int W, int H) {
+		float k = W / (2 * tan(fov / 2));
 		Vector camera_right = cross(direction, up);		
 
 		Vector direction_vec;
 		Vector C1;
 		if (is_lenticular) {
-			double L = focus_distance*tan(lenticular_max_angle / 2) / (lenticular_nb_images / 2.0);
+			float L = focus_distance*tan(lenticular_max_angle / 2) / (lenticular_nb_images / 2.0);
 
 			int offset = -((j / lenticular_pixel_width) % lenticular_nb_images - lenticular_nb_images / 2);
 
@@ -563,8 +804,8 @@ public:
 			C1 = position + offset*L * camera_right;
 			Vector v1 = (P - C1).getNormalized(); // direction we want central in offseted camera 
 			Vector PprojCam1 = (k / dot(v1, direction)) * v1 + C1;
-			double pixProjCam1_j = PprojCam1[0] + W / 2 - 0.5;
-			double pixProjCam1_i = PprojCam1[1] + H / 2 - 0.5;  // new offset : this pixel should be the central pixel in camera 
+			float pixProjCam1_j = PprojCam1[0] + W / 2 - 0.5;
+			float pixProjCam1_i = PprojCam1[1] + H / 2 - 0.5;  // new offset : this pixel should be the central pixel in camera 
 
 
 			//Vector direction_vec(j - W / 2 + 0.0 + dx_sensor, i - H / 2 + 0.5 + dy_sensor, k);			
@@ -584,11 +825,11 @@ public:
 	}
 
 	Vector position, direction, up;
-	double fov;             // field of view 
-	double focus_distance; // distance mise au point
-	double aperture;       // ouverture, pour depth of field (faible valeur = net partout)
-	double lenticular_max_angle;
-	double maxSpacingX, maxSpacingY;
+	float fov;             // field of view 
+	float focus_distance; // distance mise au point
+	float aperture;       // ouverture, pour depth of field (faible valeur = net partout)
+	float lenticular_max_angle;
+	float maxSpacingX, maxSpacingY;
 	int lenticular_nb_images, lenticular_pixel_width;
 	bool is_lenticular;
 	int current_viewX, current_viewY, nbviewX, nbviewY;

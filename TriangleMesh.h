@@ -3,22 +3,29 @@
 #include "Geometry.h"
 
 
-
-class BVHNodes {
+template<typename T>
+class BVHNodesT {
 public:
 	//int i0, i1;
 	bool isleaf;
 	int fg, fd;
-	BBox bbox;
+	BBoxT<T> bbox;
 };
 
-class BVH {
+template<typename T>
+class BVHT {
 public:
-	BBox bbox;
-	std::vector<BVHNodes> nodes;
+	BBoxT<T> bbox;
+	std::vector<BVHNodesT<T> > nodes;
 };
 
+typedef BVHT<double> BVHd;
+typedef BVHT<float> BVHf;
+typedef BVHf BVH;
 
+typedef BVHNodesT<double> BVHNodesd;
+typedef BVHNodesT<float> BVHNodesf;
+typedef BVHNodesf BVHNodes;
 
 
 class Edge {
@@ -69,22 +76,22 @@ public:
 		m12 = dot(u, v);
 		invdetm = 1. / (m11*m22 - m12*m12);
 	};
-	double area() {
+	float area() {
 		return sqrt(N.getNorm2())*0.5;
 	}
-	bool intersection(const Ray& d, Vector& P, double &t, double &alpha, double &beta, double &gamma) const {
+	bool intersection(const Ray& d, Vector& P, float &t, float &alpha, float &beta, float &gamma) const {
 		t = dot(A - d.origin, N) / dot(d.direction, N);
 		if (t < 0 || t != t) return false;  //isnan
 
 		P = d.origin + t*d.direction;
 		Vector w(P - A);
-		double b11 = dot(w, u);
-		double b21 = dot(w, v);
-		double detb = b11*m22 - b21*m12;
+		float b11 = dot(w, u);
+		float b21 = dot(w, v);
+		float detb = b11*m22 - b21*m12;
 		beta = detb * invdetm;    // coord barycentrique w.r.t à B
 		if (beta < 0) return false;
 
-		double detg = b21*m11 - b11*m12;
+		float detg = b21*m11 - b11*m12;
 		gamma = detg * invdetm;   // coord barycentrique w.r.t à C
 		if (gamma < 0) return false;
 
@@ -109,9 +116,9 @@ class TriMesh : public Object {
 public:
   ~TriMesh() {}
 	TriMesh() { type = OT_TRIMESH; };
-	TriMesh(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
+	TriMesh(Scene* scene, const char* obj, float scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
 
-	void init(Scene* scene, const char* obj, double scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool load_textures = true, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
+	void init(Scene* scene, const char* obj, float scaling, const Vector& offset, bool mirror = false, const char* colors_csv_filename = NULL, bool load_textures = true, bool preserve_input = false, bool center = true, Vector rot_center = Vector(std::nan(""), std::nan(""), std::nan("")));
 
 	void readOBJ(const char* filename, bool load_textures);
 	void readVRML(const char* filename);
@@ -162,11 +169,11 @@ public:
 
 		facecolors.resize(indices.size());
 		for (int i = 0; i < indices.size(); i++) {
-			double angle1 = std::abs(dot(vertices[indices[i].vtxj] - vertices[indices[i].vtxi], vertices[indices[i].vtxk] - vertices[indices[i].vtxi]))/sqrt((vertices[indices[i].vtxj] - vertices[indices[i].vtxi]).getNorm2()*(vertices[indices[i].vtxk] - vertices[indices[i].vtxi]).getNorm2());
-			double angle2 = std::abs(dot(vertices[indices[i].vtxi] - vertices[indices[i].vtxj], vertices[indices[i].vtxk] - vertices[indices[i].vtxj])) / sqrt((vertices[indices[i].vtxi] - vertices[indices[i].vtxj]).getNorm2()*(vertices[indices[i].vtxk] - vertices[indices[i].vtxj]).getNorm2());
-			double angle3 = std::abs(dot(vertices[indices[i].vtxi] - vertices[indices[i].vtxk], vertices[indices[i].vtxj] - vertices[indices[i].vtxk])) / sqrt((vertices[indices[i].vtxi] - vertices[indices[i].vtxk]).getNorm2()*(vertices[indices[i].vtxj] - vertices[indices[i].vtxk]).getNorm2());
-			double aniso = std::acos(std::max(angle1, std::max(angle2, angle3)))*180/M_PI;
-			facecolors[i] = TransformH(Vector(1,0,0), std::min(240., std::max(0., aniso/60*240)));
+			float angle1 = std::abs(dot(vertices[indices[i].vtxj] - vertices[indices[i].vtxi], vertices[indices[i].vtxk] - vertices[indices[i].vtxi]))/sqrt((vertices[indices[i].vtxj] - vertices[indices[i].vtxi]).getNorm2()*(vertices[indices[i].vtxk] - vertices[indices[i].vtxi]).getNorm2());
+			float angle2 = std::abs(dot(vertices[indices[i].vtxi] - vertices[indices[i].vtxj], vertices[indices[i].vtxk] - vertices[indices[i].vtxj])) / sqrt((vertices[indices[i].vtxi] - vertices[indices[i].vtxj]).getNorm2()*(vertices[indices[i].vtxk] - vertices[indices[i].vtxj]).getNorm2());
+			float angle3 = std::abs(dot(vertices[indices[i].vtxi] - vertices[indices[i].vtxk], vertices[indices[i].vtxj] - vertices[indices[i].vtxk])) / sqrt((vertices[indices[i].vtxi] - vertices[indices[i].vtxk]).getNorm2()*(vertices[indices[i].vtxj] - vertices[indices[i].vtxk]).getNorm2());
+			float aniso = std::acos(std::max(angle1, std::max(angle2, angle3)))*180/M_PI;
+			facecolors[i] = TransformH(Vector(1,0,0), std::min(240.f, std::max(0.f, aniso/60*240)));
 			//facecolors[i] = Vector(std::pow(facecolors[i][0], 2.2), std::pow(facecolors[i][1], 2.2), std::pow(facecolors[i][2], 2.2)); // just here, assumes a 2.2 gamma
 		}
 
@@ -214,16 +221,16 @@ public:
 	std::string csv_file;
 
 #ifdef USE_EMBREE
-	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const { return false; };
-	bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const { return false;  };
-	bool reservoir_sampling_intersection(const Ray& r, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const { return false; };
+	bool intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, float cur_best_t, int &triangle_id) const { return false; };
+	bool intersection_shadow(const Ray& d, float &t, float cur_best_t, float dist_light) const { return false;  };
+	bool reservoir_sampling_intersection(const Ray& r, Vector& P, float &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, float min_t, float max_t) const { return false; };
 #else
-	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const;
-	bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const;
-	bool reservoir_sampling_intersection(const Ray& r, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const;
+	bool intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, float cur_best_t, int &triangle_id) const;
+	bool intersection_shadow(const Ray& d, float &t, float cur_best_t, float dist_light) const;
+	bool reservoir_sampling_intersection(const Ray& r, Vector& P, float &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, float min_t, float max_t) const;
 #endif
 
-	MaterialValues getMaterial(int triId, double alpha, double beta, double gamma, MaterialValues &mat) const;
+	MaterialValues getMaterial(int triId, float alpha, float beta, float gamma, MaterialValues &mat) const;
 
 	BBox build_bbox(int i0, int i1);
 	BBox bbox;
@@ -244,7 +251,7 @@ public:
 
 	int max_bvh_triangles;
 	int bvh_depth;
-	double bvh_avg_depth;
+	float bvh_avg_depth;
 	int bvh_nb_nodes;
 private:
 
@@ -271,7 +278,7 @@ public:
 			for (int j = 0; j < nbsegments - 1; j++) {
 				float x2, y2, z2;
 				fscanf(f, "%f %f %f\n", &x2, &y2, &z2);
-				Cylinder* c = new Cylinder(Vector(x, y, z)*50., Vector(x2, y2, z2)*50., 0.1);
+				Cylinder* c = new Cylinder(Vector(x, y, z)*50.f, Vector(x2, y2, z2)*50.f, 0.1f);
 				cyls.push_back(c);
 				x = x2;
 				y = y2;
@@ -282,14 +289,14 @@ public:
 		build_bvh(&bvh, 0, cyls.size());
 	}
 
-	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const;
-	bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const {
+	bool intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, float cur_best_t, int &triangle_id) const;
+	bool intersection_shadow(const Ray& d, float &t, float cur_best_t, float dist_light) const {
 		MaterialValues mat;
 		int tid;
 		Vector P;
 		return intersection(d, P, t, mat, cur_best_t, tid);
 	}
-	bool reservoir_sampling_intersection(const Ray& r, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const;
+	bool reservoir_sampling_intersection(const Ray& r, Vector& P, float &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, float min_t, float max_t) const;
 
 	BBox build_bbox(int i0, int i1);
 	BBox build_centers_bbox(int i0, int i1);

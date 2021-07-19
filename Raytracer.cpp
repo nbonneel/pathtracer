@@ -15,15 +15,14 @@
 #undef min
 
 
-inline double sqr(double x) { return x*x; }
 
 
-double int_exponential(double y0, double ysol, double beta, double s, double uy) {
+float int_exponential(float y0, float ysol, float beta, float s, float uy) {
 	//double 	result =  exp((-y0 + ysol)*beta) * (1 - exp(-s*uy*beta)) / (uy*beta); // not ok
 	//double 	result = (exp(-beta * (y0 - ysol)) - exp(-beta*(y0 - ysol +s*uy)))/(uy*beta);
 	
 	//double 	result = -1.0 / (uy*beta) * (exp(-beta * (y0 + s * uy - ysol)) - exp(-beta * (y0 - ysol))); //ok
-	double 	result;
+	float 	result;
 	if (abs(uy*beta) < 0.0001) { // I may have issues with smalle values
 		result = exp(-beta * (y0 - ysol)) * (s /*- s * s*uy*beta*0.5*/);
 		//double result2 = (exp(-beta * (y0 - ysol)) - exp(-beta * (y0 + s * uy - ysol))) / (uy*beta); // ok
@@ -42,42 +41,42 @@ double int_exponential(double y0, double ysol, double beta, double s, double uy)
 
 
 
-bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, double t, Vector curWeight, int nbrebonds, bool showLight, bool hadSS, Contrib& newContrib, double &attenuationFactor) {
+bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, float t, Vector curWeight, int nbrebonds, bool showLight, bool hadSS, Contrib& newContrib, float &attenuationFactor) {
 	if (curWeight.getNorm2() < 1E-12) return false;
 	Vector rayDirection = r.direction; 
 
 	Vector Lv(0., 0., 0.);
 
-	double p_uniform = 0.5;
+	float p_uniform = 0.5f;
 	bool is_uniform_fog = (s.fog_type == 0);
-	double alpha = s.fog_absorption;
-	double sigmaT = s.fog_absorption_decay;
+	float alpha = s.fog_absorption;
+	float sigmaT = s.fog_absorption_decay;
 	bool uniform_sampling_ray = false;
 	int phase = s.fog_phase_type; // 0 : uniform, 1: Schlick, 2: Rayleigh
-	double groundLevel = s.objects[2]->get_translation(r.time, is_recording)[1];
+	float groundLevel = s.objects[2]->get_translation(r.time, is_recording)[1];
 
-	double int_ext;
+	float int_ext;
 	if (is_uniform_fog) {
 		int_ext = alpha * t *0.05;
 	} else {
 		int_ext = alpha*int_exponential(r.origin[1], groundLevel, sigmaT, t, rayDirection[1]);
 	}
-	double T = exp(-int_ext);
+	float T = exp(-int_ext);
 
 	int threadid = omp_get_thread_num();
-	double proba_t, random_t;
-	double clamped_t = std::min(1000., t);
+	float proba_t, random_t;
+	float clamped_t = std::min(1000.f, t);
 	
-	double a = dot(sampleLightPos - r.origin, r.direction);
+	float a = dot(sampleLightPos - r.origin, r.direction);
 	if (a > 0) {
 		// http://library.imageworks.com/pdfs/imageworks-library-importance-sampling-of-area-lights-in-participating-media.pdf
 		Vector projP = r.origin + a * r.direction;
-		double D = sqrt((sampleLightPos - projP).getNorm2());
-		double thetaA = -atan2(a, D);		
-		double b = t - a;
-		double thetaB = atan2(b, D); // can be negative. should be ok.
+		float D = sqrt((sampleLightPos - projP).getNorm2());
+		float thetaA = -atan2(a, D);
+		float b = t - a;
+		float thetaB = atan2(b, D); // can be negative. should be ok.
 		Vector farP = r.origin + t * r.direction;		
-		double x = engine[threadid]()*invmax;
+		float x = engine[threadid]()*invmax;
 		random_t = D * tan((1 - x)*thetaA + x * thetaB);
 		proba_t = D / ((thetaB - thetaA)*(D*D + random_t * random_t));
 		random_t += a;
@@ -87,19 +86,19 @@ bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, doub
 			random_t = engine[threadid]()*invmax*clamped_t;
 			proba_t = 1. / clamped_t;
 		} else {
-			double alpha = 5. / clamped_t;
+			float alpha = 5.f / clamped_t;
 
 			do {
 				random_t = -log(engine[threadid]()*invmax) / alpha;
 			} while (random_t > clamped_t);
 
-			double normalization = 1. / alpha * (1 - exp(-alpha * clamped_t));
+			float normalization = 1.f / alpha * (1.f - exp(-alpha * clamped_t));
 			proba_t = exp(-alpha * random_t) / normalization;
 		}
 	}
 	
 
-	double int_ext_partielle;
+	float int_ext_partielle;
 	if (is_uniform_fog) {
 		int_ext_partielle = alpha * random_t *0.05;
 	} else {
@@ -111,13 +110,13 @@ bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, doub
 	if (random_P[1] < groundLevel) return false;
 
 	Vector random_dir;
-	double proba_dir;
+	float proba_dir;
 
 	Vector point_aleatoire;
 	Vector axeOP = (random_P - centerLight).getNormalized();
 	bool is_uniform;
 	if (engine[threadid]()*invmax < p_uniform) {
-		random_dir = random_uniform_sphere();
+		random_dir = random_uniform_sphere<float>();
 		is_uniform = true;
 	} else {
 		Vector dir_aleatoire = random_cos(axeOP);
@@ -127,8 +126,8 @@ bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, doub
 	}
 
 
-	double phase_func;
-	double k = s.phase_aniso;
+	float phase_func;
+	float k = s.phase_aniso;
 	switch (phase) {
 	case 0:
 		phase_func = 1. / (4.*M_PI);
@@ -145,15 +144,15 @@ bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, doub
 	MaterialValues interMat;
 	Vector interP;
 	int interid, intertri;
-	double intert;
+	float intert;
 	bool interinter = s.intersection(L_ray, interP, interid, intert, interMat, intertri);
 	const Vector& interN = interMat.shadingN;
 
-	double V;
+	float V;
 	if (is_uniform) {
 		V = 1;
 	} else {
-		double d_light2 = (point_aleatoire - random_P).getNorm2();
+		float d_light2 = (point_aleatoire - random_P).getNorm2();
 		if (interinter && intert*intert < d_light2*0.99) {
 			V = 0;
 		} else {
@@ -164,17 +163,17 @@ bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, doub
 	attenuationFactor = T;
 
 	if (V == 0) {
-		Lv = Vector(0., 0., 0.);
+		Lv = Vector(0.f, 0.f, 0.f);
 		return false;
 	} else {
-		double pdf_uniform = 1. / (4.*M_PI);
-		double J = dot(interN, -random_dir) / (interP - random_P).getNorm2();
-		double pdf_light = (interinter && interid == 0) ? (dot((interP - centerLight).getNormalized(), axeOP) / (M_PI * sqr(radiusLight)) / J) : 0.;
+		float pdf_uniform = 1. / (4.*M_PI);
+		float J = dot(interN, -random_dir) / (interP - random_P).getNorm2();
+		float pdf_light = (interinter && interid == 0) ? (dot((interP - centerLight).getNormalized(), axeOP) / (M_PI * sqr(radiusLight)) / J) : 0.;
 		proba_dir = p_uniform * pdf_uniform + (1 - p_uniform)*pdf_light;
 
 		//Vector L = getColor(L_ray, sampleID, nbrebonds - 1, screenI, screenJ, normalValue, albedoValue);
 
-		double ext;
+		float ext;
 		if (is_uniform_fog) {
 			ext = s.fog_density*0.05;
 		} else {
@@ -197,15 +196,14 @@ bool Raytracer::fogContribution(const Ray &r, const Vector& sampleLightPos, doub
 Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int screenI, int screenJ, Vector &normalValue, Vector &albedoValue, bool no_envmap, bool has_precomputed_rays, int rayID) {
 
 
-	Sphere* env = dynamic_cast<Sphere*>(s.objects[1]);
 	int threadid = omp_get_thread_num();
 
 	Vector P;
 	MaterialValues mat;
 	int sphere_id, tri_id;
-	double t;
+	float t;
 	Contrib newContrib;
-	double attenuationFactor;
+	float attenuationFactor;
 	bool has_fog = (s.fog_density > 1E-8);
 
 	Vector color(0, 0, 0);
@@ -259,17 +257,17 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 		
 
 		if ((nbrebonds == nb_bounces) && has_backgroundimage && (!has_inter || (has_inter && sphere_id == 1 && has_dome))) {
-			int i = std::min(s.backgroundH - 1, std::max(0, (int)(screenI / (double)H*s.backgroundH)));
-			int j = std::min(s.backgroundW - 1, std::max(0, (int)(screenJ / (double)W*s.backgroundW)));
-			double r = s.background[i*s.backgroundW * 3 + j * 3];
-			double g = s.background[i*s.backgroundW * 3 + j * 3 + 1];
-			double b = s.background[i*s.backgroundW * 3 + j * 3 + 2];
+			int i = std::min(s.backgroundH - 1, std::max(0, (int)(screenI / (float)H*s.backgroundH)));
+			int j = std::min(s.backgroundW - 1, std::max(0, (int)(screenJ / (float)W*s.backgroundW)));
+			float r = s.background[i*s.backgroundW * 3 + j * 3];
+			float g = s.background[i*s.backgroundW * 3 + j * 3 + 1];
+			float b = s.background[i*s.backgroundW * 3 + j * 3 + 2];
 			color += pathWeight*Vector(r, g, b);
 			continue;
 		}
 
 		Vector rayDirection = currentRay.direction;
-		bool is_subsurface = (mat.Ksub.getNorm2() > 1E-8);
+		bool is_subsurface = (mat.Ksub.getNorm2() > 1E-6);
 
 
 		if (has_inter) {
@@ -285,7 +283,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 					}
 					continue; // we do not break anymore: there can be secondary rays due to multiple scattering still being computed
 				} else {
-					if (env) {
+					if (sphereEnv) {
 						if (has_fog) {
 							bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
 							if (hasContrib) {
@@ -302,7 +300,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 				}
 			}
 			if (sphere_id == 0) {
-				Vector currentContrib = show_lights ? (/*s.lumiere->albedo **/Vector(1., 1., 1.)* lightPower) : Vector(0., 0., 0.);				
+				Vector currentContrib = show_lights ? (/*s.lumiere->albedo **/Vector(1.f, 1.f, 1.f)* lightPower) : Vector(0., 0., 0.);				
 				if (has_fog) {
 					bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
 					if (hasContrib) {
@@ -316,7 +314,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 				}
 				continue;
 			} else {
-				double subsProba = 0.6;// sqrt(mat.Ksub.getNorm2());
+				float subsProba = 0.6f;// sqrt(mat.Ksub.getNorm2());
 				if (has_had_subsurface_interaction || !is_subsurface) subsProba = 0;
 				Vector subsW = Vector(1. / (1. - subsProba), 1. / (1. - subsProba), 1. / (1. - subsProba));
 
@@ -326,30 +324,30 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 					subsW = Vector(1. / (subsProba), 1. / (subsProba), 1. / (subsProba));
 
 					//const double diskR = 6;
-					const double sigmasub = 1.5;
-					const double diskR = sqrt(12.46) * sigmasub; // sigmasub / sqrt(12.46);
+					const float sigmasub = 1.5f;
+					const float diskR = sqrt(12.46f) * sigmasub; // sigmasub / sqrt(12.46);
 
 
 					Vector gauss(0, 0, 1000);
 
-					double integ = 1 - exp(-diskR * diskR / (2 * sigmasub*sigmasub));
-					double randR = sigmasub * sqrt(-2 * log(1 - engine[threadid]()*invmax*integ));
-					double randangle = engine[threadid]()*invmax * 2 * M_PI;
+					float integ = 1 - exp(-diskR * diskR / (2 * sigmasub*sigmasub));
+					float randR = sigmasub * sqrt(-2 * log(1 - engine[threadid]()*invmax*integ));
+					float randangle = engine[threadid]()*invmax * 2 * M_PI;
 					gauss[0] = randR * sin(randangle);
 					gauss[1] = randR * cos(randangle);
 					gauss[2] = randR;
-					double gaussval = (1. / (sigmasub*sigmasub * 2 * M_PI))*exp(-(gauss[2] * gauss[2]) / (2 * sigmasub*sigmasub));
-					double pdfgauss = gaussval / integ;
+					float gaussval = (1. / (sigmasub*sigmasub * 2 * M_PI))*exp(-(gauss[2] * gauss[2]) / (2 * sigmasub*sigmasub));
+					float pdfgauss = gaussval / integ;
 
 					Vector Tg = getTangent(N);
 					Vector Tg2 = cross(N, Tg);
 					Vector PtaboveP = P + gauss[0] * Tg + gauss[1] * Tg2 + N * diskR;
 					float r1 = engine[threadid]()*invmax;
 					Vector axis;
-					double tmax;
-					double h = sqrt(diskR*diskR - gauss[2] * gauss[2]);
+					float tmax;
+					float h = sqrt(diskR*diskR - gauss[2] * gauss[2]);
 					Vector subsOrigin = PtaboveP + (diskR - h)*(-N);
-					double wAxis;
+					float wAxis;
 					if (r1 < 0.5) {
 						wAxis = 0.5;
 						axis = -N;
@@ -369,32 +367,32 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 
 					MaterialValues subsmat;
 					int subsid, substriid;
-					double subst;
+					float subst;
 					Vector localP2;
 
 					subsid = sphere_id;
 					bool subsinter = s.get_random_intersection(Ray(subsOrigin, axis, r.time), localP2, subsid, subst, subsmat, substriid, 0, tmax, false);
 					if (subsinter) {
 						//subsW *= 1. / std::max(gaussval*std::abs(dot(mat.shadingN, subsmat.shadingN)),0.005) *exp(-(P - localP2).getNorm2() / (2.*sigmasub*sigmasub));
-						double chris = exp(-(P - localP2).getNorm2() / (2.*sigmasub*sigmasub));
+						float chris = exp(-(P - localP2).getNorm2() / (2.*sigmasub*sigmasub));
 						//double dist = (P - localP2).getNorm2();
 						//double chris = (exp(-sqrt(dist) / sigmasub) + exp(-sqrt(dist / (3*sigmasub)))) / (8*M_PI*dist*sigmasub);
 						//double surfA = 1;// sqrt(mat.Ksub.getNorm2());
 						//double sval = 1.9 - surfA + 3.5*sqr(surfA - 0.8);
 						//double chris = 30*surfA * sval*  (exp(-sval * dist / sigmasub) + exp(-sval * dist / (3 * sigmasub))) / (8 * M_PI*sigmasub*dist);
-						double sumpdfs = sqr(0.5*dot(subsmat.shadingN, N)) + sqr(0.25*dot(subsmat.shadingN, Tg)) + sqr(0.25*dot(subsmat.shadingN, Tg2));
-						double pdfdisk = wAxis * std::abs(dot(axis, subsmat.shadingN)) / sumpdfs;
+						float sumpdfs = sqr(0.5*dot(subsmat.shadingN, N)) + sqr(0.25*dot(subsmat.shadingN, Tg)) + sqr(0.25*dot(subsmat.shadingN, Tg2));
+						float pdfdisk = wAxis * std::abs(dot(axis, subsmat.shadingN)) / sumpdfs;
 						//Vector A = sqrt(mat.Ksub * subsmat.Ksub);
 						//Vector sval = Vector(1.9, 1.9, 1.9) - A + 3.5*sqr(A - Vector(0.8, 0.8, 0.8));
 						//Vector chris = sval*A*(exp(-sval * dist / sigmasub) + exp(-sval * dist / (3 * sigmasub))) / (8 * M_PI*sigmasub*dist);
-						subsW *= pdfdisk / std::max(pdfgauss, 0.05) *chris;
+						subsW *= pdfdisk / std::max(pdfgauss, 0.05f) *chris;
 						rayDirection = (localP2 - P).getNormalized();
-						P = localP2 + 0.005*subsmat.shadingN;
+						P = localP2 + 0.005f*subsmat.shadingN;
 						if (r1 < 0.5) {
-							subsW *= 2;
+							subsW *= 2.f;
 						} else
-							subsW *= 4;
-						subsW = subsW * ((/*Vector(1.,1.,1.)-*/mat.Ksub/*-mat.Ks*/) / M_PI); // Kd subsurface...
+							subsW *= 4.f;
+						subsW = subsW * ((/*Vector(1.,1.,1.)-*/mat.Ksub/*-mat.Ks*/) / float(M_PI)); // Kd subsurface...
 						mat = subsmat;
 						N = mat.shadingN;
 						tri_id = substriid;
@@ -411,7 +409,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 
 				if (s.objects[sphere_id]->miroir) {
 					Vector direction_miroir = rayDirection.reflect(N);
-					Ray rayon_miroir(P + 0.001*N, direction_miroir, r.time);
+					Ray rayon_miroir(P + 0.001f*N, direction_miroir, r.time);
 
 					//if (uniform(engine) < 0.9)
 					//currentContrib += getColor(rayon_miroir, sampleID, nbrebonds - 1, screenI, screenJ, normalValue, albedoValue, show_lights, no_envmap);// / 0.9;
@@ -435,8 +433,8 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 					continue;
 				} else
 					if (mat.transp) {
-						double n1 = 1;
-						double n2 = mat.refr_index;
+						float n1 = 1.f;
+						float n2 = mat.refr_index;
 						Vector normale_pour_transparence(N);
 						Ray new_ray;
 						bool entering = true;
@@ -446,13 +444,13 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 							normale_pour_transparence = -N;
 							entering = false;
 						}
-						double radical = 1 - sqr(n1 / n2)*(1 - sqr(dot(normale_pour_transparence, rayDirection)));
+						float radical = 1.f - sqr(n1 / n2)*(1 - sqr(dot(normale_pour_transparence, rayDirection)));
 						if (radical > 0) {
 							Vector direction_refracte = (n1 / n2)*(rayDirection - dot(rayDirection, normale_pour_transparence)*normale_pour_transparence) - normale_pour_transparence * sqrt(radical);
-							Ray rayon_refracte(P - 0.001*normale_pour_transparence, direction_refracte, r.time);
+							Ray rayon_refracte(P - 0.001f*normale_pour_transparence, direction_refracte, r.time);
 
-							double R0 = sqr((n1 - n2) / (n1 + n2));
-							double R;
+							float R0 = sqr((n1 - n2) / (n1 + n2));
+							float R;
 							if (entering) {
 								R = R0 + (1 - R0)*std::pow(1 + dot(rayDirection, N), 5);
 							} else {
@@ -460,12 +458,12 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 							}
 
 							if (engine[threadid]()*invmax < R) {
-								new_ray = Ray(P + 0.001*normale_pour_transparence, rayDirection.reflect(N), r.time);
+								new_ray = Ray(P + 0.001f*normale_pour_transparence, rayDirection.reflect(N), r.time);
 							} else {
-								new_ray = Ray(P - 0.001*normale_pour_transparence, direction_refracte, r.time);
+								new_ray = Ray(P - 0.001f*normale_pour_transparence, direction_refracte, r.time);
 							}
 						} else {
-							new_ray = Ray(P + 0.001*normale_pour_transparence, rayDirection.reflect(N), r.time);
+							new_ray = Ray(P + 0.001f*normale_pour_transparence, rayDirection.reflect(N), r.time);
 							//return Vector(0, 0, 0);
 						}
 						//currentContrib += getColor(new_ray, sampleID, nbrebonds - 1, screenI, screenJ, normalValue, albedoValue, show_lights, no_envmap);
@@ -498,7 +496,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 							dir_aleatoire = random_cos(axeOP);
 						Vector point_aleatoire = dir_aleatoire * radiusLight + centerLight;
 						Vector wi = (point_aleatoire - P); wi.fast_normalize();// .getNormalized();
-						double d_light2 = (point_aleatoire - P).getNorm2();
+						float d_light2 = (point_aleatoire - P).getNorm2();
 						Vector Np = dir_aleatoire;
 						//Vector kd =  mat.Kd;
 						Vector tr;
@@ -509,19 +507,19 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 							else
 								offset = -N; 
 								//tr = getColor(Ray(P + rayDirection * 0.001 + offset * 0.001, rayDirection, r.time), sampleID, nbrebonds, screenI, screenJ, normalValue, albedoValue, show_lights, no_envmap);
-							currentRay = Ray(P + rayDirection * 0.001 + offset * 0.001, rayDirection, r.time);
+							currentRay = Ray(P + rayDirection * 0.001f + offset * 0.001f, rayDirection, r.time);
 							//contribs.push_back(Contrib(pathWeight, currentRay, nbrebonds, show_lights, has_had_subsurface_interaction));
 							contribs[contribIndexEnd] = Contrib(pathWeight, currentRay, nbrebonds, show_lights, has_had_subsurface_interaction);
 							contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
 							continue;
 						}
-						Ray ray_light(P + 0.01*wi, wi, r.time);
-						double t_light;
+						Ray ray_light(P + 0.01f*wi, wi, r.time);
+						float t_light;
 						bool isShadowed;
 						if (dot(mat.shadingN, wi) < 0)
 							isShadowed = true;
 						else
-							isShadowed = s.intersection_shadow(ray_light, t_light, sqrt(d_light2) - 0.01, true, nbrebonds == nb_bounces);
+							isShadowed = s.intersection_shadow(ray_light, t_light, sqrt(d_light2) - 0.01f, true, nbrebonds == nb_bounces);
 						//bool direct_visible = true;
 						Vector currentContrib(0, 0, 0);
 
@@ -530,17 +528,17 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 
 							Vector BRDF;
 							if (sub_interaction) {
-								BRDF = (/*Vector(1., 1., 1.) -*/ mat.Ksub /*- mat.Ks*/) / M_PI;
+								BRDF = (/*Vector(1., 1., 1.) -*/ mat.Ksub /*- mat.Ks*/) / (float)M_PI;
 							} else {
 								BRDF = brdf->eval(mat, wi, -rayDirection, N);
 							}
-							double J = 1.*dot(Np, -wi) / d_light2;
-							double proba = dot(axeOP, dir_aleatoire) / (M_PI * radiusLight*radiusLight);
+							float J = 1.*dot(Np, -wi) / d_light2;
+							float proba = dot(axeOP, dir_aleatoire) / (M_PI * radiusLight*radiusLight);
 							if (s.objects[sphere_id]->ghost) {
 								//currentContrib += tr;
 							} else {
 								if (proba > 0) {
-									currentContrib += subsW * (lightPower* std::max(0., dot(N, wi)) * J / proba)  * BRDF;
+									currentContrib += subsW * (lightPower* std::max(0.f, dot(N, wi)) * J / proba)  * BRDF;
 								}
 							}
 
@@ -559,7 +557,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 						}
 
 						// ajout de la contribution indirecte
-						double proba_globale;
+						float proba_globale;
 						Vector direction_aleatoire;
 						if (nbrebonds == nb_bounces && no_envmap) {
 							if (sub_interaction) {
@@ -586,11 +584,11 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 						}
 
 
-						Ray	rayon_aleatoire(P + 0.01*direction_aleatoire, direction_aleatoire, r.time);
+						Ray	rayon_aleatoire(P + 0.01f*direction_aleatoire, direction_aleatoire, r.time);
 
 						Vector BRDFindirect;
 						if (sub_interaction) {
-							BRDFindirect = mat.Ksub / M_PI;
+							BRDFindirect = mat.Ksub / (float)M_PI;
 						} else {
 							BRDFindirect = brdf->eval(mat, direction_aleatoire, -rayDirection, N);
 						}
@@ -1077,29 +1075,29 @@ void Raytracer::save_scene(const char* filename) {
 	fprintf(f, "W,H: %u, %u\n", W, H);
 	fprintf(f, "nrays: %u\n", nrays);
 	fprintf(f, "nbframes: %u\n", s.nbframes);
-	fprintf(f, "Cam: (%lf, %lf, %lf), (%lf, %lf, %lf), (%lf, %lf, %lf)\n", cam.position[0], cam.position[1], cam.position[2], cam.direction[0], cam.direction[1], cam.direction[2], cam.up[0], cam.up[1], cam.up[2]);
-	fprintf(f, "fov: %lf\n", cam.fov);
-	fprintf(f, "focus: %lf\n", cam.focus_distance);
-	fprintf(f, "aperture: %lf\n", cam.aperture);			
-	fprintf(f, "sigma_filter: %lf\n", sigma_filter);
-	fprintf(f, "gamma: %lf\n", gamma);
+	fprintf(f, "Cam: (%f, %f, %f), (%f, %f, %f), (%f, %f, %f)\n", cam.position[0], cam.position[1], cam.position[2], cam.direction[0], cam.direction[1], cam.direction[2], cam.up[0], cam.up[1], cam.up[2]);
+	fprintf(f, "fov: %f\n", cam.fov);
+	fprintf(f, "focus: %f\n", cam.focus_distance);
+	fprintf(f, "aperture: %f\n", cam.aperture);			
+	fprintf(f, "sigma_filter: %f\n", sigma_filter);
+	fprintf(f, "gamma: %f\n", gamma);
 
 	fprintf(f, "is_lenticular: %u\n", cam.is_lenticular);
 	fprintf(f, "lenticular_nb_images: %u\n", cam.lenticular_nb_images);
-	fprintf(f, "lenticular_max_angle: %lf\n", cam.lenticular_max_angle);
+	fprintf(f, "lenticular_max_angle: %f\n", cam.lenticular_max_angle);
 	fprintf(f, "lenticular_pixel_width: %u\n", cam.lenticular_pixel_width);
 	fprintf(f, "isArray: %u\n", cam.isArray);
 	fprintf(f, "nbviewX: %u\n", cam.nbviewX);
 	fprintf(f, "nbviewY: %u\n", cam.nbviewY);
-	fprintf(f, "maxSpacingX: %lf\n", cam.maxSpacingX);
-	fprintf(f, "maxSpacingY: %lf\n", cam.maxSpacingY);
+	fprintf(f, "maxSpacingX: %f\n", cam.maxSpacingX);
+	fprintf(f, "maxSpacingY: %f\n", cam.maxSpacingY);
 
 	fprintf(f, "bounces: %u\n", nb_bounces);
 	fprintf(f, "has_denoiser: %u\n", has_denoiser);
 	
 
-	fprintf(f, "intensite_lum: %le\n", s.intensite_lumiere);
-	fprintf(f, "intensite_envmap: %lf\n", s.envmap_intensity);
+	fprintf(f, "intensite_lum: %f\n", s.intensite_lumiere);
+	fprintf(f, "intensite_envmap: %f\n", s.envmap_intensity);
 	if (s.backgroundfilename.size()>0)
 		fprintf(f, "background: %s\n", s.backgroundfilename.c_str());
 	
@@ -1109,14 +1107,14 @@ void Raytracer::save_scene(const char* filename) {
 		s.objects[i]->save_to_file(f);
 	}
 
-	fprintf(f, "fog_density: %lf\n", s.fog_density);
-	fprintf(f, "fog_absorption: %lf\n", s.fog_absorption);
-	fprintf(f, "fog_density_decay: %lf\n", s.fog_density_decay);
-	fprintf(f, "fog_absorption_decay: %lf\n", s.fog_absorption_decay);
+	fprintf(f, "fog_density: %f\n", s.fog_density);
+	fprintf(f, "fog_absorption: %f\n", s.fog_absorption);
+	fprintf(f, "fog_density_decay: %f\n", s.fog_density_decay);
+	fprintf(f, "fog_absorption_decay: %f\n", s.fog_absorption_decay);
 	fprintf(f, "fog_type: %u\n", s.fog_type);	
 	fprintf(f, "fog_phase_type: %u\n", s.fog_phase_type);
 
-	fprintf(f, "double_frustum_start_t: %lf\n", s.double_frustum_start_t);
+	fprintf(f, "double_frustum_start_t: %f\n", s.double_frustum_start_t);
 
 	
 	
@@ -1135,46 +1133,47 @@ void Raytracer::load_scene(const char* filename, const char* replacedNames) {
 	fscanf(f, "%[^\n]\n", line);
 	if (line[0] == 'n') {
 		sscanf(line, "nbframes: %u\n", &s.nbframes);
-		fscanf(f, "Cam: (%lf, %lf, %lf), (%lf, %lf, %lf), (%lf, %lf, %lf)\n", &cam.position[0], &cam.position[1], &cam.position[2], &cam.direction[0], &cam.direction[1], &cam.direction[2], &cam.up[0], &cam.up[1], &cam.up[2]);
+		fscanf(f, "Cam: (%f, %f, %f), (%f, %f, %f), (%f, %f, %f)\n", &cam.position[0], &cam.position[1], &cam.position[2], &cam.direction[0], &cam.direction[1], &cam.direction[2], &cam.up[0], &cam.up[1], &cam.up[2]);
 	} else {
-		sscanf(line, "Cam: (%lf, %lf, %lf), (%lf, %lf, %lf), (%lf, %lf, %lf)\n", &cam.position[0], &cam.position[1], &cam.position[2], &cam.direction[0], &cam.direction[1], &cam.direction[2], &cam.up[0], &cam.up[1], &cam.up[2]);
+		sscanf(line, "Cam: (%f, %f, %f), (%f, %f, %f), (%f, %f, %f)\n", &cam.position[0], &cam.position[1], &cam.position[2], &cam.direction[0], &cam.direction[1], &cam.direction[2], &cam.up[0], &cam.up[1], &cam.up[2]);
 	}
-	fscanf(f, "fov: %lf\n", &cam.fov);
-	fscanf(f, "focus: %lf\n", &cam.focus_distance);
-	fscanf(f, "aperture: %lf\n", &cam.aperture);
-	fscanf(f, "sigma_filter: %lf\n", &sigma_filter);
-	
+	fscanf(f, "fov: %f\n", &cam.fov);
+	fscanf(f, "focus: %f\n", &cam.focus_distance);
+	fscanf(f, "aperture: %f\n", &cam.aperture);
+	fscanf(f, "sigma_filter: %f\n", &sigma_filter);
+	fscanf(f, "gamma: %f\n", &gamma);
+
 	int nbo;
 	
 	fscanf(f, "%[^\n]\n", line);
 		
 	int read = sscanf(line, "is_lenticular: %u\n", &nbo);
-	if (read > 5) {
+	if (read == 1) {
 		cam.is_lenticular = nbo;
 		fscanf(f, "lenticular_nb_images: %u\n", &cam.lenticular_nb_images);
-		fscanf(f, "lenticular_max_angle: %lf\n", &cam.lenticular_max_angle);
+		fscanf(f, "lenticular_max_angle: %f\n", &cam.lenticular_max_angle);
 		fscanf(f, "lenticular_pixel_width: %u\n", &cam.lenticular_pixel_width);
 		fscanf(f, "isArray: %u\n", &cam.isArray);
 		fscanf(f, "nbviewX: %u\n", &cam.nbviewX);
 		fscanf(f, "nbviewY: %u\n", &cam.nbviewY);
-		fscanf(f, "maxSpacingX: %lf\n", &cam.maxSpacingX);
-		fscanf(f, "maxSpacingY: %lf\n", &cam.maxSpacingY);
-		fscanf(f, "gamma: %lf\n", &gamma);
+		fscanf(f, "maxSpacingX: %f\n", &cam.maxSpacingX);
+		fscanf(f, "maxSpacingY: %f\n", &cam.maxSpacingY);
+		fscanf(f, "bounces: %u\n", &nb_bounces);
 	} else {
-		sscanf(line, "gamma: %lf\n", &gamma);
+		sscanf(line, "bounces: %u\n", &nb_bounces);
 	}
 
-	fscanf(f, "bounces: %u\n", &nb_bounces);
+	
 
 	fscanf(f, "%[^\n]\n", line);
 	read = sscanf(line, "has_denoiser: %u\n", &nbo);
-	if (read > 5) {
+	if (read == 1) {
 		has_denoiser = nbo;
-		fscanf(f, "intensite_lum: %le\n", &s.intensite_lumiere);
+		fscanf(f, "intensite_lum: %f\n", &s.intensite_lumiere);
 	} else {
-		sscanf(line, "intensite_lum: %le\n", &s.intensite_lumiere);
+		sscanf(line, "intensite_lum: %f\n", &s.intensite_lumiere);
 	}
-	fscanf(f, "intensite_envmap: %lf\n", &s.envmap_intensity);
+	fscanf(f, "intensite_envmap: %f\n", &s.envmap_intensity);
 
 
 	fscanf(f, "%[^\n]\n", line);
@@ -1191,12 +1190,12 @@ void Raytracer::load_scene(const char* filename, const char* replacedNames) {
 		s.addObject(Object::create_from_file(f, &s, replacedNames));
 	}
 
-	fscanf(f, "fog_density: %lf\n", &s.fog_density);
+	fscanf(f, "fog_density: %f\n", &s.fog_density);
 	fscanf(f, "%[^\n]\n", line);
-	read = sscanf(line, "fog_absorption: %lf\n", &s.fog_absorption);
-	if (read > 5) {
-		fscanf(f, "fog_density_decay: %lf\n", &s.fog_density_decay);
-		fscanf(f, "fog_absorption_decay: %lf\n", &s.fog_absorption_decay);
+	read = sscanf(line, "fog_absorption: %f\n", &s.fog_absorption);
+	if (read == 1) {
+		fscanf(f, "fog_density_decay: %f\n", &s.fog_density_decay);
+		fscanf(f, "fog_absorption_decay: %f\n", &s.fog_absorption_decay);
 		fscanf(f, "fog_type: %u\n", &s.fog_type);
 	} else {
 		sscanf(line, "fog_type: %u\n", &s.fog_type);
@@ -1204,8 +1203,8 @@ void Raytracer::load_scene(const char* filename, const char* replacedNames) {
 	
 	fscanf(f, "%[^\n]\n", line);
 	read = sscanf(line, "fog_phase_type: %u\n", &s.fog_phase_type);
-	if (read>5)
-		fscanf(f, "double_frustum_start_t: %lf\n", &s.double_frustum_start_t);
+	if (read == 1)
+		fscanf(f, "double_frustum_start_t: %f\n", &s.double_frustum_start_t);
 
 	fclose(f);
 
@@ -1250,17 +1249,17 @@ void Raytracer::loadScene() {
 	cam.rotate(0, -22 * M_PI / 180, 1); // helmet
 }
 
-double sum_area_table(double* sat, int sat_width, int i0, int i1, int j0, int j1) {
+float sum_area_table(float* sat, int sat_width, int i0, int i1, int j0, int j1) {
 
-	double term1 = 0;
+	float term1 = 0;
 	if (i0 > 0) {
 		term1 = sat[(i0 - 1)*sat_width + j1];
 	}
-	double term2 = 0;
+	float term2 = 0;
 	if (j0 > 0) {
 		term2 = sat[i1*sat_width + j0-1];
 	}
-	double term3 = 0;
+	float term3 = 0;
 	if (i0>0 && j0 > 0) {
 		term3 = sat[(i0-1)*sat_width + j0 - 1];
 	}
@@ -1287,22 +1286,24 @@ inline uint32_t ReverseBits(uint32_t n) {
 
 Vector extensibleLattice2d(uint32_t id) {
 	uint32_t rid = ReverseBits(id);
-	double phi_id = rid * pow(2.0, -32);
+	float phi_id = rid * pow(2.0, -32);
 
-	double tmp;
-	double x = modf(phi_id * 1 + 0.456789123, &tmp);       // sequence: 1, 182667, 469891, 498753, 110745, 446247, 250185, 118627, 245333, 283199, 408519, 391023, 246327
-	double y = modf(phi_id * 182667 + 0.123456789, &tmp);  // see https://web.maths.unsw.edu.au/~fkuo/lattice/index.html for more ( lattice32001_order2 )
+	float tmp;
+	float x = modf(phi_id * 1 + 0.456789123, &tmp);       // sequence: 1, 182667, 469891, 498753, 110745, 446247, 250185, 118627, 245333, 283199, 408519, 391023, 246327
+	float y = modf(phi_id * 182667 + 0.123456789, &tmp);  // see https://web.maths.unsw.edu.au/~fkuo/lattice/index.html for more ( lattice32001_order2 )
 	return Vector(x, y, 0);
 }
 
-void Raytracer::prepare_render(double time) {
+void Raytracer::prepare_render(float time) {
+
+	sphereEnv = dynamic_cast<Sphere*>(s.objects[1]);
 
 	for (int i = 0; i < omp_get_max_threads(); i++) {
 		engine[i] = pcg32(i);
 	}
 	if (randomPerPixel.size() != W * H) {
-		Wlr = ceil(W / 16.);
-		Hlr = ceil(H / 16.);
+		Wlr = ceil(W / 16.f);
+		Hlr = ceil(H / 16.f);
 		computed.resize(W*H, false);
 		image.resize(W*H * 3, 0);
 		imagedouble.resize(W*H * 3, 0);
@@ -1334,10 +1335,10 @@ void Raytracer::prepare_render(double time) {
 		filter_value.resize(filter_total_width*filter_total_width);
 		for (int i = -filter_size; i <= filter_size; i++) {
 			for (int j = -filter_size; j <= filter_size; j++) {
-				double integ = 0;
+				float integ = 0;
 				for (int i2 = -filter_size; i2 <= i; i2++) {
 					for (int j2 = -filter_size; j2 <= j; j2++) {
-						double w = fast_exp(-(i2*i2 + j2 * j2) / (2.*sigma_filter*sigma_filter)) / (sigma_filter*sigma_filter*2.*M_PI);
+						float w = fast_exp(-(i2*i2 + j2 * j2) / (2.*sigma_filter*sigma_filter)) / (sigma_filter*sigma_filter*2.*M_PI);
 						integ += w;
 					}
 				}
@@ -1380,13 +1381,13 @@ void Raytracer::precomputeRayBatch(int i1, int j1, int i2, int j2, int nspp) {  
 		for (int j = 0; j < batchW; j++) {
 			for (int k = 0; k < nspp; k++) {
 				int rayId = (i*batchW + j)*nspp + k;
-				double dx = engine[threadid]()*invmax - 0.5f;  // not perfectly uniform but much faster than std::uniform
-				double dy = engine[threadid]()*invmax - 0.5f;
+				float dx = engine[threadid]()*invmax - 0.5f;  // not perfectly uniform but much faster than std::uniform
+				float dy = engine[threadid]()*invmax - 0.5f;
 				s.firstIntersection_dx[threadid][rayId] = dx;
 				s.firstIntersection_dy[threadid][rayId] = dy;
 
-				double dx_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
-				double dy_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
+				float dx_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
+				float dy_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
 
 				Ray r = cam.generateDirection(s.double_frustum_start_t, i+i1, j+j1, s.current_frame, dx, dy, dx_aperture, dy_aperture, W, H);
 				s.firstIntersection_Ray[threadid][rayId] = r;
@@ -1402,7 +1403,7 @@ void Raytracer::render_image()
 	int fstart = 0;
 	int fend = 1;
 
-	double denom2 = 1. / (2.*sigma_filter*sigma_filter);
+	float denom2 = 1.f / (2.*sigma_filter*sigma_filter);
 
 	/*double test = sum_area_table(&filter_integral[0], filter_total_width, filter_size- filter_size, filter_size+15, filter_size+8, filter_size+11);
 	double integ = 0;
@@ -1434,13 +1435,13 @@ void Raytracer::render_image()
 						for (int j = j1; j < W; j += 8) {
 
 
-							double dx = engine[threadid]()*invmax - 0.5f;  // not perfectly uniform but much faster than std::uniform
-							double dy = engine[threadid]()*invmax - 0.5f;
+							float dx = engine[threadid]()*invmax - 0.5f;  // not perfectly uniform but much faster than std::uniform
+							float dy = engine[threadid]()*invmax - 0.5f;
 
-							double dx_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
-							double dy_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
+							float dx_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
+							float dy_aperture = (engine[threadid]()*invmax - 0.5f) * cam.aperture;
 
-							double time = s.current_frame;// + engine[threadid]()*invmax;
+							float time = s.current_frame;// + engine[threadid]()*invmax;
 
 
 
@@ -1453,8 +1454,8 @@ void Raytracer::render_image()
 							int bmax_i = std::min(i + filter_size, H - 1);
 							int bmin_j = std::max(0, j - filter_size);
 							int bmax_j = std::min(j + filter_size, W - 1);
-							double ratio = 1. / sum_area_table(&filter_integral[0], filter_total_width, bmin_i - i + filter_size, bmax_i - i + filter_size, bmin_j - j + filter_size, bmax_j - j + filter_size);
-							double denom1 = ratio / (sigma_filter*sigma_filter*2.*M_PI);
+							float ratio = 1.f / sum_area_table(&filter_integral[0], filter_total_width, bmin_i - i + filter_size, bmax_i - i + filter_size, bmin_j - j + filter_size, bmax_j - j + filter_size);
+							float denom1 = ratio / (sigma_filter*sigma_filter*2.*M_PI);
 							//double dx = s.firstIntersection_dx[i*W + j];
 							//double dy = s.firstIntersection_dy[i*W + j];
 
@@ -1462,7 +1463,7 @@ void Raytracer::render_image()
 								for (int j2 = bmin_j; j2 <= bmax_j; j2++) {
 									//double w = filter_value[(i2 - i + filter_size)*filter_total_width + j2-j + filter_size] * ratio; 
 
-									double w =  fast_exp(-(sqr(i2 - i - dy) + sqr(j2 - j - dx)) *denom2) *denom1;
+									float w =  fast_exp(-(sqr(i2 - i - dy) + sqr(j2 - j - dx)) *denom2) *denom1;
 									imagedouble[((H - i2 - 1)*W + j2) * 3 + 0] += color[0] * w;
 									imagedouble[((H - i2 - 1)*W + j2) * 3 + 1] += color[1] * w;
 									imagedouble[((H - i2 - 1)*W + j2) * 3 + 2] += color[2] * w;																		
@@ -1540,11 +1541,11 @@ void Raytracer::render_image()
 void Raytracer::render_image_nopreviz() {
 
 	prepare_render(s.current_frame);
-	double denom2 = 1. / (2.*sigma_filter*sigma_filter);
+	float denom2 = 1.f / (2.f*sigma_filter*sigma_filter);
 	const int batchWidth = 4;
 	const int batchHeight = 4;
-	const int nbBatchX = ceil(W / (double)batchWidth);
-	const int nbBatchY = ceil(H / (double)batchHeight);
+	const int nbBatchX = ceil(W / (float)batchWidth);
+	const int nbBatchY = ceil(H / (float)batchHeight);
 
 	chrono.Start();
 	int maxthreads = omp_get_max_threads();
@@ -1580,8 +1581,8 @@ void Raytracer::render_image_nopreviz() {
 				int bmax_i = std::min(i + filter_size, H - 1);
 				int bmin_j = std::max(0, j - filter_size);
 				int bmax_j = std::min(j + filter_size, W - 1);
-				double ratio = 1. / sum_area_table(&filter_integral[0], filter_total_width, bmin_i - i + filter_size, bmax_i - i + filter_size, bmin_j - j + filter_size, bmax_j - j + filter_size);
-				double denom1 = ratio / (sigma_filter*sigma_filter*2.*M_PI);
+				float ratio = 1.f / sum_area_table(&filter_integral[0], filter_total_width, bmin_i - i + filter_size, bmax_i - i + filter_size, bmin_j - j + filter_size, bmax_j - j + filter_size);
+				float denom1 = ratio / (sigma_filter*sigma_filter*2.*M_PI);
 
 				for (int k = 0; k < nrays; k++) {
 
@@ -1597,8 +1598,8 @@ void Raytracer::render_image_nopreviz() {
 					Ray r = cam.generateDirection(s.double_frustum_start_t, i, j, time, dx, dy, dx_aperture, dy_aperture, W, H);*/
 
 					const Ray &r = s.firstIntersection_Ray[threadid][id*nrays+k];
-					double dx = s.firstIntersection_dx[threadid][id*nrays + k];
-					double dy = s.firstIntersection_dy[threadid][id*nrays + k];
+					float dx = s.firstIntersection_dx[threadid][id*nrays + k];
+					float dy = s.firstIntersection_dy[threadid][id*nrays + k];
 
 					Vector normal, albedo;
 					Vector color = getColor(r, k, nb_bounces, i, j, normal, albedo, false, true, id*nrays + k);
@@ -1624,7 +1625,7 @@ void Raytracer::render_image_nopreviz() {
 								//double w = filter_value[(i2 - i + filter_size)*filter_total_width + j2-j + filter_size] * ratio; 
 
 								int idx = ((H - i2 - 1)*W + j2) * 3;
-								double w = fast_exp(-(sqr(i2 - i - dy) + sqr(j2 - j - dx)) *denom2) *denom1;
+								float w = fast_exp(-(sqr(i2 - i - dy) + sqr(j2 - j - dx)) *denom2) *denom1;
 								curimagedouble[idx + 0] += color[0] * w;
 								curimagedouble[idx + 1] += color[1] * w;
 								curimagedouble[idx + 2] += color[2] * w;

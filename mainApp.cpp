@@ -663,13 +663,19 @@ bool RaytracerApp::OnInit()
     return true;
 }
 
+void RaytracerFrame::resetSize() {
+	int displayWidth = render_panel->GetClientSize().GetX();
+	render_panel->displayH = std::min(render_panel->GetClientSize().GetY() - 1, (int)(render_panel->raytracer.H / (double)render_panel->raytracer.W * displayWidth));
+	render_panel->displayW = std::min(render_panel->GetClientSize().GetX() - 1, (int)(render_panel->displayH * render_panel->raytracer.W / (double)render_panel->raytracer.H));
+	render_panel->displayH = std::min(render_panel->GetClientSize().GetY() - 1, (int)(render_panel->raytracer.H / (double)render_panel->raytracer.W * render_panel->displayW));
+
+}
+
 void RaytracerFrame::OnSize(wxSizeEvent& event) {
 	if (render_panel) {
-		int displayWidth = render_panel->GetClientSize().GetX();
-		render_panel->displayH = std::min(render_panel->GetClientSize().GetY()-1, (int)(render_panel->raytracer.H / (double)render_panel->raytracer.W * displayWidth));
-		render_panel->displayW = std::min(render_panel->GetClientSize().GetX() - 1, (int)(render_panel->displayH * render_panel->raytracer.W/ (double)render_panel->raytracer.H));
-		render_panel->displayH = std::min(render_panel->GetClientSize().GetY() - 1, (int)(render_panel->raytracer.H / (double)render_panel->raytracer.W * render_panel->displayW));
+		resetSize();
 	}
+
 	Refresh();
 
 	event.Skip();
@@ -849,7 +855,7 @@ void RenderPanel::update_textures_and_render(wxCommandEvent& event) {
 void RenderPanel::add_fluid(wxCommandEvent& event) {
 	raytracer_app->renderPanel->stop_render();
 
-	Fluid* fl = new Fluid(raytracer.s, BBox(Vector(-18, -27.3, -18), Vector(18, -27.3+50, 18)), raytracer_app->fluidresX->GetValue(), raytracer_app->fluidresY->GetValue(), raytracer_app->fluidresZ->GetValue(), raytracer_app->fluidnparticles->GetValue(), 1000., raytracer_app->fluidparticlesize->GetValue(), raytracer_app->nbframesctrl->GetValue(), raytracer_app->fluidtimestep->GetValue(), raytracer_app->fluidsubsteps->GetValue());
+	Fluid* fl = new Fluid(raytracer.s, BBoxd(Vectord(-18, -27.3, -18), Vectord(18, -27.3+50, 18)), raytracer_app->fluidresX->GetValue(), raytracer_app->fluidresY->GetValue(), raytracer_app->fluidresZ->GetValue(), raytracer_app->fluidnparticles->GetValue(), 1000., raytracer_app->fluidparticlesize->GetValue(), raytracer_app->nbframesctrl->GetValue(), raytracer_app->fluidtimestep->GetValue(), raytracer_app->fluidsubsteps->GetValue());
 	fl->init_particles(this->raytracer_app->initfluid->GetValue(), this->raytracer_app->renderPanel->selected_object);
 	fl->run();
 	
@@ -881,8 +887,8 @@ void RenderPanel::render_video(wxCommandEvent& event) {
 			raytracer.cam.nbviewY = raytracer_app->nbviewsY->GetValue();
 			Vector pos = raytracer.cam.position;
 			Vector right = cross(raytracer.cam.direction, raytracer.cam.up);
-			double dx = raytracer_app->maxspacingX->GetValue() / raytracer_app->nbviewsX->GetValue();
-			double dy = raytracer_app->maxspacingY->GetValue() / raytracer_app->nbviewsY->GetValue();
+			float dx = raytracer_app->maxspacingX->GetValue() / raytracer_app->nbviewsX->GetValue();
+			float dy = raytracer_app->maxspacingY->GetValue() / raytracer_app->nbviewsY->GetValue();
 			raytracer.cam.isArray = true;
 			for (int j = 0; j < raytracer_app->nbviewsY->GetValue(); j++) {
 				for (int k = 0; k < raytracer_app->nbviewsX->GetValue(); k++) {
@@ -1289,6 +1295,7 @@ void RaytracerFrame::Open(wxCommandEvent &evt) {
 	ChangeDirectory(openFileDialog.GetDirectory());
 	render_panel->raytracer.load_scene(openFileDialog.GetPath());
 	render_panel->update_gui();	
+	resetSize();
 	render_panel->start_render();
 #ifdef USE_EMBREE
   std::this_thread::sleep_for(std::chrono::milliseconds(100) );
@@ -2296,7 +2303,7 @@ bool DnDFile::OnDropFiles(wxCoord, wxCoord, const wxArrayString& filenames)
 
 				PointSet* g = new PointSet(filenames[n], nbcols, cols, false, false, center);
 				g->scale = 30;
-				Vector c = (g->bvh.bbox.bounds[0] + g->bvh.bbox.bounds[1])*0.5; // c is at 0
+				Vector c = (g->bvh.bbox.bounds[0] + g->bvh.bbox.bounds[1])*0.5f; // c is at 0
 				double s = std::max(g->bvh.bbox.bounds[1][0] - g->bvh.bbox.bounds[0][0], std::max(g->bvh.bbox.bounds[1][1] - g->bvh.bbox.bounds[0][1], g->bvh.bbox.bounds[1][2] - g->bvh.bbox.bounds[0][2]));
 				g->max_translation = Vector(0, m_pOwner->render_panel->raytracer.s.objects[2]->get_translation(m_pOwner->render_panel->raytracer.s.current_time, m_pOwner->render_panel->raytracer.is_recording)[1] - (g->bvh.bbox.bounds[0][1])*g->scale, 0);
 				m_pOwner->render_panel->raytracer.s.addObject(g);

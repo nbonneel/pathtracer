@@ -16,18 +16,18 @@ public:
 	}
 	Vector shadingN, Kd, Ks, Ne, Ke, Ksub;
 	bool transp;
-	double refr_index;
+	float refr_index;
 };
 
 class BRDF {
 public:
 	BRDF() {};
-	virtual Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, double &pdf, double r1, double r2) const = 0;
+	virtual Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, float &pdf, float r1, float r2) const = 0;
 	virtual Vector eval(const MaterialValues& mat, const Vector& wi, const Vector& wo, const Vector& N) const = 0;
 
-	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, double &pdf) const {  // performs MIS Kd-Ks
+	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, float &pdf) const {  // performs MIS Kd-Ks
 		int threadid = omp_get_thread_num();
-		double invmax = 1.f / engine[threadid].max();
+		float invmax = 1.f / engine[threadid].max();
 		return sample(mat, wo, N, pdf, engine[threadid]()*invmax, engine[threadid]()*invmax);
 	}
 };
@@ -38,8 +38,8 @@ class PhongBRDF : public BRDF {
 public:
 	PhongBRDF() {};
 
-	static Vector random_Phong(const Vector &R, double phong_exponent, double r1, double r2) {
-		double facteur = sqrt(1 - std::pow(r2, 2. / (phong_exponent + 1)));
+	static Vector random_Phong(const Vector &R, float phong_exponent, float r1, float r2) {
+		float facteur = sqrt(1 - std::pow(r2, 2.f / (phong_exponent + 1.f)));
 		//double facteur = sqrt(1 - fastPrecisePow(r2, 2. / (phong_exponent + 1)));
 		Vector direction_aleatoire_repere_local(cos(2 * M_PI*r1)*facteur, sin(2 * M_PI*r1)*facteur, std::pow(r2, 1. / (phong_exponent + 1)));
 		//Vector aleatoire(uniform(engine) - 0.5, uniform(engine) - 0.5, uniform(engine) - 0.5);
@@ -60,17 +60,17 @@ public:
 			return direction_aleatoire_repere_local[2] * R + direction_aleatoire_repere_local[0] * tangent1 + direction_aleatoire_repere_local[1] * tangent2;
 	}
 
-	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, double &pdf, double r1, double r2) const {  // performs MIS Kd-Ks
+	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, float &pdf, float r1, float r2) const {  // performs MIS Kd-Ks
 		int threadid = omp_get_thread_num();
-		double avgNe = (mat.Ne[0] + mat.Ne[1] + mat.Ne[2]) / 3.;
+		float avgNe = (mat.Ne[0] + mat.Ne[1] + mat.Ne[2]) / 3.f;
 		Vector direction_aleatoire;
-		double p = 1 - (mat.Ks[0] + mat.Ks[1] + mat.Ks[2]) / 3.;
+		float p = 1 - (mat.Ks[0] + mat.Ks[1] + mat.Ks[2]) / 3.f;
 		/*if (s.objects[sphere_id]->ghost) {
 			p = std::max(0.2, p);
 		}*/
 		bool sample_diffuse;
 		Vector R = (-wo).reflect(N); // reflect takes a ray going towards a surface and reflects it outwards of it
-		if (engine[threadid]() / (double)engine[threadid].max() < p) {
+		if (engine[threadid]() / (float)engine[threadid].max() < p) {
 			sample_diffuse = true;
 			direction_aleatoire = random_cos(N, r1, r2);
 		} else {
@@ -78,8 +78,8 @@ public:
 			direction_aleatoire = random_Phong(R, avgNe, r1, r2);
 		}
 
-		double proba_phong = (avgNe + 1) / (2.*M_PI) * pow(dot(R, direction_aleatoire), avgNe);
-		double proba_globale = p * dot(N, direction_aleatoire) / (M_PI)+(1. - p)*proba_phong;
+		float proba_phong = (avgNe + 1) / (2.f*M_PI) * pow(dot(R, direction_aleatoire), avgNe);
+		float proba_globale = p * dot(N, direction_aleatoire) / (M_PI)+(1.f - p)*proba_phong;
 		pdf = proba_globale;
 
 		return direction_aleatoire;
@@ -87,12 +87,12 @@ public:
 
 	Vector eval(const MaterialValues& mat, const Vector& wi, const Vector& wo, const Vector& N) const {
 		Vector reflechi = (-wo).reflect(N);
-		double d = dot(reflechi, wi);
-		if (d < 0) return mat.Kd / M_PI;
+		float d = dot(reflechi, wi);
+		if (d < 0) return mat.Kd / float(M_PI);
 		//Vector lobe = pow(Vector(d, d, d), mat.Ne) * ((mat.Ne + Vector(2., 2., 2.)) / (2.*M_PI));
-		Vector lobe = Vector(pow(d, mat.Ne[0])*(mat.Ne[0]+2.)/M_TWO_PI, pow(d, mat.Ne[1])*(mat.Ne[1] + 2.) / M_TWO_PI, pow(d, mat.Ne[2])*(mat.Ne[2] + 2.) / M_TWO_PI);
+		Vector lobe = Vector(pow(d, mat.Ne[0])*(mat.Ne[0]+2.f)/M_TWO_PI, pow(d, mat.Ne[1])*(mat.Ne[1] + 2.f) / M_TWO_PI, pow(d, mat.Ne[2])*(mat.Ne[2] + 2.f) / M_TWO_PI);
 		//Vector lobe = fastPrecisePow(Vector(d, d, d), mat.Ne) * ((mat.Ne + Vector(2., 2., 2.)) / (2.*M_PI));
-		return mat.Kd / M_PI + lobe * mat.Ks;
+		return mat.Kd / float(M_PI) + lobe * mat.Ks;
 	}
 };
 
@@ -100,13 +100,13 @@ class LambertBRDF : public BRDF {
 public:
 	LambertBRDF() {};
 
-	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, double &pdf, double r1, double r2) const {  // performs MIS Kd-Ks		
+	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, float &pdf, float r1, float r2) const {  // performs MIS Kd-Ks		
 		Vector direction_aleatoire = random_cos(N, r1, r2);
 		pdf = dot(N, direction_aleatoire) / (M_PI);
 		return direction_aleatoire;
 	}
 	Vector eval(const MaterialValues& mat, const Vector& wi, const Vector& wo, const Vector& N) const {
-		return mat.Kd / M_PI;
+		return mat.Kd / float(M_PI);
 	}
 	Vector Kd;
 };
@@ -122,7 +122,7 @@ public:
 
 	}
 
-	Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, double &pdf, double r1, double r2) const {
+	Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, float &pdf, float r1, float r2) const {
 		Vector d = random_cos(N, r1, r2);
 		pdf = dot(N, d) / (M_PI);
 		return d;
@@ -151,11 +151,11 @@ public:
 		Vector wilocal = Vector(dot(wi, tangent1), dot(wi, tangent2), dot(wi, N));
 		Vector wolocal = Vector(dot(wo, tangent1), dot(wo, tangent2), dot(wo, N));
 
-		double thetai = acos(wilocal[2]);
+		float thetai = acos(wilocal[2]);
 		if (thetai >= M_PI / 2) return Vector(0., 0., 0.);
-		double thetao = acos(wolocal[2]);
+		float thetao = acos(wolocal[2]);
 		if (thetao >= M_PI / 2) return Vector(0., 0., 0.);
-		double phid = atan2(wolocal[1], wolocal[0]) - atan2(wilocal[1], wilocal[0]); // in -pi..pi 
+		float phid = atan2(wolocal[1], wolocal[0]) - atan2(wilocal[1], wilocal[0]); // in -pi..pi 
 		if (phid < 0) phid += 2 * M_PI;  // => 0..2pi
 		if (phid < 0) phid += 2 * M_PI;  // => 0..2pi
 		if (phid >= 2 * M_PI) phid -= 2 * M_PI;  // => 0..2pi
@@ -166,9 +166,9 @@ public:
 		int idthetai2 = ((idthetai < Nthetai - 1) ? (idthetai + 1) : idthetai);
 		int idthetao2 = ((idthetao < Nthetao - 1) ? (idthetao + 1) : idthetao);
 		int idphid2 = ((idphid < Nphid - 1) ? (idphid + 1) : idphid);
-		double fthetai = thetai / (M_PI / 2.)*Nthetai - idthetai;
-		double fthetao = thetao / (M_PI / 2.)*Nthetao - idthetao;
-		double fphid = phid / (M_PI * 2.)*Nphid - idphid;
+		float fthetai = thetai / (M_PI / 2.)*Nthetai - idthetai;
+		float fthetao = thetao / (M_PI / 2.)*Nthetao - idthetao;
+		float fphid = phid / (M_PI * 2.)*Nphid - idphid;
 		Vector val000 = Vector(&data[(idthetai*Nthetao*Nphid + idthetao * Nphid + idphid) * 3]);
 		Vector val001 = Vector(&data[(idthetai*Nthetao*Nphid + idthetao * Nphid + idphid2) * 3]);
 		Vector val010 = Vector(&data[(idthetai*Nthetao*Nphid + idthetao2 * Nphid + idphid) * 3]);
@@ -177,8 +177,8 @@ public:
 		Vector val110 = Vector(&data[(idthetai2*Nthetao*Nphid + idthetao2 * Nphid + idphid) * 3]);
 		Vector val011 = Vector(&data[(idthetai*Nthetao*Nphid + idthetao2 * Nphid + idphid2) * 3]);
 		Vector val111 = Vector(&data[(idthetai2*Nthetao*Nphid + idthetao2 * Nphid + idphid2) * 3]);
-		Vector lerpVal = ((val000*(1. - fphid) + val001 * fphid)*(1. - fthetao) + (val010*(1. - fphid) + val011 * fphid)*fthetao) * (1. - fthetai)
-			+ ((val100*(1. - fphid) + val101 * fphid)*(1. - fthetao) + (val110*(1. - fphid) + val111 * fphid)*fthetao) * fthetai;
+		Vector lerpVal = ((val000*(1.f - fphid) + val001 * fphid)*(1.f - fthetao) + (val010*(1.f - fphid) + val011 * fphid)*fthetao) * (1.f - fthetai)
+			+ ((val100*(1.f - fphid) + val101 * fphid)*(1.f - fthetao) + (val110*(1.f - fphid) + val111 * fphid)*fthetao) * fthetai;
 		return lerpVal /*/ Vector(1.0, 1.15, 1.66)*/;
 	}
 	std::vector<float> data;
@@ -193,7 +193,7 @@ public:
 		read_brdf(filename.c_str(), data);
 	}
 	void setParameters(const MaterialValues &m) {};
-	Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, double &pdf, double r1, double r2) const {
+	Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, float &pdf, float r1, float r2) const {
 		Vector d = random_cos(N, r1, r2);
 		pdf = dot(N, d) / (M_PI);
 		return d;
@@ -223,17 +223,21 @@ public:
 		Vector wolocal = Vector(dot(wo, tangent1), dot(wo, tangent2), dot(wo, N));
 
 
-		double thetai = acos(wilocal[2]);
+		float thetai = acos(wilocal[2]);
 		if (thetai >= M_PI / 2) return Vector(0., 0., 0.);
-		double thetao = acos(wolocal[2]);
+		float thetao = acos(wolocal[2]);
 		if (thetao >= M_PI / 2) return Vector(0., 0., 0.);
-		double phio = atan2(wolocal[1], wolocal[0]); // in -pi..pi 
+		float phio = atan2(wolocal[1], wolocal[0]); // in -pi..pi 
 		if (phio < 0) phio += 2 * M_PI;  // => 0..2pi
-		double phii = atan2(wilocal[1], wilocal[0]); // in -pi..pi 
+		float phii = atan2(wilocal[1], wilocal[0]); // in -pi..pi 
 		if (phii < 0) phii += 2 * M_PI;  // => 0..2pi
 
 		Vector result;
-		lookup_brdf_val(data, thetai, phii, thetao, phio, result[0], result[1], result[2]);
+		double r, g, b;
+		lookup_brdf_val(data, thetai, phii, thetao, phio, r, g, b);
+		result[0] = r;
+		result[1] = g;
+		result[2] = b;
 		return result;
 
 	}
@@ -260,7 +264,7 @@ public:
 		this->multiplier = multiplier;
 	}
 
-	static double wrap(double u) {
+	static float wrap(float u) {
 		//u = fmod(u, 1);
 		u -= (int)u;
 		if (u < 0) u += 1;
@@ -283,15 +287,15 @@ public:
 		values.clear();
 	}
 
-	Vector getVec(double u, double v) const {
+	Vector getVec(float u, float v) const {
 		if (W > 0) {
 			// no assert on u and v ; assume they are btw 0  and 1
 			int x = u * (W - 1);
 			int y = v * (H - 1);
 			int idx = (y*W + x) * 3;
-			double cr = values[idx] * multiplier[0];
-			double cg = values[idx + 1] * multiplier[1];
-			double cb = values[idx + 2] * multiplier[2];
+			float cr = values[idx] * multiplier[0];
+			float cg = values[idx + 1] * multiplier[1];
+			float cb = values[idx + 2] * multiplier[2];
 			return Vector(cr, cg, cb);
 		} else {
 			return multiplier;
@@ -321,19 +325,19 @@ public:
 			return multiplier;
 		}*/
 	}
-	bool getBool(double u, double v) const {
+	bool getBool(float u, float v) const {
 		if (W > 0) {
 			// no assert on u and v ; assume they are btw 0  and 1
 			int x = u * (W - 1);
 			int y = v * (H - 1);
 			int idx = (y*W + x) * 3;
-			double cr = values[idx] * multiplier[0];
-			return cr < 0.5;
+			float cr = values[idx] * multiplier[0];
+			return cr < 0.5f;
 		} else {
-			return (multiplier[0] < 0.5);
+			return (multiplier[0] < 0.5f);
 		}
 	}
-	Vector getNormal(double u, double v) const {
+	Vector getNormal(float u, float v) const {
 		if (W > 0) {
 			// no assert on u and v ; assume they are btw 0  and 1
 			int x = u * (W - 1);
@@ -341,7 +345,7 @@ public:
 			int idx = (y*W + x) * 3;
 			return Vector(values[idx], values[idx + 1], values[idx + 2]);
 		} else {
-			return Vector(0., 0., 1.);
+			return Vector(0., 0., 1.f);
 		}
 		/*if (W > 0) {
 			// no assert on u and v ; assume they are btw 0  and 1
@@ -368,13 +372,13 @@ public:
 			return Vector(0., 0., 1.);
 		}*/
 	}
-	double getValRed(double u, double v) const {
+	float getValRed(float u, float v) const {
 		if (W > 0) {
 			// no assert on u and v ; assume they are btw 0  and 1
 			int x = u * (W - 1);
 			int y = v * (H - 1);
 			int idx = (y*W + x) * 3;
-			double cr = values[idx] * multiplier[0];
+			float cr = values[idx] * multiplier[0];
 			return cr;
 		} else {
 			return multiplier[0];
@@ -386,8 +390,8 @@ public:
 			if (load_image(file, values, W, H)) {
 #pragma omp parallel for
 				for (int i = 0; i < values.size(); i++) {
-					values[i] /= 255.;
-					values[i] = std::pow(values[i], 2.2); // values are then gamma corrected. 
+					values[i] /= 255.f;
+					values[i] = std::pow(values[i], 2.2f); // values are then gamma corrected. 
 				}
 			}
 		}
@@ -409,7 +413,7 @@ public:
 	}
 
 	size_t W, H;
-	std::vector<double> values;
+	std::vector<float> values;
 	Vector multiplier;
 	std::string filename;
 	unsigned char type; // 0: diffuse, 1: specular, 2: normal, 3:alpha, 4: roughness

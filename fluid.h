@@ -11,30 +11,32 @@
 class SimplerSphere {
 public:
 	SimplerSphere() {};
-	SimplerSphere(const Vector &origin, double rayon) {
+	SimplerSphere(const Vector &origin, float rayon) {
 		init(origin, rayon);
 	};
-
-	void init(const Vector &origin, double rayon) {
+	SimplerSphere(const Vectord &origin, float rayon) {
+		init(Vector((float)origin[0], (float)origin[1], (float)origin[2]), rayon);
+	};
+	void init(const Vector &origin, float rayon) {
 		O = origin;
 		R2 = rayon* rayon;
 	}
-	bool intersection(const Ray& d, Vector& P, Vector &N, double &t) const {
+	bool intersection(const Ray& d, Vector& P, Vector &N, float &t) const {
 		// resout a*t^2 + b*t + c = 0
-		double a = 1; // d.direction.getNorm2();
-		double b = 2 * dot(d.direction, d.origin - O);
-		double c = (d.origin - O).getNorm2() - R2;
+		float a = 1; // d.direction.getNorm2();
+		float b = 2 * dot(d.direction, d.origin - O);
+		float c = (d.origin - O).getNorm2() - R2;
 
-		double delta = b * b - 4 /** a*/ *c;
+		float delta = b * b - 4 /** a*/ *c;
 		if (delta < 0) return false;
 
-		double sqDelta = sqrt(delta);
-		double inv2a = 0.5; // 1. / (2. * a);
-		double t2 = (-b + sqDelta) * inv2a;
+		float sqDelta = sqrt(delta);
+		float inv2a = 0.5; // 1. / (2. * a);
+		float t2 = (-b + sqDelta) * inv2a;
 
 		if (t2 < 0) return false;
 
-		double t1 = (-b - sqDelta) * inv2a;
+		float t1 = (-b - sqDelta) * inv2a;
 
 		if (t1 > 0)
 			t = t1;
@@ -46,15 +48,15 @@ public:
 		return true;
 	}
 
-	bool both_intersections(const Ray& d, double &t1, double&t2) const {
+	bool both_intersections(const Ray& d, float &t1, float&t2) const {
 		// solves t^2 - 2*b*t + c = 0
-		double b = -dot(d.direction, d.origin - O);
-		double c = (d.origin - O).getNorm2() - R2;
+		float b = -dot(d.direction, d.origin - O);
+		float c = (d.origin - O).getNorm2() - R2;
 
-		double delta = b * b - c;
+		float delta = b * b - c;
 		if (delta < 0) return false;
 
-		double sqDelta = sqrt(delta);		
+		float sqDelta = sqrt(delta);
 		t2 = b + sqDelta;
 		if (t2 < 0) return false;
 
@@ -63,18 +65,18 @@ public:
 		return true;
 	}
 
-	bool intersection_shadow(const Ray& d, double &t) const {
-		double b = -dot(d.direction, d.origin - O);
-		double c = (d.origin - O).getNorm2() - R2;
+	bool intersection_shadow(const Ray& d, float &t) const {
+		float b = -dot(d.direction, d.origin - O);
+		float c = (d.origin - O).getNorm2() - R2;
 
-		double delta = b * b - c;
+		float delta = b * b - c;
 		if (delta < 0) return false;
 
-		double sqDelta = sqrt(delta);	
-		double t2 = b + sqDelta;
+		float sqDelta = sqrt(delta);
+		float t2 = b + sqDelta;
 
 		if (t2 < 0) return false;
-		double t1 = b - sqDelta;
+		float t1 = b - sqDelta;
 
 		if (t1 > 0)
 			t = t1;
@@ -83,12 +85,12 @@ public:
 		return true;
 	}
 	Vector O;
-	double R2;
+	float R2;
 };
 
 class Fluid : public Object {	
 public:
-	Fluid(Scene& s, BBox extent, int Nx, int Ny, int Nz, int Nparticles, double rho, double sphere_radius, int nbframes, double dt, int nsubsteps) : scene(s), extent(extent), Nx(Nx), Ny(Ny), Nz(Nz), Nparticles(Nparticles), rho(rho), radius(sphere_radius), nbframes(nbframes), dt(dt/nsubsteps), nsubsteps(nsubsteps){
+	Fluid(Scene& s, BBoxd extent, int Nx, int Ny, int Nz, int Nparticles, double rho, float sphere_radius, int nbframes, double dt, int nsubsteps) : scene(s), extent(extent), Nx(Nx), Ny(Ny), Nz(Nz), Nparticles(Nparticles), rho(rho), radius(sphere_radius), nbframes(nbframes), dt(dt/nsubsteps), nsubsteps(nsubsteps){
 		velX.resize((Nx + 1)*Ny*Nz, 0.);
 		velY.resize(Nx*(Ny + 1)*Nz, 0.);
 		velZ.resize(Nx*Ny*(Nz + 1), 0.);
@@ -102,11 +104,11 @@ public:
 		newVelY.resize(Nx*(Ny + 1)*Nz, 0.);
 		newVelZ.resize(Nx*Ny*(Nz + 1), 0.);
 		
-		Nv = Vector(Nx, Ny, Nz);
-		dx = (extent.bounds[1] - extent.bounds[0]) / Vector(Nx, Ny, Nz);
+		Nv = Vectord(Nx, Ny, Nz);
+		dx = (extent.bounds[1] - extent.bounds[0]) / Vectord(Nx, Ny, Nz);
 		dx2 = dx * dx;
-		invdx2 = Vector(1.,1.,1.) / dx2;
-		invdx = Vector(1., 1., 1.) / dx;
+		invdx2 = Vectord(1.,1.,1.) / dx2;
+		invdx = Vectord(1., 1., 1.) / dx;
 		name = "Fluid1";
 
 
@@ -121,11 +123,11 @@ public:
 		for (int i = 0; i < Nz; i++)
 			for (int j = 0; j < Ny; j++)
 				for (int k = 0; k < Nx; k++) {
-					Vector center = extent.bounds[0] + Vector(k+0.5, j+0.5, i+0.5)*dx;
+					Vector center = toVecf(extent.bounds[0]) + Vector(k+0.5, j+0.5, i+0.5)*toVecf(dx);
 					Vector dir(0.5, 0., 0.5); dir.normalize();
 					Vector P;
 					int id, tid;
-					double mint;
+					float mint;
 					MaterialValues mat0, mat1;
 					bool i1 = scene.intersection(Ray(center, dir, 0), P, id, mint, mat0, tid);
 					bool i2 = scene.intersection(Ray(center, -dir, 0), P, id, mint, mat1, tid);
@@ -244,7 +246,7 @@ public:
 
 	void init_particles(bool initwithshape, int selected_object) {
 
-		std::vector<Vector> initpart;
+		std::vector<Vectord> initpart;
 		std::random_device dev;
 		std::mt19937 rng(dev());
 		std::uniform_real_distribution<double> uniform(0, 1);
@@ -266,11 +268,11 @@ public:
 			for (int i = 0; i < Nz; i++)
 				for (int j = 0; j < Ny; j++)
 					for (int k = 0; k < Nx; k++) {
-						Vector center = extent.bounds[0] + Vector(k + 0.5, j + 0.5, i + 0.5)*dx;
+						Vector center = toVecf(extent.bounds[0]) + Vector(k + 0.5, j + 0.5, i + 0.5)*toVecf(dx);
 						Vector new_origin = scene.objects[selected_object]->apply_inverse_transformation(center);
 						Vector P;
 						int id, tid;
-						double mint1, mint2, mint;
+						float mint1, mint2, mint;
 						Vector col(1., 1., 1.);
 						MaterialValues mat0, mat1;
 						bool i1 = scene.objects[selected_object]->intersection(Ray(new_origin, transformed_dir, 0), P, mint1, mat0, 1E9, tid);
@@ -299,7 +301,7 @@ public:
 									col = mat1.Kd;
 								}
 							}
-							cellcol[i*Ny*Nx + j * Nx + k] = col;
+							cellcol[i*Ny*Nx + j * Nx + k] = toVecd(col);
 						}
 					}
 
@@ -325,11 +327,11 @@ public:
 						int k = id % Nx;
 						int j = (id / Nx) % Ny;
 						int i = (id / (Nx*Ny)) % Nz;
-						initpart.push_back(Vector(k + uniform(rng), j + uniform(rng), i + uniform(rng)) * dx + extent.bounds[0]);
+						initpart.push_back(Vectord(k + uniform(rng), j + uniform(rng), i + uniform(rng)) * dx + extent.bounds[0]);
 						if(cellcol.size()>0)
 							visualparticlescolor.push_back(cellcol[id]);
 						else
-							visualparticlescolor.push_back(Vector(1.,1.,1.));
+							visualparticlescolor.push_back(Vectord(1.,1.,1.));
 					}
 				}
 			}
@@ -337,7 +339,7 @@ public:
 
 
 		Nparticles = initpart.size();
-		particles.resize(nbframes + 1, std::vector<Vector>(Nparticles));
+		particles.resize(nbframes + 1, std::vector<Vectord>(Nparticles));
 		particles[0] = initpart;
 
 		ghostparticles.reserve(Nx*Ny*Nz * 1);
@@ -346,7 +348,7 @@ public:
 				for (int k = 0; k < Nx; k++) {
 					if (celltypes[i*Nx*Ny + j * Nx + k] == 1) {
 						for (int l = 0; l < 4; l++) { // not jittered
-							Vector randP = extent.bounds[0] + Vector(k + uniform(rng), j + uniform(rng), i + uniform(rng))*dx;
+							Vectord randP = extent.bounds[0] + Vectord(k + uniform(rng), j + uniform(rng), i + uniform(rng))*dx;
 							ghostparticles.push_back(randP);
 						}
 					}
@@ -362,8 +364,8 @@ public:
 	}
 
 	template<typename T>
-	T interp(const Vector& pos, const std::vector<T> &field, int Nx, int Ny, int Nz) {
-		Vector posNormalized = (pos - extent.bounds[0]) / dx; // (extent.bounds[1] - extent.bounds[0])*Vector(Nx, Ny, Nz);
+	T interp(const Vectord& pos, const std::vector<T> &field, int Nx, int Ny, int Nz) {
+		Vectord posNormalized = (pos - extent.bounds[0]) / dx; // (extent.bounds[1] - extent.bounds[0])*Vector(Nx, Ny, Nz);
 		posNormalized[0] = std::max(0., std::min(Nx - 1.000001, posNormalized[0]));
 		posNormalized[1] = std::max(0., std::min(Ny - 1.000001, posNormalized[1]));
 		posNormalized[2] = std::max(0., std::min(Nz - 1.000001, posNormalized[2]));
@@ -373,7 +375,7 @@ public:
 		//if (icoords[0] >= Nx - 1 || icoords[1] >= Ny - 1 || icoords[2] >= Nz - 1) return T(0);
 		//if (icoords[0] < 0 || icoords[1] <0 || icoords[2] <0) return T(0);
 
-		Vector fcoords(posNormalized[0] - icoords[0], posNormalized[1] - icoords[1], posNormalized[2] - icoords[2]);
+		Vectord fcoords(posNormalized[0] - icoords[0], posNormalized[1] - icoords[1], posNormalized[2] - icoords[2]);
 		/*if (icoords[0] < 0) { icoords[0] = 0; fcoords[0] = 0; }
 		if (icoords[0] >= Nx-1) { icoords[0] = Nx-2; fcoords[0] = 1; }
 		if (icoords[1] < 0) { icoords[1] = 0; fcoords[1] = 0; }
@@ -396,15 +398,15 @@ public:
 				for (int k = 1; k < Nx; k++) {
 
 					// get vector coordinates at staggered grid location by bilinear interpolation
-					Vector curVelX;
+					Vectord curVelX;
 					curVelX[0] = velX[i*Ny*(Nx + 1) + j * (Nx + 1) + k];
 					curVelX[1] = (velY[i*(Ny + 1)*Nx + j *Nx + k] + velY[i*(Ny + 1)*Nx + (j+1) *Nx + k] + velY[i*(Ny + 1)*Nx + j * Nx + k-1] + velY[i*(Ny + 1)*Nx + (j+1) *Nx + k-1])*0.25;
 					curVelX[2] = (velZ[i*Ny*Nx + j * Nx + k] + velZ[(i + 1)*Ny*Nx + j * Nx + k] + velZ[i*Ny*Nx + j * Nx + k-1] + velZ[(i + 1)*Ny*Nx + j * Nx + k-1])*0.25;
 
-					Vector newVelPosition = Vector(k, j+0.5, i+0.5) * dx + extent.bounds[0] - curVelX*dt; // previous position in world space
-					newVelPosition[0] = std::max(std::min(newVelPosition[0], extent.bounds[1][0]), extent.bounds[0][0]);  // stick to walls ; should change
-					newVelPosition[1] = std::max(std::min(newVelPosition[1] - 0.5*dx[1], extent.bounds[1][1] - dx[1]), extent.bounds[0][1]);
-					newVelPosition[2] = std::max(std::min(newVelPosition[2] - 0.5*dx[2], extent.bounds[1][2] - dx[2]), extent.bounds[0][2]);
+					Vectord newVelPosition = Vectord(k, j+0.5, i+0.5) * dx + extent.bounds[0] - curVelX*dt; // previous position in world space
+					newVelPosition[0] = std::max(std::min(newVelPosition[0], (double)extent.bounds[1][0]), (double)extent.bounds[0][0]);  // stick to walls ; should change
+					newVelPosition[1] = std::max(std::min(newVelPosition[1] - 0.5*dx[1], (double)extent.bounds[1][1] - dx[1]), (double)extent.bounds[0][1]);
+					newVelPosition[2] = std::max(std::min(newVelPosition[2] - 0.5*dx[2], (double)extent.bounds[1][2] - dx[2]), (double)extent.bounds[0][2]);
 
 					newVelX[i*Ny*(Nx + 1) + j * (Nx + 1) + k] = interp(newVelPosition, velX, Nx+1, Ny, Nz);
 				}
@@ -417,15 +419,15 @@ public:
 				for (int k = 0; k < Nx; k++) {
 
 					// get vector coordinates at staggered grid location by bilinear interpolation
-					Vector curVelY;
+					Vectord curVelY;
 					curVelY[0] = (velX[i*Ny*(Nx+1) + j * (Nx + 1) + k] + velX[i*Ny*(Nx + 1) + (j - 1) *(Nx + 1) + k] + velX[i*Ny*(Nx + 1) + j * (Nx + 1) + k+1] + velX[i*Ny*(Nx + 1) + (j - 1) *(Nx + 1) + k+1])*0.25;
 					curVelY[1] = velY[i*(Ny+1)*Nx + j * Nx + k];
 					curVelY[2] = (velZ[i*Ny*Nx + j * Nx + k] + velZ[i*Ny*Nx + (j-1) * Nx + k] + velZ[(i + 1)*Ny*Nx + j * Nx + k] + velZ[(i+1)*Ny*Nx + (j-1) * Nx + k])*0.25;
 
-					Vector newVelPosition = Vector(k+0.5, j, i + 0.5) * dx + extent.bounds[0] - curVelY * dt; // previous position in world space
-					newVelPosition[0] = std::max(std::min(newVelPosition[0] - 0.5*dx[0], extent.bounds[1][0] - dx[0]), extent.bounds[0][0]);  // stick to walls ; should change
-					newVelPosition[1] = std::max(std::min(newVelPosition[1], extent.bounds[1][1]), extent.bounds[0][1]);
-					newVelPosition[2] = std::max(std::min(newVelPosition[2] - 0.5*dx[2], extent.bounds[1][2] - dx[2]), extent.bounds[0][2]);
+					Vectord newVelPosition = Vectord(k+0.5, j, i + 0.5) * dx + extent.bounds[0] - curVelY * dt; // previous position in world space
+					newVelPosition[0] = std::max(std::min(newVelPosition[0] - 0.5*dx[0], (double)extent.bounds[1][0] - dx[0]), (double)extent.bounds[0][0]);  // stick to walls ; should change
+					newVelPosition[1] = std::max(std::min(newVelPosition[1], (double)extent.bounds[1][1]), (double)extent.bounds[0][1]);
+					newVelPosition[2] = std::max(std::min(newVelPosition[2] - 0.5*dx[2], (double)extent.bounds[1][2] - dx[2]), (double)extent.bounds[0][2]);
 
 					newVelY[i*(Ny+1)*Nx + j * Nx + k] = interp(newVelPosition, velY, Nx, Ny+1, Nz);
 				}
@@ -438,12 +440,12 @@ public:
 				for (int k = 0; k < Nx; k++) {
 
 					// get vector coordinates at staggered grid location by bilinear interpolation
-					Vector curVelZ;
+					Vectord curVelZ;
 					curVelZ[0] = (velX[i*Ny*(Nx + 1) + j * (Nx + 1) + k] + velX[(i-1)*Ny*(Nx + 1) + j *(Nx + 1) + k] + velX[(i - 1)*Ny*(Nx + 1) + j * (Nx + 1) + k+1] + velX[i*Ny*(Nx + 1) + j *(Nx + 1) + k+1])*0.25;					
 					curVelZ[1] = (velY[i*(Ny+1)*Nx + j * Nx + k] + velY[i*(Ny+1)*Nx + (j + 1) * Nx + k] + velY[(i - 1)*(Ny+1)*Nx + j * Nx + k] + velY[(i - 1)*(Ny+1)*Nx + (j + 1) * Nx + k])*0.25;
 					curVelZ[2] = velZ[i*Ny*Nx + j * Nx + k];
 
-					Vector newVelPosition = Vector(k + 0.5, j+0.5, i) * dx + extent.bounds[0] - curVelZ * dt; // previous position in world space
+					Vectord newVelPosition = Vectord(k + 0.5, j+0.5, i) * dx + extent.bounds[0] - curVelZ * dt; // previous position in world space
 					newVelPosition[0] = std::max(std::min(newVelPosition[0] - 0.5*dx[0], extent.bounds[1][0] - dx[0]), extent.bounds[0][0]);  // stick to walls ; should change
 					newVelPosition[1] = std::max(std::min(newVelPosition[1] - 0.5*dx[1], extent.bounds[1][1] - dx[1]), extent.bounds[0][1]);
 					newVelPosition[2] = std::max(std::min(newVelPosition[2], extent.bounds[1][2]), extent.bounds[0][2]);
@@ -841,7 +843,7 @@ public:
 
 	}
 
-	void moveparticles(std::vector<Vector>& particles_new, const std::vector<Vector>& particles_old) {
+	void moveparticles(std::vector<Vectord>& particles_new, const std::vector<Vectord>& particles_old) {
 #pragma omp parallel for schedule(static)
 		for (int i = 0; i < particles_old.size(); i++) {
 			double curdt = dt;
@@ -854,13 +856,13 @@ public:
 
 				//particles_new[i] = particles_old[i] + curdt * Vector(interp(particles_old[i] - Vector(0, 0.5*dx[1], 0.5*dx[2]), velX, Nx + 1, Ny, Nz), interp(particles_old[i] - Vector(0.5*dx[0], 0, 0.5*dx[2]), velY, Nx, Ny + 1, Nz), interp(particles_old[i] - Vector(0.5*dx[0], 0.5*dx[1], 0), velZ, Nx, Ny, Nz + 1));
 
-			    Vector k1 = Vector(interp(particles_old[i] - Vector(0, 0.5*dx[1], 0.5*dx[2]), velX, Nx + 1, Ny, Nz), interp(particles_old[i] - Vector(0.5*dx[0], 0, 0.5*dx[2]), velY, Nx, Ny + 1, Nz), interp(particles_old[i] - Vector(0.5*dx[0], 0.5*dx[1], 0), velZ, Nx, Ny, Nz + 1));
-				Vector k2 = Vector(interp(particles_old[i] - Vector(0, 0.5*dx[1], 0.5*dx[2]) + curdt * 0.5 * k1, velX, Nx + 1, Ny, Nz), interp(particles_old[i] - Vector(0.5*dx[0], 0, 0.5*dx[2]) + curdt * 0.5*k1, velY, Nx, Ny + 1, Nz), interp(particles_old[i] - Vector(0.5*dx[0], 0.5*dx[1], 0) + curdt * 0.5*k1, velZ, Nx, Ny, Nz + 1));
-				Vector k3 = Vector(interp(particles_old[i] - Vector(0, 0.5*dx[1], 0.5*dx[2]) + curdt * 0.5 * k2, velX, Nx + 1, Ny, Nz), interp(particles_old[i] - Vector(0.5*dx[0], 0, 0.5*dx[2]) + curdt * 0.5*k2, velY, Nx, Ny + 1, Nz), interp(particles_old[i] - Vector(0.5*dx[0], 0.5*dx[1], 0) + curdt * 0.5*k2, velZ, Nx, Ny, Nz + 1));
-				Vector k4 = Vector(interp(particles_old[i] - Vector(0, 0.5*dx[1], 0.5*dx[2]) + curdt * k3, velX, Nx + 1, Ny, Nz), interp(particles_old[i] - Vector(0.5*dx[0], 0, 0.5*dx[2]) + curdt *k3, velY, Nx, Ny + 1, Nz), interp(particles_old[i] - Vector(0.5*dx[0], 0.5*dx[1], 0) + curdt *k3, velZ, Nx, Ny, Nz + 1));
-				particles_new[i] = particles_old[i] + curdt/6.*(k1+2*k2+2*k3+k4);
+			    Vectord k1 = Vectord(interp(particles_old[i] - Vectord(0, 0.5*dx[1], 0.5*dx[2]), velX, Nx + 1, Ny, Nz), interp(particles_old[i] - Vectord(0.5*dx[0], 0, 0.5*dx[2]), velY, Nx, Ny + 1, Nz), interp(particles_old[i] - Vectord(0.5*dx[0], 0.5*dx[1], 0), velZ, Nx, Ny, Nz + 1));
+				Vectord k2 = Vectord(interp(particles_old[i] - Vectord(0, 0.5*dx[1], 0.5*dx[2]) + curdt * 0.5 * k1, velX, Nx + 1, Ny, Nz), interp(particles_old[i] - Vectord(0.5*dx[0], 0, 0.5*dx[2]) + curdt * 0.5*k1, velY, Nx, Ny + 1, Nz), interp(particles_old[i] - Vectord(0.5*dx[0], 0.5*dx[1], 0) + curdt * 0.5*k1, velZ, Nx, Ny, Nz + 1));
+				Vectord k3 = Vectord(interp(particles_old[i] - Vectord(0, 0.5*dx[1], 0.5*dx[2]) + curdt * 0.5 * k2, velX, Nx + 1, Ny, Nz), interp(particles_old[i] - Vectord(0.5*dx[0], 0, 0.5*dx[2]) + curdt * 0.5*k2, velY, Nx, Ny + 1, Nz), interp(particles_old[i] - Vectord(0.5*dx[0], 0.5*dx[1], 0) + curdt * 0.5*k2, velZ, Nx, Ny, Nz + 1));
+				Vectord k4 = Vectord(interp(particles_old[i] - Vectord(0, 0.5*dx[1], 0.5*dx[2]) + curdt * k3, velX, Nx + 1, Ny, Nz), interp(particles_old[i] - Vectord(0.5*dx[0], 0, 0.5*dx[2]) + curdt *k3, velY, Nx, Ny + 1, Nz), interp(particles_old[i] - Vectord(0.5*dx[0], 0.5*dx[1], 0) + curdt *k3, velZ, Nx, Ny, Nz + 1));
+				particles_new[i] = particles_old[i] + curdt/6.*(k1+2.*k2+2.*k3+k4);
 
-				Vector pgrid = (particles_new[i] - extent.bounds[0]) / dx;
+				Vectord pgrid = (particles_new[i] - extent.bounds[0]) / dx;
 				int pi[3] = { static_cast<int>(std::round(pgrid[0])), static_cast<int>(std::round(pgrid[1] )), static_cast<int>(std::round(pgrid[2])) };
 				if ((pi[0] < 0 || pi[1] < 0 || pi[2] < 0) || (pi[0] >= Nx || pi[1] >= Ny || pi[2] >= Nz) || (celltypes[pi[2] * Ny*Nx + pi[1] * Nx + pi[0]] == 2)) {
 					curdt *= 0.75;
@@ -890,7 +892,7 @@ public:
 
 		int fluidcount = 0;
 		for (int i = 0; i < ghostparticles.size(); i++) {
-			Vector pgrid = (ghostparticles[i] - extent.bounds[0]) / dx;
+			Vectord pgrid = (ghostparticles[i] - extent.bounds[0]) / dx;
 			int pi[3] = {static_cast<int>(std::round(pgrid[0])), static_cast<int>(std::round(pgrid[1])) , static_cast<int>(std::round(pgrid[2])) };
 			if (pi[0] < 0 || pi[1] < 0 || pi[2] < 0) continue;
 			if (pi[0] >= Nx || pi[1] >= Ny || pi[2] >= Nz) continue;
@@ -902,7 +904,7 @@ public:
 		fprintf(f, "%u\n", fluidcount);
 		fclose(f);
 		for (int i = 0; i < visualparticles.size(); i++) {
-			Vector pgrid = (visualparticles[i] - extent.bounds[0]) / dx;
+			Vectord pgrid = (visualparticles[i] - extent.bounds[0]) / dx;
 			int pi[3] = { static_cast<int>(std::round(pgrid[0])), static_cast<int>(std::round(pgrid[1])) , static_cast<int>(std::round(pgrid[2] ))};
 			if (pi[0] < 0 || pi[1] < 0 || pi[2] < 0) continue;
 			if (pi[0] >= Nx || pi[1] >= Ny || pi[2] >= Nz) continue;
@@ -953,42 +955,42 @@ public:
 
 
 
-	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const;
-	bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const;
-	bool intersection_transparent(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const;
-	bool intersection_opaque(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const;
-	bool reservoir_sampling_intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const;
+	bool intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, float cur_best_t, int &triangle_id) const;
+	bool intersection_shadow(const Ray& d, float &t, float cur_best_t, float dist_light) const;
+	bool intersection_transparent(const Ray& d, Vector& P, float &t, MaterialValues &mat, float cur_best_t, int &triangle_id) const;
+	bool intersection_opaque(const Ray& d, Vector& P, float &t, MaterialValues &mat, float cur_best_t, int &triangle_id) const;
+	bool reservoir_sampling_intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, float min_t, float max_t) const;
 
-	BBox build_bbox(int frame, int i0, int i1);
-	BBox build_centers_bbox(int frame, int i0, int i1);
+	BBoxd build_bbox(int frame, int i0, int i1);
+	BBoxd build_centers_bbox(int frame, int i0, int i1);
 	void build_bvh(int frame, int i0, int i1);
-	void build_bvh_recur(int frame, BVH* b, int node, int i0, int i1);
+	void build_bvh_recur(int frame, BVHd* b, int node, int i0, int i1);
 
 	void build_grid(int frame);
-	bool intersection_transparent2(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const;
-	bool intersection_opaque2(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const;
-	bool intersection_shadow2(const Ray& d, double &t, double cur_best_t, double dist_light) const;
+	bool intersection_transparent2(const Ray& d, Vector& P, float &t, MaterialValues &mat, float cur_best_t, int &triangle_id) const;
+	bool intersection_opaque2(const Ray& d, Vector& P, float &t, MaterialValues &mat, float cur_best_t, int &triangle_id) const;
+	bool intersection_shadow2(const Ray& d, float &t, float cur_best_t, float dist_light) const;
 		
-	BBox extent;
+	BBoxd extent;
 	int Nx, Ny, Nz, Nparticles;
-	Vector Nv;
+	Vectord Nv;
 	std::vector<double> velX, velY, velZ, pressure;
-	std::vector<std::vector<Vector> > particles;  // decouples particles used for simulation and for rendering
-	std::vector<Vector> ghostparticles, ghostparticlesnew, visualparticles, visualparticlesnew, visualparticlescolor;
+	std::vector<std::vector<Vectord> > particles;  // decouples particles used for simulation and for rendering
+	std::vector<Vectord> ghostparticles, ghostparticlesnew, visualparticles, visualparticlesnew, visualparticlescolor;
 	std::vector<int> fluidindices;
 	std::vector<char> celltypes;
-	std::vector<Vector> cellcol;
-	Vector dx, dx2, invdx, invdx2;
+	std::vector<Vectord> cellcol;
+	Vectord dx, dx2, invdx, invdx2;
 	double rho, radius, dt;
-	BVH bvh;
+	BVHd bvh;
 	int nbframes, nsubsteps;
 	std::vector<double> newVelX, newVelY, newVelZ;
 	bool opaque;
 	Scene& scene;
 
-	mutable std::pair<double, std::pair<double, int> >  allts[64][500000];
+	mutable std::pair<float, std::pair<float, int> >  allts[64][500000];
 	mutable int nodelist[64][500000];
-	mutable double tnearlist[64][500000];
+	mutable float tnearlist[64][500000];
 
 	std::vector<char> accelgrid;
 	std::vector<std::vector<int> > accelgridindices;

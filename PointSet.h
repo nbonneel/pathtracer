@@ -52,11 +52,11 @@ public:
 
 		// cols[i] : -1: ignore, 0:x 1:y, 2:z, 3:nx,4:ny,5:nz, 6:colr, 7:colg, 8:colb
 		FILE* f = fopen(filename, "r");
-		double values[100];
+		float values[100];
 		while (!feof(f)) {
 
 			for (int i = 0; i < nbcols; i++)
-				if (fscanf(f, "%lf", &values[i])!=1) break;
+				if (fscanf(f, "%f", &values[i])!=1) break;
 
 			Vector p, c(1.,1.,1.), n(0.,0.,0.);
 
@@ -93,7 +93,7 @@ public:
 			}
 
 			vertices.push_back(p);
-			colors.push_back(c/255.);
+			colors.push_back(c/255.f);
 			normals.push_back(n);
 		}
 		fclose(f);
@@ -102,14 +102,14 @@ public:
 
 		BBox bb = build_centers_bbox(0, vertices.size());
 		Vector center(0., 0., 0.);
-		double s = std::max(bb.bounds[1][0] - bb.bounds[0][0], std::max(bb.bounds[1][1] - bb.bounds[0][1], bb.bounds[1][2] - bb.bounds[0][2]));
-		Vector c = (bb.bounds[0] + bb.bounds[1])*0.5;
+		float s = std::max(bb.bounds[1][0] - bb.bounds[0][0], std::max(bb.bounds[1][1] - bb.bounds[0][1], bb.bounds[1][2] - bb.bounds[0][2]));
+		Vector c = (bb.bounds[0] + bb.bounds[1])*0.5f;
 		if (is_centered) {
 			for (int i = 0; i < vertices.size(); i++) {
-				vertices[i] = (vertices[i] - c) / s * 1;
+				vertices[i] = (vertices[i] - c) / s * 1.f;
 				center += vertices[i];
 			}
-			center = center / vertices.size();
+			center = center / (float)vertices.size();
 		}
 
 		if (normals[0][0] == 0. && normals[0][1] == 0. && normals[0][2] == 0.)
@@ -125,7 +125,7 @@ public:
 	void estimate_normals() {
 
 		int N = vertices.size();
-		PointCloud<double> cloud;
+		PointCloud<float> cloud;
 		cloud.pts.resize(N);
 		radius.resize(N);
 		for (size_t i = 0; i < N; i++) {
@@ -134,8 +134,8 @@ public:
 			cloud.pts[i].z = vertices[i][2];
 		}
 		typedef nanoflann::KDTreeSingleIndexAdaptor<
-			nanoflann::L2_Simple_Adaptor<double, PointCloud<double> >,
-			PointCloud<double>, 3> my_kd_tree_t;
+			nanoflann::L2_Simple_Adaptor<float, PointCloud<float> >,
+			PointCloud<float>, 3> my_kd_tree_t;
 
 		my_kd_tree_t   index(3 /*dim*/, cloud, nanoflann::KDTreeSingleIndexAdaptorParams(10 /* max leaf */));
 		index.buildIndex();
@@ -197,7 +197,7 @@ public:
 	static PointSet* create_from_file(FILE* f, const char* replacedNames = NULL) {
 		PointSet* result = new PointSet();
 		result->Object::load_from_file(f, replacedNames);
-		double unused;
+		float unused;
 		bool is_centered = true;
 		char line[512];
 		fscanf(f, "%[^\n]\n", line);
@@ -205,9 +205,9 @@ public:
 			int c;
 			sscanf(line, "is_centered: %u\n", &c);
 			is_centered = (c == 1);
-			fscanf(f, "radius: %lf\n", &unused);
+			fscanf(f, "radius: %f\n", &unused);
 		} else {
-			sscanf(line, "radius: %lf\n", &unused);
+			sscanf(line, "radius: %f\n", &unused);
 		}
 		
 		fscanf(f, "nbcols: %u\ncolumns: ", &result->nbcols);
@@ -219,9 +219,9 @@ public:
 	}
 
 
-	bool intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const;	
-	bool intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const;
-	bool reservoir_sampling_intersection(const Ray& r, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const;
+	bool intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, float cur_best_t, int &triangle_id) const;
+	bool intersection_shadow(const Ray& d, float &t, float cur_best_t, float dist_light) const;
+	bool reservoir_sampling_intersection(const Ray& r, Vector& P, float &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, float min_t, float max_t) const;
 
 	BBox build_bbox(int i0, int i1);
 	BBox build_centers_bbox(int i0, int i1);

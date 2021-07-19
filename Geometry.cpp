@@ -99,7 +99,7 @@ void Object::set_transp_map(const char* filename, int idx) {
 	if (idx >= transparent_map.size()) return;
 	transparent_map[idx].loadColors(filename);
 }
-void Object::set_col_transp(double col, int idx) {
+void Object::set_col_transp(float col, int idx) {
 	if (idx >= transparent_map.size()) return;
 	transparent_map[idx] = Texture("Null", 5, Vector(col, col, col));
 }
@@ -109,7 +109,7 @@ void Object::remove_transp(int id) {
 void Object::swap_transp(int id1, int id2) {
 	std::swap(transparent_map[id1], transparent_map[id2]);
 }
-void Object::add_col_transp(double col) {
+void Object::add_col_transp(float col) {
 	transparent_map.push_back(Texture("Null", 5, Vector(col, col, col)));
 }
 void Object::add_refr_map(const char* filename) {
@@ -119,7 +119,7 @@ void Object::set_refr_map(const char* filename, int idx) {
 	if (idx >= refr_index_map.size()) return;
 	refr_index_map[idx].loadColors(filename);
 }
-void Object::set_col_refr(double col, int idx) {
+void Object::set_col_refr(float col, int idx) {
 	if (idx >= refr_index_map.size()) return;
 	refr_index_map[idx] = Texture("Null", 6, Vector(col, col, col));
 }
@@ -129,7 +129,7 @@ void Object::remove_refr(int id) {
 void Object::swap_refr(int id1, int id2) {
 	std::swap(refr_index_map[id1], refr_index_map[id2]);
 }
-void Object::add_col_refr(double col) {
+void Object::add_col_refr(float col) {
 	refr_index_map.push_back(Texture("Null", 6, Vector(col, col, col)));
 }
 void Object::add_roughnessmap(const char* filename) {
@@ -144,7 +144,7 @@ void Object::set_alphamap(const char* filename, int idx) {
 	if (idx >= alphamap.size()) return;
 	alphamap[idx] = Texture(filename, 3, Vector(1., 1., 1.));
 }
-void Object::set_col_alpha(double col, int idx) {
+void Object::set_col_alpha(float col, int idx) {
 	if (idx >= alphamap.size()) return;
 	alphamap[idx] = Texture("Null", 3, Vector(col, col, col));
 }
@@ -240,7 +240,7 @@ void Object::set_null_normalmap(int idx) {
 	if (idx >= textures.size()) return;
 	normal_map[idx].clear_texture();
 }
-void Object::add_col_alpha(double col) {
+void Object::add_col_alpha(float col) {
 	alphamap.push_back(Texture("Null", 3, Vector(col, col, col)));
 }
 
@@ -337,7 +337,7 @@ void random_intersectionFilter(const RTCFilterFunctionNArguments* args) {
 #endif 
 
 // super slow version ; returns a random intersection in tmin tmax. Uses reservoir sampling. If sphere_id!=-1, considers only intersections with this object
-bool Scene::get_random_intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id, double tmin, double tmax, bool avoid_ghosts) const {
+bool Scene::get_random_intersection(const Ray& d, Vector& P, int &sphere_id, float &min_t, MaterialValues &mat, int &triangle_id, float tmin, float tmax, bool avoid_ghosts) const {
 	/*bool hasinter = false;
 	double startt = tmin;
 	int ninter = 0;
@@ -383,7 +383,7 @@ bool Scene::get_random_intersection(const Ray& d, Vector& P, int &sphere_id, dou
 	min_t = 1E99;
 
 
-	double t;
+	float t;
 	int nb_intersections = 0;
 
 	for (int i = 0; i < objects.size(); i++) {
@@ -547,9 +547,9 @@ void Scene::first_intersection_batch(int batch_size) { // dont forget to set W a
 
 			Vector localP;
 			int triangle_id;
-			double min_t;
+			float min_t;
 			MaterialValues localmat;
-			double t;
+			float t;
 
 			bool local_has_inter = objects[i]->intersection(transformed_ray, localP, t, localmat, firstIntersection_min_t[threadid][id], triangle_id);
 
@@ -587,7 +587,7 @@ void Scene::first_intersection_batch(int batch_size) { // dont forget to set W a
 }
 
 
-bool Scene::intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t, MaterialValues &mat, int &triangle_id, bool avoid_ghosts, bool isCoherent) const {
+bool Scene::intersection(const Ray& d, Vector& P, int &sphere_id, float &min_t, MaterialValues &mat, int &triangle_id, bool avoid_ghosts, bool isCoherent) const {
 
 	bool has_inter = false;
 	min_t = 1E99;
@@ -595,7 +595,7 @@ bool Scene::intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t,
 
 	Vector localP;
 	MaterialValues localmat;
-	double t;
+	float t;
 
 	for (int i = 0; i < objects.size(); i++) {
 		if (avoid_ghosts && objects[i]->ghost) continue;
@@ -689,7 +689,7 @@ bool Scene::intersection(const Ray& d, Vector& P, int &sphere_id, double &min_t,
 }
 
 
-bool Scene::intersection_shadow(const Ray& d, double &min_t, double dist_light, bool avoid_ghosts, bool isCoherent) const {
+bool Scene::intersection_shadow(const Ray& d, float &min_t, float dist_light, bool avoid_ghosts, bool isCoherent) const {
 
 	min_t = 1E99;
 
@@ -730,7 +730,7 @@ bool Scene::intersection_shadow(const Ray& d, double &min_t, double dist_light, 
 		Vector new_origin = objects[i]->apply_inverse_transformation(d.origin);
 		Ray transformed_ray(new_origin, transformed_dir, d.time);
 
-		double t;
+		float t;
 
 		bool local_has_inter = objects[i]->intersection_shadow(transformed_ray, t, min_t, dist_light);
 

@@ -121,17 +121,17 @@ void PointSet::build_bvh_recur(BVH* b, int node, int i0, int i1) {
 }
 
 
-bool PointSet::intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, double cur_best_t, int &triangle_id) const
+bool PointSet::intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, float cur_best_t, int &triangle_id) const
 {
 	t = cur_best_t;
 	bool has_inter = false;
-	double t_box_left, t_box_right;
+	float t_box_left, t_box_right;
 	int best_index = -1;
 	bool goleft, goright;
 	Vector localP, localN;
-	double localt;
+	float localt;
 	
-	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
+	Ray invd(d.origin, Vector(1.f / d.direction[0], 1.f / d.direction[1], 1.f / d.direction[2]), d.time);
 	char signs[3];
 	signs[0] = (invd.direction[0] >= 0) ? 1 : 0;
 	signs[1] = (invd.direction[1] >= 0) ? 1 : 0;
@@ -141,7 +141,7 @@ bool PointSet::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 	if (t_box_left > cur_best_t) return false;
 
 	int l[50];
-	double tnear[50];
+	float tnear[50];
 	int idx_back = -1;
 
 	l[++idx_back] = 0;
@@ -209,7 +209,7 @@ bool PointSet::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 		//mat.Kd = Vector(localN[0]*0.5+0.5, localN[1] * 0.5 + 0.5, localN[2] * 0.5 + 0.5);
 		//mat.Kd = Vector(std::abs(localN[0]), std::abs(localN[1]), std::abs(localN[2]));
 		if (display_edges) {
-			double r2 = (localP - vertices[i]).getNorm2();
+			float r2 = (localP - vertices[i]).getNorm2();
 			if (r2 > (radius[i]*radius[i] *0.95*0.95))
 				mat.Kd = Vector(0., 0., 0.);
 		}
@@ -244,17 +244,17 @@ bool PointSet::intersection(const Ray& d, Vector& P, double &t, MaterialValues &
 }
 
 
-bool PointSet::intersection_shadow(const Ray& d, double &t, double cur_best_t, double dist_light) const
+bool PointSet::intersection_shadow(const Ray& d, float &t, float cur_best_t, float dist_light) const
 {
 	t = cur_best_t;
 	bool has_inter = false;
-	double t_box_left, t_box_right;
+	float t_box_left, t_box_right;
 	int best_index = -1;
 	bool goleft, goright;
 	Vector localP, localN;
-	double localt;
+	float localt;
 	
-	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
+	Ray invd(d.origin, Vector(1.f / d.direction[0], 1.f / d.direction[1], 1.f / d.direction[2]), d.time);
 	char signs[3];
 	signs[0] = (invd.direction[0] >= 0) ? 1 : 0;
 	signs[1] = (invd.direction[1] >= 0) ? 1 : 0;
@@ -264,7 +264,7 @@ bool PointSet::intersection_shadow(const Ray& d, double &t, double cur_best_t, d
 	if (t_box_left > cur_best_t || t_box_left > dist_light) return false;
 
 	int l[50];
-	double tnear[50];
+	float tnear[50];
 	int idx_back = -1;
 
 	l[++idx_back] = 0;
@@ -316,13 +316,13 @@ bool PointSet::intersection_shadow(const Ray& d, double &t, double cur_best_t, d
 }
 
 
-bool PointSet::reservoir_sampling_intersection(const Ray& d, Vector& P, double &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, double min_t, double max_t) const {	
+bool PointSet::reservoir_sampling_intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, float min_t, float max_t) const {
 	bool has_inter = false;
-	double t_box_left, t_box_right;
+	float t_box_left, t_box_right;
 	int best_index = -1;
 	bool goleft, goright;
 	Vector localP, localN;
-	double localt;
+	float localt;
 
 	Ray invd(d.origin, Vector(1. / d.direction[0], 1. / d.direction[1], 1. / d.direction[2]), d.time);
 	char signs[3];
@@ -337,7 +337,7 @@ bool PointSet::reservoir_sampling_intersection(const Ray& d, Vector& P, double &
 	const float invmax = 1.f / engine[threadid].max();
 
 	int l[50];
-	double tnear[50];
+	float tnear[50];
 	int idx_back = -1;
 
 	l[++idx_back] = 0;
@@ -410,7 +410,7 @@ bool PointSet::reservoir_sampling_intersection(const Ray& d, Vector& P, double &
 		//mat.Kd = Vector(localN[0]*0.5+0.5, localN[1] * 0.5 + 0.5, localN[2] * 0.5 + 0.5);
 		//mat.Kd = Vector(std::abs(localN[0]), std::abs(localN[1]), std::abs(localN[2]));
 		if (display_edges) {
-			double r2 = (localP - vertices[i]).getNorm2();
+			float r2 = (localP - vertices[i]).getNorm2();
 			if (r2 > (radius[i] * radius[i] * 0.95*0.95))
 				mat.Kd = Vector(0., 0., 0.);
 		}

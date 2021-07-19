@@ -10,6 +10,8 @@
 #include <OpenImageDenoise/oidn.hpp>
 #endif
 
+
+
 class Contrib {
 public:
 	Contrib() {};
@@ -38,7 +40,7 @@ public:
 #endif
 	};
 	void loadScene();
-	void prepare_render(double time);
+	void prepare_render(float time);
 	void render_image();
 	void render_image_nopreviz();
 	void clear_image() { 
@@ -65,7 +67,7 @@ public:
 	void load_scene(const char* filename, const char* replacedNames = NULL);
 
 	Vector getColor(const Ray &r, int sampleID, int nbrebonds, int screenI, int screenJ, Vector &normalValue, Vector &albedoValue, bool no_envmap = false, bool has_precomputed_rays = false, int rayID = 0);
-	bool fogContribution(const Ray &r, const Vector& sampleLightPos, double t, Vector curWeight, int nbrebonds, bool showLight, bool hadSS, Contrib& newContrib, double &attenuationFactor);
+	bool fogContribution(const Ray &r, const Vector& sampleLightPos, float t, Vector curWeight, int nbrebonds, bool showLight, bool hadSS, Contrib& newContrib, float &attenuationFactor);
 	void precomputeRayBatch(int i1, int j1, int i2, int j2, int nspp);
 
 	int W, H, Wlr, Hlr;
@@ -73,11 +75,12 @@ public:
 	std::vector<std::pair<int, int> > permut;
 	Camera cam;   // camera: position, direction de visée, up vector
 	
-	double sigma_filter, lastfilter;  // antialiasing
+	float sigma_filter, lastfilter;  // antialiasing
 	int filter_size, filter_total_width;
 	int nb_bounces;
-	double gamma;
+	float gamma;
 	bool is_recording;
+	Sphere* sphereEnv;
 	
 	Scene s;
 
@@ -88,24 +91,24 @@ public:
 	std::vector<float> imagedouble;
 	std::vector<float> albedoImage, normalImage, filteredImage;	
 	std::vector<bool> computed;
-	double curTimePerFrame;
+	float curTimePerFrame;
 	PerfChrono chrono;
 	const float invmax;
-	std::vector<double> filter_value;
-	std::vector<double> filter_integral;
+	std::vector<float> filter_value;
+	std::vector<float> filter_integral;
 
-	std::vector<double> filter_value_lowres;
-	std::vector<double> filter_integral_lowres;
+	std::vector<float> filter_value_lowres;
+	std::vector<float> filter_integral_lowres;
 
 
-	std::vector<double> imagedouble_lowres;
-	std::vector<double> sample_count;
+	std::vector<float> imagedouble_lowres;
+	std::vector<float> sample_count;
 
 	std::vector<Vector> samples2d;
 	std::vector<Vector> randomPerPixel;
 
 	Vector centerLight;
-	double lum_scale, radiusLight, lightPower;
+	float lum_scale, radiusLight, lightPower;
 
 	static const int sizeCircArray = 200;
 	Contrib contribsArray[64][sizeCircArray];
