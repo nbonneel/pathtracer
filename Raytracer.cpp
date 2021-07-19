@@ -215,8 +215,8 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 	int contribIndexStart = 0;
 	int contribIndexEnd = 1;
 	//contribs.push_front(Contrib(Vector(1,1,1), r, nb_bounces, true, false));
-	contribs[contribIndexStart] = Contrib(Vector(1, 1, 1), r, nb_bounces, true, false);
-	bool has_dome = dynamic_cast<Sphere*>(s.objects[1]);
+	contribs[contribIndexStart] = Contrib(Vector(1.f, 1.f, 1.f), r, nb_bounces, true, false);
+	bool has_dome = sphereEnv;
 	bool has_backgroundimage = (s.backgroundW > 0) && (s.background.size() == s.backgroundW*s.backgroundH * 3);
 
 
@@ -237,7 +237,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 		//if (contribIndexStart < 0) contribIndexStart = sizeCircArray-1;
 
 		if (nbrebonds == 0) continue;
-		if (pathWeight.getNorm2() < sqr(0.01)) continue;
+		if (pathWeight.getNorm2() < sqr(0.01f)) continue;
 
 		bool has_inter;
 		if (has_precomputed_rays && nbrebonds == nb_bounces) {
@@ -267,7 +267,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 		}
 
 		Vector rayDirection = currentRay.direction;
-		bool is_subsurface = (mat.Ksub.getNorm2() > 1E-6);
+		bool is_subsurface = (mat.Ksub.getNorm2() > 1E-8);
 
 
 		if (has_inter) {
@@ -300,7 +300,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 				}
 			}
 			if (sphere_id == 0) {
-				Vector currentContrib = show_lights ? (/*s.lumiere->albedo **/Vector(1.f, 1.f, 1.f)* lightPower) : Vector(0., 0., 0.);				
+				Vector currentContrib = show_lights ? (/*s.lumiere->albedo **/Vector(lightPower, lightPower, lightPower)) : Vector(0.f, 0.f, 0.f);
 				if (has_fog) {
 					bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
 					if (hasContrib) {
@@ -314,53 +314,55 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 				}
 				continue;
 			} else {
-				float subsProba = 0.6f;// sqrt(mat.Ksub.getNorm2());
-				if (has_had_subsurface_interaction || !is_subsurface) subsProba = 0;
-				Vector subsW = Vector(1. / (1. - subsProba), 1. / (1. - subsProba), 1. / (1. - subsProba));
+				const float subsProba = (has_had_subsurface_interaction || !is_subsurface)?0.f:0.6f;// sqrt(mat.Ksub.getNorm2());
+				
+				const float inv1MSubsProba = 1.f / (1.f - subsProba);
+				Vector subsW(inv1MSubsProba, inv1MSubsProba, inv1MSubsProba);
 
 				bool sub_interaction = false;
 				if (/*!has_had_subsurface_interaction &&*/ is_subsurface && (engine[threadid]()*invmax < subsProba)) {
 					sub_interaction = true;
-					subsW = Vector(1. / (subsProba), 1. / (subsProba), 1. / (subsProba));
+					const float invSubsProba = 1.f / subsProba;
+					subsW = Vector(invSubsProba, invSubsProba, invSubsProba);
 
 					//const double diskR = 6;
 					const float sigmasub = 1.5f;
 					const float diskR = sqrt(12.46f) * sigmasub; // sigmasub / sqrt(12.46);
 
 
-					Vector gauss(0, 0, 1000);
+					Vector gauss(0.f, 0.f, 1000.f);
 
-					float integ = 1 - exp(-diskR * diskR / (2 * sigmasub*sigmasub));
-					float randR = sigmasub * sqrt(-2 * log(1 - engine[threadid]()*invmax*integ));
-					float randangle = engine[threadid]()*invmax * 2 * M_PI;
+					float integ = 1.f - exp(-diskR * diskR / (2.f * sigmasub*sigmasub));
+					float randR = sigmasub * sqrt(-2.f * log(1.f - engine[threadid]()*invmax*integ));
+					float randangle = engine[threadid]()*invmax * 2.f * (float)M_PI;
 					gauss[0] = randR * sin(randangle);
 					gauss[1] = randR * cos(randangle);
 					gauss[2] = randR;
-					float gaussval = (1. / (sigmasub*sigmasub * 2 * M_PI))*exp(-(gauss[2] * gauss[2]) / (2 * sigmasub*sigmasub));
+					float gaussval = (1. / (sigmasub*sigmasub * 2.f * (float)M_PI))*exp(-(gauss[2] * gauss[2]) / (2.f * sigmasub*sigmasub));
 					float pdfgauss = gaussval / integ;
 
 					Vector Tg = getTangent(N);
 					Vector Tg2 = cross(N, Tg);
 					Vector PtaboveP = P + gauss[0] * Tg + gauss[1] * Tg2 + N * diskR;
 					float r1 = engine[threadid]()*invmax;
-					Vector axis;
+					Vector& axis = -N;
 					float tmax;
 					float h = sqrt(diskR*diskR - gauss[2] * gauss[2]);
 					Vector subsOrigin = PtaboveP + (diskR - h)*(-N);
 					float wAxis;
-					if (r1 < 0.5) {
-						wAxis = 0.5;
-						axis = -N;
-						tmax = 2 * h;
+					if (r1 < 0.5f) {
+						wAxis = 0.5f;
+						//axis = -N;
+						tmax = 2.f * h;
 					} else {
-						wAxis = 0.25;
-						tmax = 2 * gauss[2];
-						if (r1 < 0.75) {
+						wAxis = 0.25f;
+						tmax = 2.f * gauss[2];
+						if (r1 < 0.75f) {
 							axis = Tg;
 						} else
 							axis = Tg2;
 						float r2 = engine[threadid]()*invmax;
-						if (r2 < 0.5) {
+						if (r2 < 0.5f) {
 							subsOrigin -= h * N;
 						}
 					}
@@ -388,7 +390,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 						subsW *= pdfdisk / std::max(pdfgauss, 0.05f) *chris;
 						rayDirection = (localP2 - P).getNormalized();
 						P = localP2 + 0.005f*subsmat.shadingN;
-						if (r1 < 0.5) {
+						if (r1 < 0.5f) {
 							subsW *= 2.f;
 						} else
 							subsW *= 4.f;
@@ -444,7 +446,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 							normale_pour_transparence = -N;
 							entering = false;
 						}
-						float radical = 1.f - sqr(n1 / n2)*(1 - sqr(dot(normale_pour_transparence, rayDirection)));
+						float radical = 1.f - sqr(n1 / n2)*(1.f - sqr(dot(normale_pour_transparence, rayDirection)));
 						if (radical > 0) {
 							Vector direction_refracte = (n1 / n2)*(rayDirection - dot(rayDirection, normale_pour_transparence)*normale_pour_transparence) - normale_pour_transparence * sqrt(radical);
 							Ray rayon_refracte(P - 0.001f*normale_pour_transparence, direction_refracte, r.time);
@@ -452,9 +454,9 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 							float R0 = sqr((n1 - n2) / (n1 + n2));
 							float R;
 							if (entering) {
-								R = R0 + (1 - R0)*std::pow(1 + dot(rayDirection, N), 5);
+								R = R0 + (1 - R0)*std::pow(1.f + dot(rayDirection, N), 5.f);
 							} else {
-								R = R0 + (1 - R0)*std::pow(1 - dot(direction_refracte, N), 5);
+								R = R0 + (1 - R0)*std::pow(1.f - dot(direction_refracte, N), 5.f);
 							}
 
 							if (engine[threadid]()*invmax < R) {
@@ -532,12 +534,12 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 							} else {
 								BRDF = brdf->eval(mat, wi, -rayDirection, N);
 							}
-							float J = 1.*dot(Np, -wi) / d_light2;
+							float J = dot(Np, -wi) / d_light2;
 							float proba = dot(axeOP, dir_aleatoire) / (M_PI * radiusLight*radiusLight);
 							if (s.objects[sphere_id]->ghost) {
 								//currentContrib += tr;
 							} else {
-								if (proba > 0) {
+								if (proba > 0.f) {
 									currentContrib += subsW * (lightPower* std::max(0.f, dot(N, wi)) * J / proba)  * BRDF;
 								}
 							}
@@ -571,7 +573,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 							float r2 = modf(randomPerPixel[screenI*W + screenJ][1] + samples2d[sampleID][1], &tmp);
 							if (sub_interaction) {
 								direction_aleatoire = random_cos(mat.shadingN, r1, r2);
-								proba_globale = dot(N, direction_aleatoire) / M_PI;
+								proba_globale = dot(N, direction_aleatoire) / (float)M_PI;
 							} else
 								direction_aleatoire = brdf->sample(mat, -rayDirection, N, proba_globale, r1, r2);
 						}

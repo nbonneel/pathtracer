@@ -253,7 +253,6 @@ void Scene::addObject(Object* o) {
 	castToMesh.push_back(g);
 
 #ifdef USE_EMBREE
-	embree_bvh_up_to_date = false;	
 	if (g) {
 		g->instance_geom = rtcNewGeometry(embree_device, RTC_GEOMETRY_TYPE_INSTANCE);
 		rtcSetGeometryInstancedScene(g->instance_geom, g->embree_scene_for_instance);
@@ -579,8 +578,8 @@ void Scene::first_intersection_batch(int batch_size) { // dont forget to set W a
 #else
 
 //#pragma omp parallel for schedule(dynamic, 1)
-	for (int id = 0; id < W*H; id++) {
-		firstIntersection_has_inter[threadid][id] = intersection(firstIntersection_Ray[threadid][id], firstIntersection_P[threadid][id], firstIntersection_sphere_id[threadid][id], firstIntersection_min_t[threadid][id], firstIntersection_mat[threadid][id], firstIntersection_triangle_id[threadid][rayId], false, true);
+	for (int id = 0; id < batch_size; id++) {
+		firstIntersection_has_inter[threadid][id] = intersection(firstIntersection_Ray[threadid][id], firstIntersection_P[threadid][id], firstIntersection_sphere_id[threadid][id], firstIntersection_min_t[threadid][id], firstIntersection_mat[threadid][id], firstIntersection_triangle_id[threadid][id], false, true);
 	}
 
 #endif

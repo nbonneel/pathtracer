@@ -287,16 +287,19 @@ public:
 		values.clear();
 	}
 
-	Vector getVec(float u, float v) const {
+	__forceinline Vector getVec(float u, float v) const {
 		if (W > 0) {
 			// no assert on u and v ; assume they are btw 0  and 1
 			int x = u * (W - 1);
 			int y = v * (H - 1);
 			int idx = (y*W + x) * 3;
-			float cr = values[idx] * multiplier[0];
-			float cg = values[idx + 1] * multiplier[1];
-			float cb = values[idx + 2] * multiplier[2];
-			return Vector(cr, cg, cb);
+			return Vector(values[idx] * multiplier[0], values[idx + 1] * multiplier[1], values[idx + 2] * multiplier[2]);
+			/*__m256 regV = _mm256_loadu_ps(&values[idx]);
+			__m256 regM = _mm256_loadu_ps(&multiplier[0]);
+			__m256 mul = _mm256_mul_ps(regV, regM);
+			float* mulf = (float*)&mul;
+			return Vector(mulf[0], mulf[1], mulf[2]);*/
+
 		} else {
 			return multiplier;
 		}

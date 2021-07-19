@@ -863,11 +863,11 @@ BBox TriMesh::build_bbox(int i0, int i1) {
 BBox TriMesh::build_centers_bbox(int i0, int i1) {
 
 	BBox result;
-	result.bounds[1] = (vertices[indices[i0].vtxi] + vertices[indices[i0].vtxj] + vertices[indices[i0].vtxk]) / 3.;
-	result.bounds[0] = (vertices[indices[i0].vtxi] + vertices[indices[i0].vtxj] + vertices[indices[i0].vtxk]) / 3.;
+	result.bounds[1] = (vertices[indices[i0].vtxi] + vertices[indices[i0].vtxj] + vertices[indices[i0].vtxk]) / 3.f;
+	result.bounds[0] = (vertices[indices[i0].vtxi] + vertices[indices[i0].vtxj] + vertices[indices[i0].vtxk]) / 3.f;
 	for (int i = i0; i < i1; i++) { // indice de triangle
 		for (int k = 0; k < 3; k++) { // indice de dimension
-			Vector center = (vertices[indices[i].vtxi] + vertices[indices[i].vtxj] + vertices[indices[i].vtxk]) / 3.;
+			Vector center = (vertices[indices[i].vtxi] + vertices[indices[i].vtxj] + vertices[indices[i].vtxk]) / 3.f;
 			result.bounds[0][k] = std::min(result.bounds[0][k], center[k]);
 			result.bounds[1][k] = std::max(result.bounds[1][k], center[k]);
 		}
@@ -1228,7 +1228,7 @@ bool TriMesh::intersection(const Ray& d, Vector& P, float &t, MaterialValues &ma
 		//localN.normalize();
 		P = localP;
 		
-		mat = getMaterial(i, alpha, beta, gamma);
+		getMaterial(i, alpha, beta, gamma, mat);
 	}
 
 	return has_inter;
@@ -1318,7 +1318,7 @@ bool TriMesh::intersection_shadow(const Ray& d, float &t, float cur_best_t, floa
 	return has_inter;
 }
 
-bool TriMesh::reservoir_sampling_intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, float min_t, double max_t) const {
+bool TriMesh::reservoir_sampling_intersection(const Ray& d, Vector& P, float &t, MaterialValues &mat, int &triangle_id, int &current_nb_intersections, float min_t, float max_t) const {
 	bool has_inter = false;
 	float t_box_left, t_box_right;
 	int best_index = -1;
@@ -1421,7 +1421,7 @@ bool TriMesh::reservoir_sampling_intersection(const Ray& d, Vector& P, float &t,
 		//localN.normalize();
 		P = localP;
 
-		mat = getMaterial(i, alpha, beta, gamma);
+		getMaterial(i, alpha, beta, gamma, mat);
 	}
 
 	return has_inter;
