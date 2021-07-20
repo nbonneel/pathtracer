@@ -414,6 +414,7 @@ public:
 		raytracer.loadScene();
 		W = raytracer.W;
 		H = raytracer.H;
+		gamma_corrected_image = NULL; // aligned allocated later
 		cur_img.resize(W*H * 3);
 		for (int i = 0; i < H; i++) {
 			for (int j = 0; j < W; j++) {
@@ -619,13 +620,18 @@ public:
 					stop_render(); // could do like below, but with embree, rebuilding the scene BVH while accessing it could crash (? not tested)
 					start_render();
 				} else {
-					raytracer.s.objects[selected_object]->build_matrix(raytracer.s.current_frame, raytracer.is_recording);
-					raytracer.centerLight = raytracer.s.lumiere->apply_transformation(raytracer.s.lumiere->O);// s.lumiere->O + s.lumiere->get_translation(r.time, is_recording);
-					raytracer.lum_scale = raytracer.s.lumiere->get_scale(raytracer.s.current_frame, raytracer.is_recording);
-					raytracer.radiusLight = raytracer.lum_scale * raytracer.s.lumiere->R;
 
-					raytracer.clear_image(); // faster than stopping threads and relaunching ; not threadsafe, but works ok for previz while moving mouse
-					std::fill(raytracer.sample_count.begin(), raytracer.sample_count.end(), 10);
+					if (raytracer.stopped) {
+						stop_render();
+						start_render();
+					} else {
+						raytracer.s.objects[selected_object]->build_matrix(raytracer.s.current_frame, raytracer.is_recording);
+						raytracer.centerLight = raytracer.s.lumiere->apply_transformation(raytracer.s.lumiere->O);// s.lumiere->O + s.lumiere->get_translation(r.time, is_recording);
+
+						raytracer.realtime_ray_iter = 0;
+						raytracer.clear_image(); // faster than stopping threads and relaunching ; not threadsafe, but works ok for previz while moving mouse
+						std::fill(raytracer.sample_count.begin(), raytracer.sample_count.end(), 10);
+					}
 				}
 			} else { // camera motion
 				if (left_mouse_down) {
@@ -641,9 +647,14 @@ public:
 					raytracer.cam.position += (float)dx*camera_right + (float)dy*raytracer.cam.up;
 
 				}
-
-				raytracer.clear_image(); // faster than stopping threads and relaunching ; not threadsafe, but works ok for previz while moving mouse
-				std::fill(raytracer.sample_count.begin(), raytracer.sample_count.end(), 10);
+				if (raytracer.stopped) {
+					stop_render();
+					start_render();
+				} else {
+					raytracer.realtime_ray_iter = 0;
+					raytracer.clear_image(); // faster than stopping threads and relaunching ; not threadsafe, but works ok for previz while moving mouse
+					std::fill(raytracer.sample_count.begin(), raytracer.sample_count.end(), 10);
+				}
 			}			
 										
 		} else {
@@ -704,17 +715,40 @@ public:
 		if (event.ShiftDown()) {
 			if (selected_object >= 0 && selected_object < raytracer.s.objects.size()) {
 				raytracer.s.objects[selected_object]->scale *= (event.GetWheelRotation() > 0) ? 1.1 : (1 / 1.1);
-				stop_render();
+
+				if (raytracer.s.objects[selected_object]->type == OT_TRIMESH) {
+					stop_render(); // could do like below, but with embree, rebuilding the scene BVH while accessing it could crash (? not tested)
 #ifdef USE_EMBREE
-				raytracer.s.embree_bvh_up_to_date = false;
+					raytracer.s.embree_bvh_up_to_date = false;
 #endif
-				start_render();
+					start_render();
+				} else {
+					if (raytracer.stopped) {
+						stop_render();
+						start_render();
+					} else {
+						raytracer.s.objects[selected_object]->build_matrix(raytracer.s.current_frame, raytracer.is_recording);
+						raytracer.lum_scale = raytracer.s.lumiere->get_scale(raytracer.s.current_frame, raytracer.is_recording);
+						raytracer.radiusLight = raytracer.lum_scale * raytracer.s.lumiere->R;
+						raytracer.realtime_ray_iter = 0;
+						raytracer.clear_image(); // faster than stopping threads and relaunching ; not threadsafe, but works ok for previz while moving mouse
+						std::fill(raytracer.sample_count.begin(), raytracer.sample_count.end(), 10);
+					}
+				}
 			}
 		} else {
 			float dist =  (event.GetWheelRotation() > 0 ? 1 : -1)*2.;
 			raytracer.cam.position += dist*raytracer.cam.direction;
-			stop_render();
-			start_render();
+			//stop_render();
+			//start_render();
+			if (raytracer.stopped) {
+				stop_render();
+				start_render();
+			}  else {
+				raytracer.realtime_ray_iter = 0;
+				raytracer.clear_image(); // faster than stopping threads and relaunching ; not threadsafe, but works ok for previz while moving mouse
+				std::fill(raytracer.sample_count.begin(), raytracer.sample_count.end(), 10);
+			}
 		}
 
 		paintNow();
@@ -734,7 +768,8 @@ public:
 	Raytracer raytracer;
 	wxImage screenImage;
 	wxBitmap bmpBuf;
-	std::vector<unsigned char> gamma_corrected_image;
+	unsigned char* gamma_corrected_image;
+	int gamma_alloc_size;
 
 	DECLARE_EVENT_TABLE()
 };

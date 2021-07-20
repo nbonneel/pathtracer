@@ -109,6 +109,7 @@ public:
 
 	Vector centerLight;
 	float lum_scale, radiusLight, lightPower;
+	int realtime_ray_iter;
 
 	static const int sizeCircArray = 200;
 	Contrib contribsArray[64][sizeCircArray];

@@ -3,6 +3,7 @@
 #include <wx/textdlg.h> 
 #include <string>
 
+//#include "avx_mathfun.h"
 
 wxIMPLEMENT_APP_CONSOLE(RaytracerApp);
 
@@ -1127,17 +1128,53 @@ void RenderPanel::update_gui() {
 
 }
 
+void * malloc_simd(const size_t size, const size_t alignment) {
+#if defined WIN32           // WIN32
+	return _aligned_malloc(size, alignment);
+#elif defined __linux__     // Linux
+	return memalign(alignment, size);
+#elif defined __MACH__      // Mac OS X
+	return malloc(size);
+#else                       // other (use valloc for page-aligned memory)
+	return valloc(size);
+#endif
+}
+
+void free_simd(void* mem) {
+#if defined WIN32           // WIN32
+	return _aligned_free(mem);
+#elif defined __linux__     // Linux
+	free(mem);
+#elif defined __MACH__      // Mac OS X
+	free(mem);
+#else                       // other (use valloc for page-aligned memory)
+	free(mem);
+#endif
+}
+
+
 void RenderPanel::render(wxDC& dc)
 {
 	if (cur_img.size() == 0) return;
-	if (raytracer.stopped) return;
+	if (raytracer.stopped) {
+		double scale_x = (double)displayW / raytracer.W;
+		double scale_y = (double)displayH / raytracer.H;
+		dc.SetUserScale(scale_x, scale_y);
+		dc.DrawBitmap(bmpBuf, 0, 0);
+		dc.SetUserScale(1.0, 1.0);
+		return;
+	}
 	raytracer_app->progressBar->SetValue(raytracer.current_nb_rays / (double)raytracer.nrays*1000.);
 	std::ostringstream os;
 	os << "Time per ray: " << raytracer.curTimePerFrame / 1000. << " s";
 	raytracer_app->infoPerf->SetLabelText(os.str().c_str());
 
 #if 1
-	gamma_corrected_image.resize(raytracer.W*raytracer.H * 3);
+	if (gamma_alloc_size != raytracer.W*raytracer.H) {
+		if (gamma_corrected_image) free_simd(gamma_corrected_image);
+		gamma_corrected_image = (unsigned char*) malloc_simd(raytracer.W*raytracer.H * 3, 32);
+		gamma_alloc_size = raytracer.W*raytracer.H;
+	}
 	extrapolated_image = raytracer.imagedouble;
 	/*computed = raytracer.computed;
 	computed2 = raytracer.computed;
@@ -1174,6 +1211,7 @@ void RenderPanel::render(wxDC& dc)
 	}*/
 
 	raytracer.sample_count.resize(raytracer.W*raytracer.H); // just in case.
+#pragma omp parallel for
 	for (int i = 0; i < raytracer.H; i++) {
 		for (int j = 0; j < raytracer.W; j++) {
 			//if (!raytracer.computed[i*raytracer.W + j]) {
@@ -1203,19 +1241,70 @@ void RenderPanel::render(wxDC& dc)
 	//os << "Nbchanged: " << nbchanged;
 	//raytracer_app->infoPerf->SetLabelText(os.str().c_str());
 
-#pragma omp parallel for 
+/*#pragma omp parallel for 
 	for (int i = 0; i < raytracer.H; i++) {
 		for (int j = 0; j < raytracer.W; j++) {
 			double normalization = 1. / (raytracer.sample_count[i*raytracer.W + j] + 1.);
-			/*gamma_corrected_image[(i*raytracer.W + j) * 3 + 0] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 0] / (raytracer.current_nb_rays + 1)), 1 / 2.2));   // rouge
-			gamma_corrected_image[(i*raytracer.W + j) * 3 + 1] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 1] / (raytracer.current_nb_rays + 1)), 1 / 2.2)); // vert
-			gamma_corrected_image[(i*raytracer.W + j) * 3 + 2] = std::min(255., fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 2] / (raytracer.current_nb_rays + 1)), 1 / 2.2)); // bleu*/
 			gamma_corrected_image[(i*raytracer.W + j) * 3 + 0] = std::min(255., 255.*fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 0] / 196964.699 * normalization), 1 / raytracer.gamma));   // rouge
 			gamma_corrected_image[(i*raytracer.W + j) * 3 + 1] = std::min(255., 255.*fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 1] / 196964.699 * normalization), 1 / raytracer.gamma)); // vert
 			gamma_corrected_image[(i*raytracer.W + j) * 3 + 2] = std::min(255., 255.*fastPow(std::max(0., extrapolated_image[(i*raytracer.W + j) * 3 + 2] / 196964.699 * normalization), 1 / raytracer.gamma)); // bleu
-
 		}
+	}*/
+#pragma omp parallel for 
+	for (int i = 0; i < raytracer.W*raytracer.H * 3; i++) {
+		float normalization = 1.f / ((raytracer.sample_count[i/3] + 1.f)*196964.699f);
+		gamma_corrected_image[i] =  std::min(255.f, 255.f*(float)fastPow(std::max(0.f, extrapolated_image[i] * normalization), 1.f / raytracer.gamma));   // rouge
 	}
+
+	// to be used with the exp/log in https://raw.githubusercontent.com/Tencent/ncnn/master/src/layer/x86/avx_mathfun.h 
+	// does not improve.
+	/*__m256 powfactor = _mm256_set1_ps(1.f / raytracer.gamma);
+	__m256 one = _mm256_set1_ps(1.f);
+	__m256 zero = _mm256_set1_ps(0.f);
+	__m256 twofivefive = _mm256_set1_ps(255.f);
+	__m256 magic = _mm256_set1_ps(196964.699f);
+#pragma omp parallel for 
+	for (int i = 0; i < raytracer.W*raytracer.H*3; i+=(3*8)) {
+		//float normalization = 1.f / ((raytracer.sample_count[i/3] + 1.f)*196964.699f);
+		//gamma_corrected_image[i] =  std::min(255.f, 255.f*(float)fastPow(std::max(0.f, extrapolated_image[i] * normalization), 1.f / raytracer.gamma));   // rouge
+	
+		int i3 = i/3;
+		__m256 n1 = _mm256_set_ps(raytracer.sample_count[i3], raytracer.sample_count[i3], raytracer.sample_count[i3], raytracer.sample_count[i3 + 1], raytracer.sample_count[i3 + 1], raytracer.sample_count[i3 + 1], raytracer.sample_count[i3 + 2], raytracer.sample_count[i3 + 2]);
+		__m256 n2 = _mm256_set_ps(raytracer.sample_count[i3+2], raytracer.sample_count[i3 + 3], raytracer.sample_count[i3 + 3], raytracer.sample_count[i3 + 3], raytracer.sample_count[i3 + 4], raytracer.sample_count[i3 + 4], raytracer.sample_count[i3 + 4], raytracer.sample_count[i3 + 5]);
+		__m256 n3 = _mm256_set_ps(raytracer.sample_count[i3+5], raytracer.sample_count[i3 + 5], raytracer.sample_count[i3 + 6], raytracer.sample_count[i3 + 6], raytracer.sample_count[i3 + 6], raytracer.sample_count[i3 + 7], raytracer.sample_count[i3 + 7], raytracer.sample_count[i3 + 7]);
+
+		n1 = _mm256_add_ps(n1, one);
+		n2 = _mm256_add_ps(n2, one);
+		n3 = _mm256_add_ps(n3, one);
+
+		n1 = _mm256_mul_ps(n1, magic);
+		n2 = _mm256_mul_ps(n2, magic);
+		n3 = _mm256_mul_ps(n3, magic);
+
+
+		__m256 first8  = _mm256_load_ps(&extrapolated_image[i]);
+		__m256 second8 = _mm256_load_ps(&extrapolated_image[i+8]);
+		__m256 third8  = _mm256_load_ps(&extrapolated_image[i+16]);
+
+		first8 = _mm256_div_ps(first8, n1);
+		second8 = _mm256_div_ps(second8, n2);
+		third8 = _mm256_div_ps(third8, n3);
+
+		__m256 rfirst8 = _mm256_max_ps(zero, _mm256_min_ps(twofivefive, _mm256_mul_ps(twofivefive, exp256_ps(_mm256_mul_ps(powfactor, log256_ps(first8))))));
+		__m256 rsecond8 = _mm256_max_ps(zero, _mm256_min_ps(twofivefive, _mm256_mul_ps(twofivefive, exp256_ps(_mm256_mul_ps(powfactor, log256_ps(second8))))));
+		__m256 rthird8 = _mm256_max_ps(zero, _mm256_min_ps(twofivefive, _mm256_mul_ps(twofivefive, exp256_ps(_mm256_mul_ps(powfactor, log256_ps(third8))))));
+
+		__m256i ifirst8 = _mm256_cvtps_epi32(rfirst8);
+		__m256i isecond8 = _mm256_cvtps_epi32(rsecond8);
+		__m256i ithird8 = _mm256_cvtps_epi32(rthird8);
+
+		int result[8*3];
+		_mm256_storeu_si256((__m256i*)result, ifirst8);
+		_mm256_storeu_si256((__m256i*)(&result[8]), isecond8);
+		_mm256_storeu_si256((__m256i*)(&result[16]), ithird8);
+		for (int j = 0; j < 3 * 8; j++)
+			gamma_corrected_image[i + j] = result[j];
+	}*/
 
 	static int nbcalls = -1; nbcalls++;
 	if (nbcalls == 0 || screenImage.GetWidth() != raytracer.W || screenImage.GetHeight() != raytracer.H) {

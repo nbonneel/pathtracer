@@ -1418,9 +1418,9 @@ void Raytracer::render_image()
 
 	prepare_render(s.current_frame);
 	
-
-		for (int k = 0; k < nrays; k++) {
-			current_nb_rays = k;
+	realtime_ray_iter = 0;
+		for ( ; realtime_ray_iter < nrays; realtime_ray_iter++) {
+			current_nb_rays = realtime_ray_iter;
 			chrono.Start();
 			for(int pix_in_block=0; pix_in_block<64; pix_in_block++) {
 				int i1 = pix_in_block % 8;// permut[pix_in_block].first;
@@ -1450,7 +1450,7 @@ void Raytracer::render_image()
 							Ray r = cam.generateDirection(s.double_frustum_start_t, i, j, time, dx, dy, dx_aperture, dy_aperture, W, H);
 
 							Vector normal, albedo;
-							Vector color = getColor(r, k, nb_bounces, i, j, normal, albedo, false, false);
+							Vector color = getColor(r, realtime_ray_iter, nb_bounces, i, j, normal, albedo, false, false);
 
 							int bmin_i = std::max(0, i - filter_size);
 							int bmax_i = std::min(i + filter_size, H - 1);
@@ -1518,9 +1518,9 @@ void Raytracer::render_image()
 #pragma omp parallel for 
 		for (int i = 0; i < H; i++) {
 			for (int j = 0; j < W; j++) {
-				image[((H - i - 1)*W + j) * 3 + 0] = std::min(255., std::max(0., 255.*std::pow(imagedouble[((H - i - 1)*W + j) * 3 + 0] / 196964.7 / sample_count[(H - i - 1)*W + j], 1 / gamma)));   // rouge
-				image[((H - i - 1)*W + j) * 3 + 1] = std::min(255., std::max(0., 255.*std::pow(imagedouble[((H - i - 1)*W + j) * 3 + 1] / 196964.7 / sample_count[(H - i - 1)*W + j], 1 / gamma))); // vert
-				image[((H - i - 1)*W + j) * 3 + 2] = std::min(255., std::max(0., 255.*std::pow(imagedouble[((H - i - 1)*W + j) * 3 + 2] / 196964.7 / sample_count[(H - i - 1)*W + j], 1 / gamma))); // bleu
+				image[((H - i - 1)*W + j) * 3 + 0] = std::min(255., std::max(0., 255.*std::pow(imagedouble[((H - i - 1)*W + j) * 3 + 0] / 196964.7 / std::max(sample_count[(H - i - 1)*W + j],1.f), 1 / gamma)));   // rouge
+				image[((H - i - 1)*W + j) * 3 + 1] = std::min(255., std::max(0., 255.*std::pow(imagedouble[((H - i - 1)*W + j) * 3 + 1] / 196964.7 / std::max(sample_count[(H - i - 1)*W + j],1.f), 1 / gamma))); // vert
+				image[((H - i - 1)*W + j) * 3 + 2] = std::min(255., std::max(0., 255.*std::pow(imagedouble[((H - i - 1)*W + j) * 3 + 2] / 196964.7 / std::max(sample_count[(H - i - 1)*W + j],1.f), 1 / gamma))); // bleu
 			}
 		}
 
@@ -1534,7 +1534,7 @@ void Raytracer::render_image()
 			}
 			save_image(os.str().c_str(), &image[0], W, H);
 		}
-	
+	stopped = true;
 
 	//std::cout << chrono.GetDiffMs() / (double)1000. << std::endl;
     return;
