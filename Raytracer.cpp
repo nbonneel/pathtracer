@@ -231,6 +231,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 
 		bool has_had_subsurface_interaction = curContrib.has_had_subsurface_interaction;
 		bool show_lights = curContrib.show_lights;
+		bool show_envmap = curContrib.showenvmap;
 		//contribs.pop_front();
 		contribIndexStart++;
 		if (contribIndexStart >= sizeCircArray) contribIndexStart = 0;
@@ -272,7 +273,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 
 		if (has_inter) {
 			if (sphere_id == 1) {
-				if (no_envmap) {
+				if (no_envmap || !show_envmap) {
 					if (has_fog) {
 						bool hasContrib = fogContribution(currentRay, centerLight, t, pathWeight, nbrebonds, show_lights, has_had_subsurface_interaction, newContrib, attenuationFactor);
 						if (hasContrib) {
@@ -501,20 +502,8 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 						float d_light2 = (point_aleatoire - P).getNorm2();
 						Vector Np = dir_aleatoire;
 						//Vector kd =  mat.Kd;
-						Vector tr;
-						if (s.objects[sphere_id]->ghost) {
-							Vector offset;   // try to be robust here since we don't do nbrebonds-1
-							if (dot(N, rayDirection) > 0)
-								offset = N;
-							else
-								offset = -N; 
-								//tr = getColor(Ray(P + rayDirection * 0.001 + offset * 0.001, rayDirection, r.time), sampleID, nbrebonds, screenI, screenJ, normalValue, albedoValue, show_lights, no_envmap);
-							currentRay = Ray(P + rayDirection * 0.001f + offset * 0.001f, rayDirection, r.time);
-							//contribs.push_back(Contrib(pathWeight, currentRay, nbrebonds, show_lights, has_had_subsurface_interaction));
-							contribs[contribIndexEnd] = Contrib(pathWeight, currentRay, nbrebonds, show_lights, has_had_subsurface_interaction);
-							contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
-							continue;
-						}
+						//Vector tr;
+
 						Ray ray_light(P + 0.01f*wi, wi, r.time);
 						float t_light;
 						bool isShadowed;
@@ -528,6 +517,25 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 						if (!isShadowed) {
 							//if (dot(N, wi) < 0) N = -N; // two sided shading...
 
+
+							// special case for "ghost" objects: objects that are not visible but receive shadows/reflect specular reflections (e.g., for compositing with photos)
+							if (s.objects[sphere_id]->ghost) { // here we merely continue the path straight through the ghost object
+
+
+									Vector offset;   // try to be robust here since we don't do nbrebonds-1
+									if (dot(N, rayDirection) > 0)
+										offset = N;
+									else
+										offset = -N;
+									//tr = getColor(Ray(P + rayDirection * 0.001 + offset * 0.001, rayDirection, r.time), sampleID, nbrebonds, screenI, screenJ, normalValue, albedoValue, show_lights, no_envmap);
+									currentRay = Ray(P + rayDirection * 0.001f + offset * 0.001f, rayDirection, r.time);
+									//contribs.push_back(Contrib(pathWeight, currentRay, nbrebonds, show_lights, has_had_subsurface_interaction));
+									contribs[contribIndexEnd] = Contrib(pathWeight, currentRay, nbrebonds, show_lights, has_had_subsurface_interaction, show_envmap);
+									contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
+									//continue;
+								
+							}
+
 							Vector BRDF;
 							if (sub_interaction) {
 								BRDF = (/*Vector(1., 1., 1.) -*/ mat.Ksub /*- mat.Ks*/) / (float)M_PI;
@@ -536,7 +544,7 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 							}
 							float J = dot(Np, -wi) / d_light2;
 							float proba = dot(axeOP, dir_aleatoire) / (M_PI * radiusLight*radiusLight);
-							if (s.objects[sphere_id]->ghost) {
+							if (s.objects[sphere_id]->ghost) { // no (positive) direct light contribution for ghost objects.
 								//currentContrib += tr;
 							} else {
 								if (proba > 0.f) {
@@ -561,12 +569,14 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 						// ajout de la contribution indirecte
 						float proba_globale;
 						Vector direction_aleatoire;
+						bool has_sampled_diffuse;
 						if (nbrebonds == nb_bounces && no_envmap) {
 							if (sub_interaction) {
 								direction_aleatoire = random_cos(N);
 								proba_globale = dot(N, direction_aleatoire);
+								has_sampled_diffuse = true;
 							} else
-								direction_aleatoire = brdf->sample(mat, -rayDirection, N, proba_globale);
+								direction_aleatoire = brdf->sample(mat, -rayDirection, N, proba_globale, has_sampled_diffuse);
 						} else {
 							float tmp;
 							float r1 = modf(randomPerPixel[screenI*W + screenJ][0] + samples2d[sampleID][0], &tmp); // cranley patterson
@@ -574,8 +584,9 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 							if (sub_interaction) {
 								direction_aleatoire = random_cos(mat.shadingN, r1, r2);
 								proba_globale = dot(N, direction_aleatoire) / (float)M_PI;
+								has_sampled_diffuse = true;
 							} else
-								direction_aleatoire = brdf->sample(mat, -rayDirection, N, proba_globale, r1, r2);
+								direction_aleatoire = brdf->sample(mat, -rayDirection, N, proba_globale, r1, r2, has_sampled_diffuse);
 						}
 
 
@@ -599,12 +610,23 @@ Vector Raytracer::getColor(const Ray &r, int sampleID, int nbrebondsss, int scre
 
 						Vector newpathWeight = pathWeight * subsW * BRDFindirect* ((dot(N, direction_aleatoire) / proba_globale));
 
+						
+						if (s.objects[sphere_id]->ghost && has_backgroundimage) {
+							int i = std::min(s.backgroundH - 1, std::max(0, (int)(screenI / (float)H*s.backgroundH)));
+							int j = std::min(s.backgroundW - 1, std::max(0, (int)(screenJ / (float)W*s.backgroundW)));
+							float r = s.background[i*s.backgroundW * 3 + j * 3];
+							float g = s.background[i*s.backgroundW * 3 + j * 3 + 1];
+							float b = s.background[i*s.backgroundW * 3 + j * 3 + 2];
+							newpathWeight *= Vector(r, g, b)/ 196964.699f;
+						}
+
+						// indirect contribution. For ghost objects, only indirect for specular paths
 						if (has_fog) {					
 							//contribs.push_back(Contrib(attenuationFactor*newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction?true:has_had_subsurface_interaction));
-							contribs[contribIndexEnd] = Contrib(attenuationFactor*newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction ? true : has_had_subsurface_interaction);
+							contribs[contribIndexEnd] = Contrib(attenuationFactor*newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction ? true : has_had_subsurface_interaction, (show_envmap&&isShadowed&&has_sampled_diffuse) || !s.objects[sphere_id]->ghost);
 							contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
 						} else {
-							contribs[contribIndexEnd] = Contrib(newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction ? true : has_had_subsurface_interaction);
+							contribs[contribIndexEnd] = Contrib(newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction ? true : has_had_subsurface_interaction, (show_envmap&&isShadowed&&has_sampled_diffuse) ||!s.objects[sphere_id]->ghost);
 							contribIndexEnd++; if (contribIndexEnd >= sizeCircArray) contribIndexEnd = 0;
 //							contribs.push_back(Contrib(newpathWeight, rayon_aleatoire, nbrebonds - 1, false, sub_interaction ? true : has_had_subsurface_interaction));
 						}

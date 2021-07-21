@@ -22,13 +22,13 @@ public:
 class BRDF {
 public:
 	BRDF() {};
-	virtual Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, float &pdf, float r1, float r2) const = 0;
+	virtual Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, float &pdf, float r1, float r2, bool &has_sampled_diffuse) const = 0;
 	virtual Vector eval(const MaterialValues& mat, const Vector& wi, const Vector& wo, const Vector& N) const = 0;
 
-	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, float &pdf) const {  // performs MIS Kd-Ks
+	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, float &pdf, bool &has_sampled_diffuse) const {  // performs MIS Kd-Ks
 		int threadid = omp_get_thread_num();
 		float invmax = 1.f / engine[threadid].max();
-		return sample(mat, wo, N, pdf, engine[threadid]()*invmax, engine[threadid]()*invmax);
+		return sample(mat, wo, N, pdf, engine[threadid]()*invmax, engine[threadid]()*invmax, has_sampled_diffuse);
 	}
 };
 
@@ -60,7 +60,7 @@ public:
 			return direction_aleatoire_repere_local[2] * R + direction_aleatoire_repere_local[0] * tangent1 + direction_aleatoire_repere_local[1] * tangent2;
 	}
 
-	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, float &pdf, float r1, float r2) const {  // performs MIS Kd-Ks
+	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, float &pdf, float r1, float r2, bool &has_sampled_diffuse) const {  // performs MIS Kd-Ks
 		int threadid = omp_get_thread_num();
 		float avgNe = (mat.Ne[0] + mat.Ne[1] + mat.Ne[2]) / 3.f;
 		Vector direction_aleatoire;
@@ -68,13 +68,13 @@ public:
 		/*if (s.objects[sphere_id]->ghost) {
 			p = std::max(0.2, p);
 		}*/
-		bool sample_diffuse;
+		
 		Vector R = (-wo).reflect(N); // reflect takes a ray going towards a surface and reflects it outwards of it
 		if (engine[threadid]() / (float)engine[threadid].max() < p) {
-			sample_diffuse = true;
+			has_sampled_diffuse = true;
 			direction_aleatoire = random_cos(N, r1, r2);
 		} else {
-			sample_diffuse = false;
+			has_sampled_diffuse = false;
 			direction_aleatoire = random_Phong(R, avgNe, r1, r2);
 		}
 
@@ -100,9 +100,10 @@ class LambertBRDF : public BRDF {
 public:
 	LambertBRDF() {};
 
-	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, float &pdf, float r1, float r2) const {  // performs MIS Kd-Ks		
+	Vector sample(const MaterialValues& mat, const Vector& wo, const Vector& N, float &pdf, float r1, float r2, bool &has_sampled_diffuse) const {  // performs MIS Kd-Ks		
 		Vector direction_aleatoire = random_cos(N, r1, r2);
 		pdf = dot(N, direction_aleatoire) / (M_PI);
+		has_sampled_diffuse = true;
 		return direction_aleatoire;
 	}
 	Vector eval(const MaterialValues& mat, const Vector& wi, const Vector& wo, const Vector& N) const {
@@ -122,9 +123,10 @@ public:
 
 	}
 
-	Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, float &pdf, float r1, float r2) const {
+	Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, float &pdf, float r1, float r2, bool &has_sampled_diffuse) const {
 		Vector d = random_cos(N, r1, r2);
 		pdf = dot(N, d) / (M_PI);
+		has_sampled_diffuse = false; // technically yes though
 		return d;
 	}
 	Vector eval(const MaterialValues& mat, const Vector& wi, const Vector& wo, const Vector& N) const {
@@ -193,9 +195,10 @@ public:
 		read_brdf(filename.c_str(), data);
 	}
 	void setParameters(const MaterialValues &m) {};
-	Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, float &pdf, float r1, float r2) const {
+	Vector sample(const MaterialValues& mat, const Vector& wi, const Vector& N, float &pdf, float r1, float r2, bool &has_sampled_diffuse) const {
 		Vector d = random_cos(N, r1, r2);
 		pdf = dot(N, d) / (M_PI);
+		has_sampled_diffuse = false; // technically yes though
 		return d;
 	}
 	Vector eval(const MaterialValues& mat, const Vector& wi, const Vector& wo, const Vector& N) const {

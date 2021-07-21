@@ -15,11 +15,11 @@
 class Contrib {
 public:
 	Contrib() {};
-	Contrib(const Vector& w, const Ray& r, int d, bool showlights, bool hadSS) :weight(w), r(r), depth(d), show_lights(showlights), has_had_subsurface_interaction(hadSS) {};
+	Contrib(const Vector& w, const Ray& r, int d, bool showlights = true, bool hadSS = false, bool showenvmap = true) :weight(w), r(r), depth(d), show_lights(showlights), has_had_subsurface_interaction(hadSS), showenvmap(showenvmap){};
 	Vector weight;
 	Ray r;
 	int depth;
-	bool show_lights, has_had_subsurface_interaction;
+	bool show_lights, has_had_subsurface_interaction, showenvmap;
 };
 
 class Raytracer {
